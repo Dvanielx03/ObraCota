@@ -81,7 +81,7 @@ test.describe("recorrido 3D de ReStage", () => {
     await linea.fill("2");
     await expect(rotulo).toHaveText("Fase de construcción 3");
     await expect(fecha).toHaveText("5 may 2025");
-    await expect(page.getByText(/ConstructionPhase_03/).filter({ visible: true })).toBeVisible();
+    await expect(seccion.getByRole("button", { name: /reproducir|pausar/i })).toHaveCount(0);
 
     await linea.fill("0");
     await expect(rotulo).toHaveText("Antes del primer hito");
@@ -90,9 +90,9 @@ test.describe("recorrido 3D de ReStage", () => {
     await expect(rotulo).toHaveText("Fase de construcción 1");
     await expect(fecha).toHaveText("26 ago 2024");
 
-    // Reproducir avanza solo hasta el último hito.
-    await page.getByRole("button", { name: "Reproducir la secuencia" }).filter({ visible: true }).click();
-    await expect(fecha).toHaveText("25 ago 2025", { timeout: 20_000 });
+    await linea.focus();
+    await linea.press("End");
+    await expect(fecha).toHaveText("25 ago 2025");
   });
 
   test("muestra créditos, licencia, cambios y una salida de la sección", async ({ page }) => {
