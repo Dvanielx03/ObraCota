@@ -1,0 +1,2226 @@
+{
+ "fuente": {
+  "archivo": "as-planned.ifc",
+  "esquema": "IFC2X3",
+  "aplicacion": "Synchro",
+  "bytesIfc": 65078748,
+  "excluidos": [
+   "ROOT nulpunt"
+  ]
+ },
+ "caja": {
+  "min": [
+   -12.722,
+   -7.63,
+   -8.179
+  ],
+  "max": [
+   10.763,
+   7.426,
+   15.336
+  ]
+ },
+ "niveles": [
+  {
+   "i": 0,
+   "nombre": "Cimentación",
+   "y": -7.33,
+   "elementos": 133
+  },
+  {
+   "i": 1,
+   "nombre": "Nivel +0,00",
+   "y": -6.365,
+   "elementos": 745
+  },
+  {
+   "i": 2,
+   "nombre": "Nivel +3,00",
+   "y": -3.31,
+   "elementos": 941
+  },
+  {
+   "i": 3,
+   "nombre": "Nivel +6,00",
+   "y": -0.31,
+   "elementos": 972
+  },
+  {
+   "i": 4,
+   "nombre": "Nivel +9,00",
+   "y": 2.69,
+   "elementos": 361
+  },
+  {
+   "i": 5,
+   "nombre": "Cubierta",
+   "y": 5.662,
+   "elementos": 352
+  }
+ ],
+ "grupos": [
+  {
+   "id": "fachada",
+   "elementos": 918
+  },
+  {
+   "id": "cubierta",
+   "elementos": 700
+  },
+  {
+   "id": "acabados",
+   "elementos": 536
+  },
+  {
+   "id": "carpinteria",
+   "elementos": 457
+  },
+  {
+   "id": "particiones",
+   "elementos": 189
+  },
+  {
+   "id": "cimentacion",
+   "elementos": 146
+  },
+  {
+   "id": "muros",
+   "elementos": 134
+  },
+  {
+   "id": "losas",
+   "elementos": 117
+  },
+  {
+   "id": "circulacion",
+   "elementos": 113
+  },
+  {
+   "id": "estructura",
+   "elementos": 110
+  },
+  {
+   "id": "instalaciones",
+   "elementos": 73
+  },
+  {
+   "id": "mobiliario",
+   "elementos": 10
+  },
+  {
+   "id": "otros",
+   "elementos": 1
+  }
+ ],
+ "estructurales": [
+  "cimentacion",
+  "muros",
+  "losas",
+  "estructura"
+ ],
+ "cubos": [
+  {
+   "clave": "n00_cimentacion_150306_150310",
+   "nivel": 0,
+   "grupo": "cimentacion",
+   "vidrio": false,
+   "elementos": 7,
+   "inicio": "2015-03-06",
+   "fin": "2015-03-10",
+   "general": false
+  },
+  {
+   "clave": "n00_cimentacion_150312_150325",
+   "nivel": 0,
+   "grupo": "cimentacion",
+   "vidrio": false,
+   "elementos": 32,
+   "inicio": "2015-03-12",
+   "fin": "2015-03-25",
+   "general": false
+  },
+  {
+   "clave": "n00_cimentacion_150326_150402",
+   "nivel": 0,
+   "grupo": "cimentacion",
+   "vidrio": false,
+   "elementos": 39,
+   "inicio": "2015-03-26",
+   "fin": "2015-04-02",
+   "general": false
+  },
+  {
+   "clave": "n00_cimentacion_150407_150414",
+   "nivel": 0,
+   "grupo": "cimentacion",
+   "vidrio": false,
+   "elementos": 50,
+   "inicio": "2015-04-07",
+   "fin": "2015-04-14",
+   "general": false
+  },
+  {
+   "clave": "n00_estructura_150420_150420",
+   "nivel": 0,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 4,
+   "inicio": "2015-04-20",
+   "fin": "2015-04-20",
+   "general": false
+  },
+  {
+   "clave": "n00_losas_150226_150305",
+   "nivel": 0,
+   "grupo": "losas",
+   "vidrio": false,
+   "elementos": 1,
+   "inicio": "2015-02-26",
+   "fin": "2015-03-05",
+   "general": false
+  },
+  {
+   "clave": "n01_acabados_150416_150416",
+   "nivel": 1,
+   "grupo": "acabados",
+   "vidrio": false,
+   "elementos": 26,
+   "inicio": "2015-04-16",
+   "fin": "2015-04-16",
+   "general": false
+  },
+  {
+   "clave": "n01_acabados_150907_151231",
+   "nivel": 1,
+   "grupo": "acabados",
+   "vidrio": false,
+   "elementos": 74,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n01_carpinteria_150618_150624",
+   "nivel": 1,
+   "grupo": "carpinteria",
+   "vidrio": false,
+   "elementos": 133,
+   "inicio": "2015-06-18",
+   "fin": "2015-06-24",
+   "general": false
+  },
+  {
+   "clave": "n01_carpinteria_150907_151231",
+   "nivel": 1,
+   "grupo": "carpinteria",
+   "vidrio": false,
+   "elementos": 32,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n01_cimentacion_150306_150310",
+   "nivel": 1,
+   "grupo": "cimentacion",
+   "vidrio": false,
+   "elementos": 4,
+   "inicio": "2015-03-06",
+   "fin": "2015-03-10",
+   "general": false
+  },
+  {
+   "clave": "n01_cimentacion_150618_150624",
+   "nivel": 1,
+   "grupo": "cimentacion",
+   "vidrio": false,
+   "elementos": 14,
+   "inicio": "2015-06-18",
+   "fin": "2015-06-24",
+   "general": false
+  },
+  {
+   "clave": "n01_circulacion_150521_150521",
+   "nivel": 1,
+   "grupo": "circulacion",
+   "vidrio": false,
+   "elementos": 9,
+   "inicio": "2015-05-21",
+   "fin": "2015-05-21",
+   "general": false
+  },
+  {
+   "clave": "n01_estructura_150420_150420",
+   "nivel": 1,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 1,
+   "inicio": "2015-04-20",
+   "fin": "2015-04-20",
+   "general": false
+  },
+  {
+   "clave": "n01_estructura_150709_150721",
+   "nivel": 1,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 4,
+   "inicio": "2015-07-09",
+   "fin": "2015-07-21",
+   "general": false
+  },
+  {
+   "clave": "n01_estructura_150907_151231",
+   "nivel": 1,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 2,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n01_fachada_150616_150708",
+   "nivel": 1,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 135,
+   "inicio": "2015-06-16",
+   "fin": "2015-07-08",
+   "general": false
+  },
+  {
+   "clave": "n01_fachada_150625_150708",
+   "nivel": 1,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 78,
+   "inicio": "2015-06-25",
+   "fin": "2015-07-08",
+   "general": false
+  },
+  {
+   "clave": "n01_fachada_150907_151231",
+   "nivel": 1,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 42,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n01_instalaciones_150709_150721",
+   "nivel": 1,
+   "grupo": "instalaciones",
+   "vidrio": false,
+   "elementos": 4,
+   "inicio": "2015-07-09",
+   "fin": "2015-07-21",
+   "general": false
+  },
+  {
+   "clave": "n01_instalaciones_150907_151231",
+   "nivel": 1,
+   "grupo": "instalaciones",
+   "vidrio": false,
+   "elementos": 13,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n01_losas_150413_150413",
+   "nivel": 1,
+   "grupo": "losas",
+   "vidrio": false,
+   "elementos": 51,
+   "inicio": "2015-04-13",
+   "fin": "2015-04-13",
+   "general": false
+  },
+  {
+   "clave": "n01_losas_150416_150416",
+   "nivel": 1,
+   "grupo": "losas",
+   "vidrio": false,
+   "elementos": 1,
+   "inicio": "2015-04-16",
+   "fin": "2015-04-16",
+   "general": false
+  },
+  {
+   "clave": "n01_losas_150907_151231",
+   "nivel": 1,
+   "grupo": "losas",
+   "vidrio": false,
+   "elementos": 2,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n01_mobiliario_150907_151231",
+   "nivel": 1,
+   "grupo": "mobiliario",
+   "vidrio": false,
+   "elementos": 10,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n01_muros_150306_150310",
+   "nivel": 1,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 6,
+   "inicio": "2015-03-06",
+   "fin": "2015-03-10",
+   "general": false
+  },
+  {
+   "clave": "n01_muros_150421_150424",
+   "nivel": 1,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 24,
+   "inicio": "2015-04-21",
+   "fin": "2015-04-24",
+   "general": false
+  },
+  {
+   "clave": "n01_muros_150907_151231",
+   "nivel": 1,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 12,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n01_otros_150907_151231",
+   "nivel": 1,
+   "grupo": "otros",
+   "vidrio": false,
+   "elementos": 1,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n01_particiones_150618_150624",
+   "nivel": 1,
+   "grupo": "particiones",
+   "vidrio": false,
+   "elementos": 29,
+   "inicio": "2015-06-18",
+   "fin": "2015-06-24",
+   "general": false
+  },
+  {
+   "clave": "n01_particiones_150907_151231",
+   "nivel": 1,
+   "grupo": "particiones",
+   "vidrio": false,
+   "elementos": 38,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n02_acabados_150907_151231",
+   "nivel": 2,
+   "grupo": "acabados",
+   "vidrio": false,
+   "elementos": 160,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n02_carpinteria_150702_150710",
+   "nivel": 2,
+   "grupo": "carpinteria",
+   "vidrio": false,
+   "elementos": 88,
+   "inicio": "2015-07-02",
+   "fin": "2015-07-10",
+   "general": false
+  },
+  {
+   "clave": "n02_carpinteria_150907_151231",
+   "nivel": 2,
+   "grupo": "carpinteria",
+   "vidrio": false,
+   "elementos": 48,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n02_circulacion_150617_150617",
+   "nivel": 2,
+   "grupo": "circulacion",
+   "vidrio": false,
+   "elementos": 5,
+   "inicio": "2015-06-17",
+   "fin": "2015-06-17",
+   "general": false
+  },
+  {
+   "clave": "n02_circulacion_150907_151231",
+   "nivel": 2,
+   "grupo": "circulacion",
+   "vidrio": false,
+   "elementos": 39,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n02_cubierta_150716_150806",
+   "nivel": 2,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 56,
+   "inicio": "2015-07-16",
+   "fin": "2015-08-06",
+   "general": false
+  },
+  {
+   "clave": "n02_cubierta_150828_150903",
+   "nivel": 2,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 58,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-03",
+   "general": false
+  },
+  {
+   "clave": "n02_cubierta_150828_150917",
+   "nivel": 2,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 2,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-17",
+   "general": false
+  },
+  {
+   "clave": "n02_cubierta_150907_151231",
+   "nivel": 2,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 11,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n02_estructura_150511_150511",
+   "nivel": 2,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 4,
+   "inicio": "2015-05-11",
+   "fin": "2015-05-11",
+   "general": false
+  },
+  {
+   "clave": "n02_estructura_150709_150721",
+   "nivel": 2,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 16,
+   "inicio": "2015-07-09",
+   "fin": "2015-07-21",
+   "general": false
+  },
+  {
+   "clave": "n02_estructura_150713_150806",
+   "nivel": 2,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 1,
+   "inicio": "2015-07-13",
+   "fin": "2015-08-06",
+   "general": false
+  },
+  {
+   "clave": "n02_estructura_150716_150806",
+   "nivel": 2,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 3,
+   "inicio": "2015-07-16",
+   "fin": "2015-08-06",
+   "general": false
+  },
+  {
+   "clave": "n02_estructura_150907_151231",
+   "nivel": 2,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 5,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n02_fachada_150616_150708",
+   "nivel": 2,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 30,
+   "inicio": "2015-06-16",
+   "fin": "2015-07-08",
+   "general": false
+  },
+  {
+   "clave": "n02_fachada_150625_150708",
+   "nivel": 2,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 37,
+   "inicio": "2015-06-25",
+   "fin": "2015-07-08",
+   "general": false
+  },
+  {
+   "clave": "n02_fachada_150709_150721",
+   "nivel": 2,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 154,
+   "inicio": "2015-07-09",
+   "fin": "2015-07-21",
+   "general": false
+  },
+  {
+   "clave": "n02_fachada_150709_150818",
+   "nivel": 2,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 12,
+   "inicio": "2015-07-09",
+   "fin": "2015-08-18",
+   "general": false
+  },
+  {
+   "clave": "n02_fachada_150828_150917",
+   "nivel": 2,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 28,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-17",
+   "general": false
+  },
+  {
+   "clave": "n02_fachada_150907_151231",
+   "nivel": 2,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 43,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n02_instalaciones_150907_151231",
+   "nivel": 2,
+   "grupo": "instalaciones",
+   "vidrio": false,
+   "elementos": 24,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n02_losas_150501_150602",
+   "nivel": 2,
+   "grupo": "losas",
+   "vidrio": false,
+   "elementos": 23,
+   "inicio": "2015-05-01",
+   "fin": "2015-06-02",
+   "general": false
+  },
+  {
+   "clave": "n02_losas_150907_151231",
+   "nivel": 2,
+   "grupo": "losas",
+   "vidrio": false,
+   "elementos": 1,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n02_muros_150522_150528",
+   "nivel": 2,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 34,
+   "inicio": "2015-05-22",
+   "fin": "2015-05-28",
+   "general": false
+  },
+  {
+   "clave": "n02_muros_150907_151231",
+   "nivel": 2,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 6,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n02_particiones_150907_151231",
+   "nivel": 2,
+   "grupo": "particiones",
+   "vidrio": false,
+   "elementos": 53,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n03_acabados_150615_150615",
+   "nivel": 3,
+   "grupo": "acabados",
+   "vidrio": false,
+   "elementos": 15,
+   "inicio": "2015-06-15",
+   "fin": "2015-06-15",
+   "general": false
+  },
+  {
+   "clave": "n03_acabados_150907_151231",
+   "nivel": 3,
+   "grupo": "acabados",
+   "vidrio": false,
+   "elementos": 38,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n03_carpinteria_150702_150710",
+   "nivel": 3,
+   "grupo": "carpinteria",
+   "vidrio": false,
+   "elementos": 83,
+   "inicio": "2015-07-02",
+   "fin": "2015-07-10",
+   "general": false
+  },
+  {
+   "clave": "n03_carpinteria_150907_151231",
+   "nivel": 3,
+   "grupo": "carpinteria",
+   "vidrio": false,
+   "elementos": 32,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n03_circulacion_150713_150713",
+   "nivel": 3,
+   "grupo": "circulacion",
+   "vidrio": false,
+   "elementos": 5,
+   "inicio": "2015-07-13",
+   "fin": "2015-07-13",
+   "general": false
+  },
+  {
+   "clave": "n03_circulacion_150907_151231",
+   "nivel": 3,
+   "grupo": "circulacion",
+   "vidrio": false,
+   "elementos": 34,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n03_cubierta_150709_150818",
+   "nivel": 3,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 14,
+   "inicio": "2015-07-09",
+   "fin": "2015-08-18",
+   "general": false
+  },
+  {
+   "clave": "n03_cubierta_150716_150806",
+   "nivel": 3,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 5,
+   "inicio": "2015-07-16",
+   "fin": "2015-08-06",
+   "general": false
+  },
+  {
+   "clave": "n03_cubierta_150716_151002",
+   "nivel": 3,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 6,
+   "inicio": "2015-07-16",
+   "fin": "2015-10-02",
+   "general": false
+  },
+  {
+   "clave": "n03_cubierta_150828_150903",
+   "nivel": 3,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 31,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-03",
+   "general": false
+  },
+  {
+   "clave": "n03_cubierta_150828_150917",
+   "nivel": 3,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 148,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-17",
+   "general": false
+  },
+  {
+   "clave": "n03_cubierta_150918_151012",
+   "nivel": 3,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 12,
+   "inicio": "2015-09-18",
+   "fin": "2015-10-12",
+   "general": false
+  },
+  {
+   "clave": "n03_cubierta_150921_151002",
+   "nivel": 3,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 88,
+   "inicio": "2015-09-21",
+   "fin": "2015-10-02",
+   "general": false
+  },
+  {
+   "clave": "n03_estructura_150709_150721",
+   "nivel": 3,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 18,
+   "inicio": "2015-07-09",
+   "fin": "2015-07-21",
+   "general": false
+  },
+  {
+   "clave": "n03_estructura_150713_150716",
+   "nivel": 3,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 27,
+   "inicio": "2015-07-13",
+   "fin": "2015-07-16",
+   "general": false
+  },
+  {
+   "clave": "n03_estructura_150907_151231",
+   "nivel": 3,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 5,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n03_fachada_150709_150721",
+   "nivel": 3,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 57,
+   "inicio": "2015-07-09",
+   "fin": "2015-07-21",
+   "general": false
+  },
+  {
+   "clave": "n03_fachada_150709_150804",
+   "nivel": 3,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 167,
+   "inicio": "2015-07-09",
+   "fin": "2015-08-04",
+   "general": false
+  },
+  {
+   "clave": "n03_fachada_150709_150818",
+   "nivel": 3,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 58,
+   "inicio": "2015-07-09",
+   "fin": "2015-08-18",
+   "general": false
+  },
+  {
+   "clave": "n03_fachada_150828_150903",
+   "nivel": 3,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 4,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-03",
+   "general": false
+  },
+  {
+   "clave": "n03_fachada_150907_151231",
+   "nivel": 3,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 10,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n03_instalaciones_150709_150721",
+   "nivel": 3,
+   "grupo": "instalaciones",
+   "vidrio": false,
+   "elementos": 9,
+   "inicio": "2015-07-09",
+   "fin": "2015-07-21",
+   "general": false
+  },
+  {
+   "clave": "n03_instalaciones_150907_151231",
+   "nivel": 3,
+   "grupo": "instalaciones",
+   "vidrio": false,
+   "elementos": 23,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n03_losas_150529_150615",
+   "nivel": 3,
+   "grupo": "losas",
+   "vidrio": false,
+   "elementos": 13,
+   "inicio": "2015-05-29",
+   "fin": "2015-06-15",
+   "general": false
+  },
+  {
+   "clave": "n03_losas_150907_151231",
+   "nivel": 3,
+   "grupo": "losas",
+   "vidrio": false,
+   "elementos": 3,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n03_muros_150522_150528",
+   "nivel": 3,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 16,
+   "inicio": "2015-05-22",
+   "fin": "2015-05-28",
+   "general": false
+  },
+  {
+   "clave": "n03_muros_150526_150528",
+   "nivel": 3,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 1,
+   "inicio": "2015-05-26",
+   "fin": "2015-05-28",
+   "general": false
+  },
+  {
+   "clave": "n03_muros_150618_150623",
+   "nivel": 3,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 9,
+   "inicio": "2015-06-18",
+   "fin": "2015-06-23",
+   "general": false
+  },
+  {
+   "clave": "n03_muros_150907_151231",
+   "nivel": 3,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 6,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n03_particiones_150907_151231",
+   "nivel": 3,
+   "grupo": "particiones",
+   "vidrio": false,
+   "elementos": 35,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n04_acabados_150828_150917",
+   "nivel": 4,
+   "grupo": "acabados",
+   "vidrio": false,
+   "elementos": 2,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-17",
+   "general": false
+  },
+  {
+   "clave": "n04_acabados_150907_151231",
+   "nivel": 4,
+   "grupo": "acabados",
+   "vidrio": false,
+   "elementos": 94,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n04_carpinteria_150720_150724",
+   "nivel": 4,
+   "grupo": "carpinteria",
+   "vidrio": false,
+   "elementos": 14,
+   "inicio": "2015-07-20",
+   "fin": "2015-07-24",
+   "general": false
+  },
+  {
+   "clave": "n04_carpinteria_150907_151231",
+   "nivel": 4,
+   "grupo": "carpinteria",
+   "vidrio": false,
+   "elementos": 27,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n04_circulacion_150907_151231",
+   "nivel": 4,
+   "grupo": "circulacion",
+   "vidrio": false,
+   "elementos": 21,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n04_cubierta_150619_150917",
+   "nivel": 4,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 2,
+   "inicio": "2015-06-19",
+   "fin": "2015-09-17",
+   "general": false
+  },
+  {
+   "clave": "n04_cubierta_150828_150917",
+   "nivel": 4,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 26,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-17",
+   "general": false
+  },
+  {
+   "clave": "n04_cubierta_150907_151231",
+   "nivel": 4,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 34,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n04_cubierta_150921_151002",
+   "nivel": 4,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 41,
+   "inicio": "2015-09-21",
+   "fin": "2015-10-02",
+   "general": false
+  },
+  {
+   "clave": "n04_estructura_150713_150716",
+   "nivel": 4,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 10,
+   "inicio": "2015-07-13",
+   "fin": "2015-07-16",
+   "general": false
+  },
+  {
+   "clave": "n04_estructura_150828_150917",
+   "nivel": 4,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 1,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-17",
+   "general": false
+  },
+  {
+   "clave": "n04_fachada_150709_150804",
+   "nivel": 4,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 14,
+   "inicio": "2015-07-09",
+   "fin": "2015-08-04",
+   "general": false
+  },
+  {
+   "clave": "n04_fachada_150722_150804",
+   "nivel": 4,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 6,
+   "inicio": "2015-07-22",
+   "fin": "2015-08-04",
+   "general": false
+  },
+  {
+   "clave": "n04_fachada_150907_151231",
+   "nivel": 4,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 8,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n04_losas_150624_150709",
+   "nivel": 4,
+   "grupo": "losas",
+   "vidrio": false,
+   "elementos": 13,
+   "inicio": "2015-06-24",
+   "fin": "2015-07-09",
+   "general": false
+  },
+  {
+   "clave": "n04_muros_150618_150623",
+   "nivel": 4,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 8,
+   "inicio": "2015-06-18",
+   "fin": "2015-06-23",
+   "general": false
+  },
+  {
+   "clave": "n04_muros_150715_150716",
+   "nivel": 4,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 5,
+   "inicio": "2015-07-15",
+   "fin": "2015-07-16",
+   "general": false
+  },
+  {
+   "clave": "n04_muros_150907_151231",
+   "nivel": 4,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 1,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n04_particiones_150907_151231",
+   "nivel": 4,
+   "grupo": "particiones",
+   "vidrio": false,
+   "elementos": 34,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n05_acabados_150828_150917",
+   "nivel": 5,
+   "grupo": "acabados",
+   "vidrio": false,
+   "elementos": 2,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-17",
+   "general": false
+  },
+  {
+   "clave": "n05_acabados_150907_151231",
+   "nivel": 5,
+   "grupo": "acabados",
+   "vidrio": false,
+   "elementos": 125,
+   "inicio": "2015-09-07",
+   "fin": "2015-12-31",
+   "general": true
+  },
+  {
+   "clave": "n05_cubierta_150828_150917",
+   "nivel": 5,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 132,
+   "inicio": "2015-08-28",
+   "fin": "2015-09-17",
+   "general": false
+  },
+  {
+   "clave": "n05_cubierta_150918_151001",
+   "nivel": 5,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 8,
+   "inicio": "2015-09-18",
+   "fin": "2015-10-01",
+   "general": false
+  },
+  {
+   "clave": "n05_cubierta_150921_151002",
+   "nivel": 5,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 14,
+   "inicio": "2015-09-21",
+   "fin": "2015-10-02",
+   "general": false
+  },
+  {
+   "clave": "n05_cubierta_151009_151015",
+   "nivel": 5,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 12,
+   "inicio": "2015-10-09",
+   "fin": "2015-10-15",
+   "general": false
+  },
+  {
+   "clave": "n05_estructura_150713_150716",
+   "nivel": 5,
+   "grupo": "estructura",
+   "vidrio": false,
+   "elementos": 9,
+   "inicio": "2015-07-13",
+   "fin": "2015-07-16",
+   "general": false
+  },
+  {
+   "clave": "n05_fachada_150722_150804",
+   "nivel": 5,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 12,
+   "inicio": "2015-07-22",
+   "fin": "2015-08-04",
+   "general": false
+  },
+  {
+   "clave": "n05_fachada_150918_151001",
+   "nivel": 5,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 23,
+   "inicio": "2015-09-18",
+   "fin": "2015-10-01",
+   "general": false
+  },
+  {
+   "clave": "n05_losas_150716_150820",
+   "nivel": 5,
+   "grupo": "losas",
+   "vidrio": false,
+   "elementos": 9,
+   "inicio": "2015-07-16",
+   "fin": "2015-08-20",
+   "general": false
+  },
+  {
+   "clave": "n05_muros_150715_150716",
+   "nivel": 5,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 2,
+   "inicio": "2015-07-15",
+   "fin": "2015-07-16",
+   "general": false
+  },
+  {
+   "clave": "n05_muros_150918_151001",
+   "nivel": 5,
+   "grupo": "muros",
+   "vidrio": false,
+   "elementos": 4,
+   "inicio": "2015-09-18",
+   "fin": "2015-10-01",
+   "general": false
+  }
+ ],
+ "programa": {
+  "inicio": "2015-02-19",
+  "fin": "2015-12-31",
+  "tareasTotales": 125,
+  "tareas": [
+   {
+    "codigo": "ST00930",
+    "nombre": "GEVEL",
+    "grupo": "",
+    "inicio": "2015-02-19",
+    "fin": "2015-02-19",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST01090",
+    "nombre": "DAK",
+    "grupo": "",
+    "inicio": "2015-02-19",
+    "fin": "2015-02-19",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00020",
+    "nombre": "Maatvoering gemeente",
+    "grupo": "",
+    "inicio": "2015-02-20",
+    "fin": "2015-02-20",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00040",
+    "nombre": "Grondwerk",
+    "grupo": "",
+    "inicio": "2015-02-20",
+    "fin": "2015-02-26",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00030",
+    "nombre": "Uitzetten grondwerk",
+    "grupo": "",
+    "inicio": "2015-02-26",
+    "fin": "2015-02-26",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00060",
+    "nombre": "Stellen bruggetjes",
+    "grupo": "",
+    "inicio": "2015-02-26",
+    "fin": "2015-02-27",
+    "elementos": 1,
+    "general": false
+   },
+   {
+    "codigo": "ST00070",
+    "nombre": "Nuts invoeren",
+    "grupo": "",
+    "inicio": "2015-03-02",
+    "fin": "2015-03-04",
+    "elementos": 1,
+    "general": false
+   },
+   {
+    "codigo": "ST00080",
+    "nombre": "Werkvloer liftput",
+    "grupo": "",
+    "inicio": "2015-03-03",
+    "fin": "2015-03-03",
+    "elementos": 1,
+    "general": false
+   },
+   {
+    "codigo": "ST00090",
+    "nombre": "Wapening liftvloer",
+    "grupo": "",
+    "inicio": "2015-03-04",
+    "fin": "2015-03-04",
+    "elementos": 1,
+    "general": false
+   },
+   {
+    "codigo": "ST00100",
+    "nombre": "Bekisten liftvloer",
+    "grupo": "",
+    "inicio": "2015-03-04",
+    "fin": "2015-03-04",
+    "elementos": 1,
+    "general": false
+   },
+   {
+    "codigo": "ST00110",
+    "nombre": "Stort liftvloer",
+    "grupo": "",
+    "inicio": "2015-03-05",
+    "fin": "2015-03-05",
+    "elementos": 1,
+    "general": false
+   },
+   {
+    "codigo": "ST00130",
+    "nombre": "Bekisten liftwanden",
+    "grupo": "",
+    "inicio": "2015-03-06",
+    "fin": "2015-03-06",
+    "elementos": 17,
+    "general": false
+   },
+   {
+    "codigo": "ST00140",
+    "nombre": "Wapening liftwanden",
+    "grupo": "",
+    "inicio": "2015-03-09",
+    "fin": "2015-03-09",
+    "elementos": 17,
+    "general": false
+   },
+   {
+    "codigo": "ST00150",
+    "nombre": "Stort liftwanden",
+    "grupo": "",
+    "inicio": "2015-03-10",
+    "fin": "2015-03-10",
+    "elementos": 17,
+    "general": false
+   },
+   {
+    "codigo": "ST00170",
+    "nombre": "Maatvoering fundering",
+    "grupo": "",
+    "inicio": "2015-03-11",
+    "fin": "2015-03-11",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00190",
+    "nombre": "Aanvullen liftput",
+    "grupo": "",
+    "inicio": "2015-03-11",
+    "fin": "2015-03-11",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00200",
+    "nombre": "Stellen funderingkist incl. poeren",
+    "grupo": "",
+    "inicio": "2015-03-12",
+    "fin": "2015-03-20",
+    "elementos": 32,
+    "general": false
+   },
+   {
+    "codigo": "ST00210",
+    "nombre": "Wapening",
+    "grupo": "",
+    "inicio": "2015-03-19",
+    "fin": "2015-03-24",
+    "elementos": 32,
+    "general": false
+   },
+   {
+    "codigo": "ST00230",
+    "nombre": "Stort",
+    "grupo": "",
+    "inicio": "2015-03-25",
+    "fin": "2015-03-25",
+    "elementos": 32,
+    "general": false
+   },
+   {
+    "codigo": "ST00250",
+    "nombre": "Opstorten fundering",
+    "grupo": "",
+    "inicio": "2015-03-26",
+    "fin": "2015-04-02",
+    "elementos": 39,
+    "general": false
+   },
+   {
+    "codigo": "ST00260",
+    "nombre": "Wapening",
+    "grupo": "",
+    "inicio": "2015-04-01",
+    "fin": "2015-04-02",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00270",
+    "nombre": "Stort",
+    "grupo": "",
+    "inicio": "2015-04-03",
+    "fin": "2015-04-03",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00290",
+    "nombre": "Bodemafsluiting aanbrengen",
+    "grupo": "",
+    "inicio": "2015-04-07",
+    "fin": "2015-04-07",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00310",
+    "nombre": "Stelwerk metselwerk onder peil",
+    "grupo": "",
+    "inicio": "2015-04-07",
+    "fin": "2015-04-07",
+    "elementos": 50,
+    "general": false
+   },
+   {
+    "codigo": "ST00300",
+    "nombre": "Installaties onder peil",
+    "grupo": "",
+    "inicio": "2015-04-07",
+    "fin": "2015-04-09",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00320",
+    "nombre": "Metselwerk onderpeil (buitenblad)",
+    "grupo": "",
+    "inicio": "2015-04-08",
+    "fin": "2015-04-14",
+    "elementos": 50,
+    "general": false
+   },
+   {
+    "codigo": "ST00340",
+    "nombre": "Maatvoering begane grondvloer",
+    "grupo": "",
+    "inicio": "2015-04-10",
+    "fin": "2015-04-10",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00350",
+    "nombre": "Kanaalplaatvloer leggen (lev. week 16)",
+    "grupo": "",
+    "inicio": "2015-04-13",
+    "fin": "2015-04-13",
+    "elementos": 51,
+    "general": false
+   },
+   {
+    "codigo": "ST00360",
+    "nombre": "Bekisten",
+    "grupo": "",
+    "inicio": "2015-04-14",
+    "fin": "2015-04-15",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00370",
+    "nombre": "Afstorten kanaalplaat",
+    "grupo": "",
+    "inicio": "2015-04-16",
+    "fin": "2015-04-16",
+    "elementos": 27,
+    "general": false
+   },
+   {
+    "codigo": "ST00390",
+    "nombre": "Maatvoering",
+    "grupo": "",
+    "inicio": "2015-04-17",
+    "fin": "2015-04-17",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00420",
+    "nombre": "Plaatsen stalen kolommen",
+    "grupo": "",
+    "inicio": "2015-04-20",
+    "fin": "2015-04-20",
+    "elementos": 5,
+    "general": false
+   },
+   {
+    "codigo": "ST00460",
+    "nombre": "Stelwerk kalkzandsteen",
+    "grupo": "",
+    "inicio": "2015-04-21",
+    "fin": "2015-04-21",
+    "elementos": 24,
+    "general": false
+   },
+   {
+    "codigo": "ST00490",
+    "nombre": "Lijmwerk kalkzandsteen elementen",
+    "grupo": "",
+    "inicio": "2015-04-22",
+    "fin": "2015-04-24",
+    "elementos": 24,
+    "general": false
+   },
+   {
+    "codigo": "ST00530",
+    "nombre": "Opstellen",
+    "grupo": "",
+    "inicio": "2015-04-29",
+    "fin": "2015-05-01",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00560",
+    "nombre": "Leggen breedplaat incl. Veiligheid",
+    "grupo": "",
+    "inicio": "2015-05-01",
+    "fin": "2015-05-04",
+    "elementos": 23,
+    "general": false
+   },
+   {
+    "codigo": "ST00600",
+    "nombre": "Randkist",
+    "grupo": "",
+    "inicio": "2015-05-07",
+    "fin": "2015-05-08",
+    "elementos": 23,
+    "general": false
+   },
+   {
+    "codigo": "ST00660",
+    "nombre": "Installateurs",
+    "grupo": "",
+    "inicio": "2015-05-07",
+    "fin": "2015-05-12",
+    "elementos": 23,
+    "general": false
+   },
+   {
+    "codigo": "ST00630",
+    "nombre": "Stalen balken",
+    "grupo": "",
+    "inicio": "2015-05-11",
+    "fin": "2015-05-11",
+    "elementos": 27,
+    "general": false
+   },
+   {
+    "codigo": "ST00690",
+    "nombre": "Wapening",
+    "grupo": "",
+    "inicio": "2015-05-13",
+    "fin": "2015-05-14",
+    "elementos": 23,
+    "general": false
+   },
+   {
+    "codigo": "ST00730",
+    "nombre": "Stort",
+    "grupo": "",
+    "inicio": "2015-05-19",
+    "fin": "2015-05-19",
+    "elementos": 23,
+    "general": false
+   },
+   {
+    "codigo": "ST00400",
+    "nombre": "Maatvoering",
+    "grupo": "",
+    "inicio": "2015-05-20",
+    "fin": "2015-05-20",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00430",
+    "nombre": "Prefab trappen en bordes",
+    "grupo": "",
+    "inicio": "2015-05-21",
+    "fin": "2015-05-21",
+    "elementos": 9,
+    "general": false
+   },
+   {
+    "codigo": "ST00470",
+    "nombre": "Stelwerk kalkzandsteen",
+    "grupo": "",
+    "inicio": "2015-05-22",
+    "fin": "2015-05-22",
+    "elementos": 50,
+    "general": false
+   },
+   {
+    "codigo": "ST00500",
+    "nombre": "Lijmwerk kalkzandsteen elementen",
+    "grupo": "",
+    "inicio": "2015-05-26",
+    "fin": "2015-05-28",
+    "elementos": 51,
+    "general": false
+   },
+   {
+    "codigo": "ST00540",
+    "nombre": "Opstellen",
+    "grupo": "",
+    "inicio": "2015-05-29",
+    "fin": "2015-06-02",
+    "elementos": 36,
+    "general": false
+   },
+   {
+    "codigo": "ST00570",
+    "nombre": "Leggen breedplaat incl. Veiligheid",
+    "grupo": "",
+    "inicio": "2015-06-03",
+    "fin": "2015-06-04",
+    "elementos": 13,
+    "general": false
+   },
+   {
+    "codigo": "ST00610",
+    "nombre": "Randkist",
+    "grupo": "",
+    "inicio": "2015-06-05",
+    "fin": "2015-06-08",
+    "elementos": 13,
+    "general": false
+   },
+   {
+    "codigo": "ST00670",
+    "nombre": "Installateurs",
+    "grupo": "",
+    "inicio": "2015-06-05",
+    "fin": "2015-06-10",
+    "elementos": 13,
+    "general": false
+   },
+   {
+    "codigo": "ST00640",
+    "nombre": "Stalen balken",
+    "grupo": "",
+    "inicio": "2015-06-09",
+    "fin": "2015-06-09",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00700",
+    "nombre": "Wapening",
+    "grupo": "",
+    "inicio": "2015-06-11",
+    "fin": "2015-06-12",
+    "elementos": 13,
+    "general": false
+   },
+   {
+    "codigo": "ST00740",
+    "nombre": "Stort",
+    "grupo": "",
+    "inicio": "2015-06-15",
+    "fin": "2015-06-15",
+    "elementos": 28,
+    "general": false
+   },
+   {
+    "codigo": "ST00410",
+    "nombre": "Maatvoering",
+    "grupo": "",
+    "inicio": "2015-06-16",
+    "fin": "2015-06-16",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00940",
+    "nombre": "Stelwerk buitengevel",
+    "grupo": "",
+    "inicio": "2015-06-16",
+    "fin": "2015-06-22",
+    "elementos": 165,
+    "general": false
+   },
+   {
+    "codigo": "ST00440",
+    "nombre": "Prefab trappen en bordes",
+    "grupo": "",
+    "inicio": "2015-06-17",
+    "fin": "2015-06-17",
+    "elementos": 5,
+    "general": false
+   },
+   {
+    "codigo": "ST00480",
+    "nombre": "Stelwerk kalkzandsteen",
+    "grupo": "",
+    "inicio": "2015-06-18",
+    "fin": "2015-06-18",
+    "elementos": 17,
+    "general": false
+   },
+   {
+    "codigo": "ST00970",
+    "nombre": "Plaatsen kozijnen",
+    "grupo": "",
+    "inicio": "2015-06-18",
+    "fin": "2015-06-24",
+    "elementos": 176,
+    "general": false
+   },
+   {
+    "codigo": "ST00510",
+    "nombre": "Lijmwerk kalkzandsteen elementen",
+    "grupo": "",
+    "inicio": "2015-06-19",
+    "fin": "2015-06-23",
+    "elementos": 19,
+    "general": false
+   },
+   {
+    "codigo": "ST00550",
+    "nombre": "Opstellen",
+    "grupo": "",
+    "inicio": "2015-06-24",
+    "fin": "2015-06-26",
+    "elementos": 13,
+    "general": false
+   },
+   {
+    "codigo": "ST01050",
+    "nombre": "Metselwerk",
+    "grupo": "",
+    "inicio": "2015-06-25",
+    "fin": "2015-07-08",
+    "elementos": 280,
+    "general": false
+   },
+   {
+    "codigo": "ST00580",
+    "nombre": "Leggen breedplaat incl. Veiligheid",
+    "grupo": "",
+    "inicio": "2015-06-29",
+    "fin": "2015-06-30",
+    "elementos": 13,
+    "general": false
+   },
+   {
+    "codigo": "ST01020",
+    "nombre": "Steiger",
+    "grupo": "",
+    "inicio": "2015-06-30",
+    "fin": "2015-07-01",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00620",
+    "nombre": "Randkist",
+    "grupo": "",
+    "inicio": "2015-07-01",
+    "fin": "2015-07-02",
+    "elementos": 13,
+    "general": false
+   },
+   {
+    "codigo": "ST00680",
+    "nombre": "Installateurs",
+    "grupo": "",
+    "inicio": "2015-07-01",
+    "fin": "2015-07-06",
+    "elementos": 13,
+    "general": false
+   },
+   {
+    "codigo": "ST00950",
+    "nombre": "Stelwerk buitengevel",
+    "grupo": "",
+    "inicio": "2015-07-02",
+    "fin": "2015-07-08",
+    "elementos": 171,
+    "general": false
+   },
+   {
+    "codigo": "ST00650",
+    "nombre": "Stalen balken",
+    "grupo": "",
+    "inicio": "2015-07-03",
+    "fin": "2015-07-03",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00980",
+    "nombre": "Plaatsen kozijnen",
+    "grupo": "",
+    "inicio": "2015-07-06",
+    "fin": "2015-07-10",
+    "elementos": 171,
+    "general": false
+   },
+   {
+    "codigo": "ST00710",
+    "nombre": "Wapening",
+    "grupo": "",
+    "inicio": "2015-07-07",
+    "fin": "2015-07-08",
+    "elementos": 13,
+    "general": false
+   },
+   {
+    "codigo": "ST00750",
+    "nombre": "Stort",
+    "grupo": "",
+    "inicio": "2015-07-09",
+    "fin": "2015-07-09",
+    "elementos": 13,
+    "general": false
+   },
+   {
+    "codigo": "ST01060",
+    "nombre": "Metselwerk",
+    "grupo": "",
+    "inicio": "2015-07-09",
+    "fin": "2015-07-21",
+    "elementos": 527,
+    "general": false
+   },
+   {
+    "codigo": "ST00770",
+    "nombre": "Maatvoering",
+    "grupo": "",
+    "inicio": "2015-07-10",
+    "fin": "2015-07-10",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST01100",
+    "nombre": "Maatvoering kap",
+    "grupo": "",
+    "inicio": "2015-07-10",
+    "fin": "2015-07-16",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00820",
+    "nombre": "Prefab trappen en bordes 2e verd.",
+    "grupo": "",
+    "inicio": "2015-07-13",
+    "fin": "2015-07-13",
+    "elementos": 5,
+    "general": false
+   },
+   {
+    "codigo": "ST00790",
+    "nombre": "Staalconstuctie dak",
+    "grupo": "",
+    "inicio": "2015-07-13",
+    "fin": "2015-07-16",
+    "elementos": 47,
+    "general": false
+   },
+   {
+    "codigo": "ST01030",
+    "nombre": "Steiger",
+    "grupo": "",
+    "inicio": "2015-07-14",
+    "fin": "2015-07-15",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00800",
+    "nombre": "Stelwerk /lijmwerk lift",
+    "grupo": "",
+    "inicio": "2015-07-15",
+    "fin": "2015-07-16",
+    "elementos": 7,
+    "general": false
+   },
+   {
+    "codigo": "ST00840",
+    "nombre": "Opstellen",
+    "grupo": "",
+    "inicio": "2015-07-16",
+    "fin": "2015-07-20",
+    "elementos": 9,
+    "general": false
+   },
+   {
+    "codigo": "ST00960",
+    "nombre": "Stelwerk buitengevel",
+    "grupo": "",
+    "inicio": "2015-07-16",
+    "fin": "2015-07-22",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST01120",
+    "nombre": "Plaatsen scharnierkap incl. goot en platte daken",
+    "grupo": "",
+    "inicio": "2015-07-16",
+    "fin": "2015-08-06",
+    "elementos": 85,
+    "general": false
+   },
+   {
+    "codigo": "ST00850",
+    "nombre": "Leggen breedplaat incl. Veiligheid",
+    "grupo": "",
+    "inicio": "2015-07-20",
+    "fin": "2015-07-21",
+    "elementos": 9,
+    "general": false
+   },
+   {
+    "codigo": "ST00990",
+    "nombre": "Plaatsen kozijnen",
+    "grupo": "",
+    "inicio": "2015-07-20",
+    "fin": "2015-07-24",
+    "elementos": 14,
+    "general": false
+   },
+   {
+    "codigo": "ST00870",
+    "nombre": "Randkist",
+    "grupo": "",
+    "inicio": "2015-07-22",
+    "fin": "2015-07-23",
+    "elementos": 9,
+    "general": false
+   },
+   {
+    "codigo": "ST00880",
+    "nombre": "Installateurs",
+    "grupo": "",
+    "inicio": "2015-07-22",
+    "fin": "2015-07-27",
+    "elementos": 9,
+    "general": false
+   },
+   {
+    "codigo": "ST01070",
+    "nombre": "Metselwerk",
+    "grupo": "",
+    "inicio": "2015-07-22",
+    "fin": "2015-08-04",
+    "elementos": 199,
+    "general": false
+   },
+   {
+    "codigo": "ST01000",
+    "nombre": "Prefab betonband",
+    "grupo": "",
+    "inicio": "2015-08-17",
+    "fin": "2015-08-18",
+    "elementos": 84,
+    "general": false
+   },
+   {
+    "codigo": "ST01040",
+    "nombre": "Steiger",
+    "grupo": "",
+    "inicio": "2015-08-17",
+    "fin": "2015-08-18",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST00890",
+    "nombre": "Wapening",
+    "grupo": "",
+    "inicio": "2015-08-18",
+    "fin": "2015-08-19",
+    "elementos": 9,
+    "general": false
+   },
+   {
+    "codigo": "ST00910",
+    "nombre": "Stort",
+    "grupo": "",
+    "inicio": "2015-08-20",
+    "fin": "2015-08-20",
+    "elementos": 9,
+    "general": false
+   },
+   {
+    "codigo": "ST01110",
+    "nombre": "Maatvoering kap",
+    "grupo": "",
+    "inicio": "2015-08-21",
+    "fin": "2015-08-27",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST01150",
+    "nombre": "Zinken bekleding dakkapelen",
+    "grupo": "",
+    "inicio": "2015-08-28",
+    "fin": "2015-09-03",
+    "elementos": 80,
+    "general": false
+   },
+   {
+    "codigo": "ST01170",
+    "nombre": "Dakramen",
+    "grupo": "",
+    "inicio": "2015-08-28",
+    "fin": "2015-09-03",
+    "elementos": 85,
+    "general": false
+   },
+   {
+    "codigo": "ST01200",
+    "nombre": "Dakbedekking platte daken",
+    "grupo": "",
+    "inicio": "2015-08-28",
+    "fin": "2015-09-03",
+    "elementos": 38,
+    "general": false
+   },
+   {
+    "codigo": "ST01130",
+    "nombre": "Plaatsen scharnierkap incl. goot en platte daken",
+    "grupo": "",
+    "inicio": "2015-08-28",
+    "fin": "2015-09-17",
+    "elementos": 313,
+    "general": false
+   },
+   {
+    "codigo": "ST01220",
+    "nombre": "Dakpannen",
+    "grupo": "",
+    "inicio": "2015-09-04",
+    "fin": "2015-09-17",
+    "elementos": 30,
+    "general": false
+   },
+   {
+    "codigo": "ST01260",
+    "nombre": "Afbouw",
+    "grupo": "",
+    "inicio": "2015-09-07",
+    "fin": "2015-12-31",
+    "elementos": 3505,
+    "general": true
+   },
+   {
+    "codigo": "ST01240",
+    "nombre": "Zink goot",
+    "grupo": "",
+    "inicio": "2015-09-15",
+    "fin": "2015-09-21",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST01210",
+    "nombre": "Dakbedekking platte daken",
+    "grupo": "",
+    "inicio": "2015-09-18",
+    "fin": "2015-10-01",
+    "elementos": 47,
+    "general": false
+   },
+   {
+    "codigo": "ST01160",
+    "nombre": "Zinken bekleding dakkapelen",
+    "grupo": "",
+    "inicio": "2015-09-21",
+    "fin": "2015-10-02",
+    "elementos": 149,
+    "general": false
+   },
+   {
+    "codigo": "ST01180",
+    "nombre": "Dakramen",
+    "grupo": "",
+    "inicio": "2015-09-21",
+    "fin": "2015-10-02",
+    "elementos": 0,
+    "general": false
+   },
+   {
+    "codigo": "ST01230",
+    "nombre": "Dakpannen",
+    "grupo": "",
+    "inicio": "2015-09-29",
+    "fin": "2015-10-12",
+    "elementos": 12,
+    "general": false
+   },
+   {
+    "codigo": "ST01250",
+    "nombre": "Zink goot",
+    "grupo": "",
+    "inicio": "2015-10-09",
+    "fin": "2015-10-15",
+    "elementos": 12,
+    "general": false
+   }
+  ]
+ },
+ "totales": {
+  "elementos": 3504,
+  "triangulosIfc": 258866,
+  "triangulosGlb": 258866,
+  "aristas": 176391,
+  "bytesGlb": 1785688
+ }
+}

@@ -1,0 +1,770 @@
+{
+ "fuente": {
+  "archivo": "Restage_IP_ALL_MULTI_001.ifc",
+  "esquema": "IFC4",
+  "aplicacion": "cadwork version 30.0 build 403",
+  "bytesIfc": 189817172,
+  "excluidos": [
+   "Earth",
+   "Toposolid:Grass - 200mm:319177",
+   "Assembled Stair ×10",
+   "SI_SH_White Fabric Shading ×2",
+   "OuterFence",
+   "Railing ×2",
+   "ST_GN_Container_LOD300 ×24"
+  ]
+ },
+ "caja": {
+  "min": [
+   7.08,
+   -1.513,
+   45.065
+  ],
+  "max": [
+   26.32,
+   8.066,
+   56.205
+  ]
+ },
+ "niveles": [
+  {
+   "i": 0,
+   "nombre": "Cimentación",
+   "y": 0.017,
+   "elementos": 319
+  },
+  {
+   "i": 1,
+   "nombre": "Planta baja",
+   "y": 0.317,
+   "elementos": 2117
+  },
+  {
+   "i": 2,
+   "nombre": "Planta alta",
+   "y": 2.747,
+   "elementos": 810
+  },
+  {
+   "i": 3,
+   "nombre": "Cubierta",
+   "y": 5.147,
+   "elementos": 547
+  }
+ ],
+ "grupos": [
+  {
+   "id": "uniones",
+   "elementos": 2331
+  },
+  {
+   "id": "acero",
+   "elementos": 917
+  },
+  {
+   "id": "instalaciones",
+   "elementos": 173
+  },
+  {
+   "id": "madera",
+   "elementos": 144
+  },
+  {
+   "id": "hormigon",
+   "elementos": 83
+  },
+  {
+   "id": "aislamiento",
+   "elementos": 72
+  },
+  {
+   "id": "fachada",
+   "elementos": 50
+  },
+  {
+   "id": "armadura",
+   "elementos": 12
+  },
+  {
+   "id": "cubierta",
+   "elementos": 11
+  }
+ ],
+ "estructurales": [
+  "hormigon",
+  "acero",
+  "madera",
+  "uniones"
+ ],
+ "cubos": [
+  {
+   "clave": "n00_acero_h0",
+   "nivel": 0,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 83,
+   "hito": 0
+  },
+  {
+   "clave": "n00_acero_h6",
+   "nivel": 0,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 2,
+   "hito": 6
+  },
+  {
+   "clave": "n00_aislamiento_h0",
+   "nivel": 0,
+   "grupo": "aislamiento",
+   "vidrio": false,
+   "elementos": 58,
+   "hito": 0
+  },
+  {
+   "clave": "n00_armadura_h0",
+   "nivel": 0,
+   "grupo": "armadura",
+   "vidrio": false,
+   "elementos": 7,
+   "hito": 0
+  },
+  {
+   "clave": "n00_hormigon_h0",
+   "nivel": 0,
+   "grupo": "hormigon",
+   "vidrio": false,
+   "elementos": 17,
+   "hito": 0
+  },
+  {
+   "clave": "n00_instalaciones_h0",
+   "nivel": 0,
+   "grupo": "instalaciones",
+   "vidrio": false,
+   "elementos": 1,
+   "hito": 0
+  },
+  {
+   "clave": "n00_instalaciones_h4",
+   "nivel": 0,
+   "grupo": "instalaciones",
+   "vidrio": false,
+   "elementos": 6,
+   "hito": 4
+  },
+  {
+   "clave": "n00_uniones_h0",
+   "nivel": 0,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 145,
+   "hito": 0
+  },
+  {
+   "clave": "n01_acero_h0",
+   "nivel": 1,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 211,
+   "hito": 0
+  },
+  {
+   "clave": "n01_acero_h1",
+   "nivel": 1,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 148,
+   "hito": 1
+  },
+  {
+   "clave": "n01_acero_h1_d-apoyo",
+   "nivel": 1,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 1,
+   "hito": 1,
+   "destacado": "apoyo"
+  },
+  {
+   "clave": "n01_acero_h1_d-columna",
+   "nivel": 1,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 1,
+   "hito": 1,
+   "destacado": "columna"
+  },
+  {
+   "clave": "n01_acero_h1_d-union",
+   "nivel": 1,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 1,
+   "hito": 1,
+   "destacado": "union"
+  },
+  {
+   "clave": "n01_acero_h6",
+   "nivel": 1,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 72,
+   "hito": 6
+  },
+  {
+   "clave": "n01_aislamiento_h0",
+   "nivel": 1,
+   "grupo": "aislamiento",
+   "vidrio": false,
+   "elementos": 14,
+   "hito": 0
+  },
+  {
+   "clave": "n01_armadura_h0",
+   "nivel": 1,
+   "grupo": "armadura",
+   "vidrio": false,
+   "elementos": 5,
+   "hito": 0
+  },
+  {
+   "clave": "n01_fachada_h1",
+   "nivel": 1,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 20,
+   "hito": 1
+  },
+  {
+   "clave": "n01_fachada_h5",
+   "nivel": 1,
+   "grupo": "fachada",
+   "vidrio": false,
+   "elementos": 30,
+   "hito": 5
+  },
+  {
+   "clave": "n01_hormigon_h0",
+   "nivel": 1,
+   "grupo": "hormigon",
+   "vidrio": false,
+   "elementos": 5,
+   "hito": 0
+  },
+  {
+   "clave": "n01_hormigon_h3",
+   "nivel": 1,
+   "grupo": "hormigon",
+   "vidrio": false,
+   "elementos": 2,
+   "hito": 3
+  },
+  {
+   "clave": "n01_hormigon_h7",
+   "nivel": 1,
+   "grupo": "hormigon",
+   "vidrio": false,
+   "elementos": 58,
+   "hito": 7
+  },
+  {
+   "clave": "n01_instalaciones_h0",
+   "nivel": 1,
+   "grupo": "instalaciones",
+   "vidrio": false,
+   "elementos": 161,
+   "hito": 0
+  },
+  {
+   "clave": "n01_instalaciones_h2",
+   "nivel": 1,
+   "grupo": "instalaciones",
+   "vidrio": false,
+   "elementos": 4,
+   "hito": 2
+  },
+  {
+   "clave": "n01_madera_h0",
+   "nivel": 1,
+   "grupo": "madera",
+   "vidrio": false,
+   "elementos": 26,
+   "hito": 0
+  },
+  {
+   "clave": "n01_madera_h1",
+   "nivel": 1,
+   "grupo": "madera",
+   "vidrio": false,
+   "elementos": 5,
+   "hito": 1
+  },
+  {
+   "clave": "n01_uniones_h0",
+   "nivel": 1,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 708,
+   "hito": 0
+  },
+  {
+   "clave": "n01_uniones_h1",
+   "nivel": 1,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 277,
+   "hito": 1
+  },
+  {
+   "clave": "n01_uniones_h1_d-union",
+   "nivel": 1,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 3,
+   "hito": 1,
+   "destacado": "union"
+  },
+  {
+   "clave": "n01_uniones_h5",
+   "nivel": 1,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 105,
+   "hito": 5
+  },
+  {
+   "clave": "n01_uniones_h6",
+   "nivel": 1,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 252,
+   "hito": 6
+  },
+  {
+   "clave": "n01_uniones_h7",
+   "nivel": 1,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 8,
+   "hito": 7
+  },
+  {
+   "clave": "n02_acero_h0",
+   "nivel": 2,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 198,
+   "hito": 0
+  },
+  {
+   "clave": "n02_acero_h1",
+   "nivel": 2,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 21,
+   "hito": 1
+  },
+  {
+   "clave": "n02_acero_h6",
+   "nivel": 2,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 24,
+   "hito": 6
+  },
+  {
+   "clave": "n02_hormigon_h7",
+   "nivel": 2,
+   "grupo": "hormigon",
+   "vidrio": false,
+   "elementos": 1,
+   "hito": 7
+  },
+  {
+   "clave": "n02_madera_h0",
+   "nivel": 2,
+   "grupo": "madera",
+   "vidrio": false,
+   "elementos": 94,
+   "hito": 0
+  },
+  {
+   "clave": "n02_madera_h1",
+   "nivel": 2,
+   "grupo": "madera",
+   "vidrio": false,
+   "elementos": 5,
+   "hito": 1
+  },
+  {
+   "clave": "n02_uniones_h0",
+   "nivel": 2,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 375,
+   "hito": 0
+  },
+  {
+   "clave": "n02_uniones_h1",
+   "nivel": 2,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 56,
+   "hito": 1
+  },
+  {
+   "clave": "n02_uniones_h6",
+   "nivel": 2,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 36,
+   "hito": 6
+  },
+  {
+   "clave": "n03_acero_h0",
+   "nivel": 3,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 112,
+   "hito": 0
+  },
+  {
+   "clave": "n03_acero_h1",
+   "nivel": 3,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 41,
+   "hito": 1
+  },
+  {
+   "clave": "n03_acero_h1_d-union",
+   "nivel": 3,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 1,
+   "hito": 1,
+   "destacado": "union"
+  },
+  {
+   "clave": "n03_acero_h1_d-viga",
+   "nivel": 3,
+   "grupo": "acero",
+   "vidrio": false,
+   "elementos": 1,
+   "hito": 1,
+   "destacado": "viga"
+  },
+  {
+   "clave": "n03_cubierta_h0",
+   "nivel": 3,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 8,
+   "hito": 0
+  },
+  {
+   "clave": "n03_cubierta_h1",
+   "nivel": 3,
+   "grupo": "cubierta",
+   "vidrio": false,
+   "elementos": 3,
+   "hito": 1
+  },
+  {
+   "clave": "n03_instalaciones_h0",
+   "nivel": 3,
+   "grupo": "instalaciones",
+   "vidrio": false,
+   "elementos": 1,
+   "hito": 0
+  },
+  {
+   "clave": "n03_madera_h0",
+   "nivel": 3,
+   "grupo": "madera",
+   "vidrio": false,
+   "elementos": 14,
+   "hito": 0
+  },
+  {
+   "clave": "n03_uniones_h0",
+   "nivel": 3,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 271,
+   "hito": 0
+  },
+  {
+   "clave": "n03_uniones_h1",
+   "nivel": 3,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 91,
+   "hito": 1
+  },
+  {
+   "clave": "n03_uniones_h1_d-union",
+   "nivel": 3,
+   "grupo": "uniones",
+   "vidrio": false,
+   "elementos": 4,
+   "hito": 1,
+   "destacado": "union"
+  }
+ ],
+ "programa": null,
+ "hitos": {
+  "lista": [
+   {
+    "i": 0,
+    "codigo": "1",
+    "nombre": "ConstructionPhase_01",
+    "alias": [
+     {
+      "codigo": "Module1",
+      "nombre": "Bauabschnitt_01"
+     }
+    ],
+    "fecha": "2024-08-26",
+    "grupo": "",
+    "elementos": 2514
+   },
+   {
+    "i": 1,
+    "codigo": "3",
+    "nombre": "ConstructionPhase_03",
+    "alias": [
+     {
+      "codigo": "Module3",
+      "nombre": "Bauabschnitt_02"
+     }
+    ],
+    "fecha": "2025-05-05",
+    "grupo": "",
+    "elementos": 679
+   },
+   {
+    "i": 2,
+    "codigo": "3.1",
+    "nombre": "SolarPanel",
+    "alias": [
+     {
+      "codigo": "Module3.1",
+      "nombre": "SolarPanel"
+     }
+    ],
+    "fecha": "2025-05-09",
+    "grupo": "ConstructionPhase_03",
+    "elementos": 4
+   },
+   {
+    "i": 3,
+    "codigo": "2.1",
+    "nombre": "Concrete Slab Floor",
+    "alias": [],
+    "fecha": "2025-05-16",
+    "grupo": "ConstructionPhase_02",
+    "elementos": 2
+   },
+   {
+    "i": 4,
+    "codigo": "2.2",
+    "nombre": "Underground Water Tank",
+    "alias": [],
+    "fecha": "2025-06-03",
+    "grupo": "ConstructionPhase_02",
+    "elementos": 6
+   },
+   {
+    "i": 5,
+    "codigo": "2.3",
+    "nombre": "Green Facade",
+    "alias": [],
+    "fecha": "2025-06-04",
+    "grupo": "ConstructionPhase_02",
+    "elementos": 135
+   },
+   {
+    "i": 6,
+    "codigo": "4",
+    "nombre": "ConstructionPhase_04",
+    "alias": [],
+    "fecha": "2025-08-08",
+    "grupo": "",
+    "elementos": 386
+   },
+   {
+    "i": 7,
+    "codigo": "2.4",
+    "nombre": "3D-Printed Concrete Wall",
+    "alias": [],
+    "fecha": "2025-08-25",
+    "grupo": "ConstructionPhase_02",
+    "elementos": 67
+   }
+  ],
+  "sinFecha": [
+   {
+    "codigo": "2",
+    "nombre": "ConstructionPhase_02",
+    "elementos": 0
+   }
+  ],
+  "elementosSinHito": 0,
+  "tareasTotales": 12
+ },
+ "destacados": [
+  {
+   "clave": "union",
+   "min": [
+    18.783,
+    5.167,
+    52.995
+   ],
+   "max": [
+    18.836,
+    5.287,
+    53.115
+   ],
+   "piezas": [
+    {
+     "guid": "3Y7IL7dxDDHxddzti3YYPi",
+     "clase": "IFCPLATE",
+     "nombre": "STL1-01-PLT-BL",
+     "material": "STEEL/S355J2+N",
+     "nivel": "Steel1_01"
+    },
+    {
+     "guid": "2mHO2yg$T8BvxRXOOKE6oI",
+     "clase": "IFCPLATE",
+     "nombre": "STL1-00-PLT-BL",
+     "material": "STEEL/S355J2+N",
+     "nivel": "Steel1_00"
+    },
+    {
+     "guid": "2OMewiiqHDY9eGYsjFIdqz",
+     "clase": "IFCMECHANICALFASTENER",
+     "nombre": "STL1-01-FSTN-Bolt_12mm",
+     "material": "10.9",
+     "nivel": "Steel1_01"
+    },
+    {
+     "guid": "21bmPu7pXEQxthZRIbsAR2",
+     "clase": "IFCFASTENER",
+     "nombre": "STL1-01-WELD",
+     "material": "",
+     "nivel": "Steel1_01"
+    },
+    {
+     "guid": "3oAnQsp0z6EBfqC$VQe7TO",
+     "clase": "IFCFASTENER",
+     "nombre": "STL1-01-WELD",
+     "material": "",
+     "nivel": "Steel1_01"
+    },
+    {
+     "guid": "2inBV$0MP4UQL0QEnAfFKQ",
+     "clase": "IFCFASTENER",
+     "nombre": "STL1-01-WELD",
+     "material": "",
+     "nivel": "Steel1_01"
+    },
+    {
+     "guid": "3fRUNhDBjCPuzbxROaNUm8",
+     "clase": "IFCFASTENER",
+     "nombre": "STL1-00-WELD",
+     "material": "",
+     "nivel": "Steel1_00"
+    },
+    {
+     "guid": "12qOCsLMH2d9ciRg8z2jLb",
+     "clase": "IFCFASTENER",
+     "nombre": "STL1-00-WELD",
+     "material": "",
+     "nivel": "Steel1_00"
+    },
+    {
+     "guid": "3TNNAktob77QvjJJX73lbI",
+     "clase": "IFCFASTENER",
+     "nombre": "STL1-00-WELD",
+     "material": "",
+     "nivel": "Steel1_00"
+    }
+   ]
+  },
+  {
+   "clave": "viga",
+   "min": [
+    16.905,
+    5.167,
+    52.995
+   ],
+   "max": [
+    18.801,
+    5.287,
+    53.115
+   ],
+   "piezas": [
+    {
+     "guid": "0nJatm5Vn3rxBdLuS2c_nL",
+     "clase": "IFCBEAM",
+     "nombre": "STL1-01-BEAM-HEB",
+     "material": "STEEL/S235JR",
+     "nivel": "Steel1_01"
+    }
+   ]
+  },
+  {
+   "clave": "columna",
+   "min": [
+    18.993,
+    0.367,
+    52.995
+   ],
+   "max": [
+    19.113,
+    5.287,
+    53.115
+   ],
+   "piezas": [
+    {
+     "guid": "2fEOFOj49FRw53T_feI1WP",
+     "clase": "IFCBEAM",
+     "nombre": "STL1-00-BEAM-HEB",
+     "material": "STEEL/S235JR",
+     "nivel": "Steel1_00"
+    }
+   ]
+  },
+  {
+   "clave": "apoyo",
+   "min": [
+    18.825,
+    5.167,
+    52.995
+   ],
+   "max": [
+    19.049,
+    5.287,
+    53.115
+   ],
+   "piezas": [
+    {
+     "guid": "0u5NeaWfj3IuacpJN1ghPG",
+     "clase": "IFCBEAM",
+     "nombre": "STL1-00-BEAM-HEB",
+     "material": "STEEL/S235JR",
+     "nivel": "Steel1_00"
+    }
+   ]
+  }
+ ],
+ "totales": {
+  "elementos": 3793,
+  "triangulosIfc": 1595774,
+  "triangulosGlb": 416530,
+  "aristas": 537773,
+  "bytesGlb": 1989624
+ }
+}
