@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowClockwise, ArrowCounterClockwise, Pause, Play } from "@phosphor-icons/react/dist/ssr";
+import { ArrowClockwise, ArrowCounterClockwise } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "cn";
 
 import fichaJson from "@/lib/modelo/ficha-restage.json";
@@ -39,86 +39,43 @@ type Carga = "espera" | "cargando" | "listo" | "error";
 const BOTON_REDONDO =
   "grid size-11 place-items-center rounded-full border border-bone/50 bg-ink-deep/80 text-bone transition-[background-color,transform] duration-300 ease-out-quart hover:bg-bone/10 active:scale-[0.96]";
 
-/** Línea de tiempo por hitos reales: avanzar, pausar y elegir un hito. */
-function ControlHitos({
-  tiempo,
-  libre,
-  reproduciendo,
-  alCambiar,
-  alAlternar,
-}: {
+/** El scroll presenta los hitos. Al terminar, la línea permite revisarlos. */
+function ControlHitos({ tiempo, libre, alCambiar }: {
   tiempo: number;
   libre: boolean;
-  reproduciendo: boolean;
   alCambiar: (t: number) => void;
-  alAlternar: () => void;
 }) {
-  const id = useId();
   const total = HITOS.length;
   const hechos = Math.min(total, Math.floor(tiempo * total + 1e-6));
-  const hito = hechos > 0 ? HITOS[hechos - 1] : null;
+  const hito = HITOS[hechos - 1];
   const titulo = hito ? nombreHito(hito) : "Antes del primer hito";
-  const alias = hito?.alias.find((a) => a.nombre !== hito.nombre);
+
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg bg-ink-black/90 p-4 lg:p-5">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={alAlternar}
-          disabled={!libre}
-          aria-label={reproduciendo ? "Pausar la secuencia" : "Reproducir la secuencia"}
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-bone text-ink transition-transform duration-200 ease-out-quart active:scale-[0.96] disabled:opacity-40"
-        >
-          {reproduciendo ? (
-            <Pause aria-hidden="true" weight="fill" className="size-[18px]" />
-          ) : (
-            <Play aria-hidden="true" weight="fill" className="size-[18px]" />
-          )}
-        </button>
-        <div className="min-w-0 flex-1">
-          <label htmlFor={id} className="flex items-baseline justify-between gap-3 text-sm">
-            <span data-rotulo-tiempo className="font-semibold text-bone lg:truncate">
-              {titulo}
-            </span>
-            <span data-fecha-tiempo className="shrink-0 tabular-nums text-mist">
-              {hito ? fechaHito(hito) : `0 de ${total}`}
-            </span>
-          </label>
-          <input
-            id={id}
-            type="range"
-            min={0}
-            max={total}
-            step={1}
-            value={hechos}
-            disabled={!libre}
-            onChange={(e) => alCambiar(Number(e.target.value) / total)}
-            aria-valuetext={hito ? `Hito ${hechos} de ${total}: ${titulo}, terminado el ${fechaHito(hito)}` : `Antes del primer hito, 0 de ${total}`}
-            className="mt-1.5 h-6 w-full cursor-pointer accent-amber disabled:cursor-default"
-          />
-        </div>
+    <div className="rounded-lg bg-ink-black/90 p-4 lg:p-5">
+      <div className="flex items-baseline justify-between gap-3 text-xs tabular-nums text-mist">
+        <span>Hito {hechos} de {total}</span>
+        {hito && <span data-fecha-tiempo>{fechaHito(hito)}</span>}
       </div>
-      <p className="text-xs leading-4 text-mist">
-        {hito ? (
-          <>
-            Hito {hechos} de {total} · {hito.elementos.toLocaleString("es-CO")} elementos · en el archivo:{" "}
-            <span lang="en">{hito.nombre}</span>
-            {alias ? (
-              <>
-                {" "}
-                (<span lang="de">{alias.nombre}</span>)
-              </>
-            ) : null}
-          </>
-        ) : (
-          `${total} hitos con fecha real de terminación`
-        )}
-      </p>
-      <p className="text-xs leading-4 text-mist">
-        {libre
-          ? "Fechas reales de terminación, leídas del IFC. El archivo no trae comienzos ni duraciones: la línea avanza de hito en hito."
-          : "Sigue bajando: al terminar podrás mover los hitos a mano."}
-      </p>
+      <p data-rotulo-tiempo className="mt-1 text-sm font-semibold text-bone">{titulo}</p>
+      {libre ? (
+        <input
+          type="range"
+          aria-label="Elegir hito de construcción"
+          aria-valuetext={hito ? `${titulo}, ${fechaHito(hito)}` : titulo}
+          min={0}
+          max={total}
+          step={1}
+          value={hechos}
+          onChange={(e) => alCambiar(Number(e.target.value) / total)}
+          className="block min-h-11 w-full cursor-pointer accent-amber"
+        />
+      ) : (
+        <div aria-hidden="true" className="mt-3 flex gap-1">
+          {HITOS.map((h, i) => (
+            <span key={h.nombre} className={`h-0.5 flex-1 rounded-full ${i < hechos ? "bg-amber" : "bg-bone/25"}`} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -130,7 +87,6 @@ export function Recorrido() {
   const panel = useRef<HTMLDivElement>(null);
   const visor = useRef<VisorModelo | null>(null);
   const disparador = useRef<ScrollTrigger | null>(null);
-  const reproduccion = useRef<gsap.core.Tween | null>(null);
   const arrastre = useRef<number | null>(null);
   /** Única fuente de verdad del recorrido: avance del scroll y, al final, el control manual. */
   const mando = useRef({ avance: 0, libre: false, tiempo: 1, giro: 0, entrada: 1 });
@@ -147,7 +103,6 @@ export function Recorrido() {
   const [conEtiqueta, setConEtiqueta] = useState(false);
   const [segundaLectura, setSegundaLectura] = useState(false);
   const [enPortada, setEnPortada] = useState(true);
-  const [reproduciendo, setReproduciendo] = useState(false);
 
   /** Dibuja el estado actual del mando y pone la interfaz al día. */
   const pintar = useCallback(() => {
@@ -177,11 +132,6 @@ export function Recorrido() {
       const m = mando.current;
       const yaLibre = p >= AVANCE_LIBRE;
       if (yaLibre && !m.libre) Object.assign(m, { tiempo: 1, giro: 0 });
-      if (!yaLibre && reproduccion.current) {
-        reproduccion.current.kill();
-        reproduccion.current = null;
-        setReproduciendo(false);
-      }
       m.avance = p;
       m.libre = yaLibre;
       pintar();
@@ -304,36 +254,10 @@ export function Recorrido() {
     disparador.current?.getTween()?.progress(1);
   };
 
-  const detener = () => {
-    reproduccion.current?.kill();
-    reproduccion.current = null;
-    setReproduciendo(false);
-  };
-
   const cambiarTiempo = (t: number) => {
     asentar();
-    detener();
     mando.current.tiempo = t;
     pintar();
-  };
-
-  const alternarReproduccion = () => {
-    if (reproduccion.current) return detener();
-    asentar();
-    const m = mando.current;
-    if (m.tiempo >= 0.999) m.tiempo = 0;
-    setReproduciendo(true);
-    reproduccion.current = gsap.to(m, {
-      tiempo: 1,
-      duration: 1.3 * HITOS.length * (1 - m.tiempo),
-      ease: "none",
-      onUpdate: pintar,
-      onComplete: () => {
-        reproduccion.current = null;
-        setReproduciendo(false);
-        pintar();
-      },
-    });
   };
 
   const girar = (sentido: 1 | -1) => {
@@ -367,7 +291,7 @@ export function Recorrido() {
     </div>
   );
   const control = (
-    <ControlHitos tiempo={tiempo} libre={libre} reproduciendo={reproduciendo} alCambiar={cambiarTiempo} alAlternar={alternarReproduccion} />
+    <ControlHitos tiempo={tiempo} libre={libre} alCambiar={cambiarTiempo} />
   );
 
   return (
