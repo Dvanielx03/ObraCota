@@ -119,8 +119,11 @@ test.describe("Formulario de demostración", () => {
     await page.goto("/#contacto");
     const formulario = page.locator("#contacto form");
 
-    await formulario.getByRole("button", { name: "Enviar solicitud" }).click();
-    await expect(formulario.getByText("Escribe tu nombre para saber a quién responder.")).toBeVisible();
+    // En desarrollo el primer clic puede llegar antes de que la página responda: se reintenta.
+    await expect(async () => {
+      await formulario.getByRole("button", { name: "Enviar solicitud" }).click({ timeout: 2_000 });
+      await expect(formulario.getByText("Escribe tu nombre para saber a quién responder.")).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 30_000 });
     await expect(formulario.getByText("Escribe un correo para poder contactarte.")).toBeVisible();
     await expect(formulario.getByText("Marca la casilla para aceptar el tratamiento de tus datos.")).toBeVisible();
     await expect(formulario.getByLabel("Tu nombre")).toBeFocused();
