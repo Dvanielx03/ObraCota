@@ -1,0 +1,420 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* ObraCota · sistema visual «Precisión»
+   Mundo oscuro azul noche, texto hueso, ámbar de las ventanas como acento. */
+
+@theme {
+  --color-ink: #0a1522;
+  --color-ink-deep: #060d16;
+  --color-ink-black: #04080d;
+  --color-ink-raised: #101e2e;
+  --color-ink-capsule: #16202c;
+  --color-bone: #f1ede4;
+  --color-paper: #ffffff;
+  --color-amber: #f2b25c;
+  --color-mist: #a9b4bf;
+  --color-slate: #4b5661;
+  --color-leaf: #3fa37a;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-rise: rise 0.9s var(--ease-out-expo) both;
+  --animate-settle: settle 1.6s var(--ease-out-expo) both;
+  --animate-fade-up: fade-up 0.8s var(--ease-out-expo) both;
+  --animate-menu-link: menu-link 0.5s var(--ease-out-quart) both;
+  /* Carrusel de Avance: la vista se abre desde el centro, se acerca despacio y el riel se llena. */
+  --animate-avance-abrir: avance-abrir 1.15s var(--ease-out-expo) both;
+  --animate-avance-empuje: avance-empuje 9s linear both;
+  --animate-avance-llenar: avance-llenar 6s linear both;
+
+  @keyframes avance-abrir {
+    from {
+      clip-path: inset(0 50% 0 50%);
+    }
+    to {
+      clip-path: inset(0 0% 0 0%);
+    }
+  }
+  @keyframes avance-empuje {
+    from {
+      transform: scale(1);
+    }
+    to {
+      transform: scale(1.07);
+    }
+  }
+  @keyframes avance-llenar {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  @keyframes rise {
+    from {
+      transform: translateY(108%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  @keyframes settle {
+    from {
+      transform: scale(1.07);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes menu-link {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* «ancho»: hay sitio para poner texto y foto lado a lado. No depende solo del ancho: un
+   teléfono apaisado también lo cumple, aunque no llegue a 1024 px. */
+@custom-variant ancho (@media (min-width: 64rem) or ((min-width: 40rem) and (orientation: landscape) and (max-height: 32rem)));
+
+@theme inline {
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bebas), sans-serif;
+  --font-heading: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.3334);
+  --radius-2xl: calc(var(--radius) * 2);
+}
+
+/* Tokens de shadcn sobre el mundo oscuro. */
+:root {
+  --radius: 0.75rem;
+  --background: #0a1522;
+  --foreground: #f1ede4;
+  --card: #101e2e;
+  --card-foreground: #f1ede4;
+  --popover: #04080d;
+  --popover-foreground: #f1ede4;
+  --primary: #f1ede4;
+  --primary-foreground: #0a1522;
+  --secondary: #16202c;
+  --secondary-foreground: #f1ede4;
+  --muted: #16202c;
+  --muted-foreground: #a9b4bf;
+  --accent: #16202c;
+  --accent-foreground: #f1ede4;
+  --destructive: #ff9c8a;
+  --border: rgb(241 237 228 / 0.16);
+  --input: rgb(241 237 228 / 0.45);
+  --ring: #f2b25c;
+  color-scheme: dark;
+}
+
+/* Las superficies hueso invierten los mismos tokens. */
+.on-bone {
+  --background: #f1ede4;
+  --foreground: #0a1522;
+  --card: #ffffff;
+  --card-foreground: #0a1522;
+  --primary: #0a1522;
+  --primary-foreground: #f1ede4;
+  --muted: #e6e0d4;
+  --muted-foreground: #4b5661;
+  --accent: #e6e0d4;
+  --accent-foreground: #0a1522;
+  --destructive: #a3261a;
+  --border: rgb(10 21 34 / 0.25);
+  --input: #0a1522;
+  --ring: #0a1522;
+  color-scheme: light;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply font-sans;
+    scroll-padding-top: 7rem;
+    scrollbar-color: #2b3b4f #060d16;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-ink text-bone antialiased;
+    font-feature-settings: "tnum" 0;
+  }
+
+  ::selection {
+    background: #f2b25c;
+    color: #0a1522;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  a {
+    text-underline-offset: 0.3em;
+    text-decoration-thickness: 1px;
+  }
+
+  input,
+  textarea {
+    caret-color: var(--ring);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+}
+
+/* Estilos de texto con nombre. La voz de titulares es Bebas Neue;
+   el texto corrido usa los pasos de la escala de Tailwind con Manrope. */
+@utility display-hero {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: clamp(5.25rem, 21.5vw, 10.5rem);
+  line-height: 0.893;
+  letter-spacing: 0.006em;
+}
+
+@utility display-section {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: clamp(4rem, 7.8vw, 7rem);
+  line-height: 0.9;
+  letter-spacing: 0.005em;
+}
+
+@utility display-figure {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: clamp(10rem, 16.7vw, 15rem);
+  line-height: 0.82;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility display-stat {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: clamp(4rem, 6.1vw, 5.5rem);
+  line-height: 0.91;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility display-label {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: clamp(3rem, 5vw, 4.5rem);
+  line-height: 0.9;
+}
+
+@utility display-step {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 2.75rem;
+  line-height: 0.91;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility text-statement {
+  font-size: clamp(1.875rem, 3.6vw, 3.25rem);
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+  font-weight: 500;
+}
+
+.header-glass {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--color-ink-deep);
+  background-image: linear-gradient(174deg, rgb(223 238 251 / 11%), transparent 55%, rgb(242 178 92 / 5%));
+  border: 1px solid rgb(241 237 228 / 20%);
+  box-shadow: inset 0 2px 4px -2px rgb(255 255 255 / 55%), inset 0 -3px 5px -3px rgb(180 207 222 / 55%), 0 2px 5px rgb(4 8 13 / 20%), 0 9px 24px -8px rgb(4 8 13 / 45%);
+}
+
+.indicador-seccion {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: var(--indicador-ancho);
+  height: var(--indicador-alto);
+  transform: translate(var(--indicador-x), var(--indicador-y));
+  border-radius: 999px;
+  background: var(--color-bone);
+  visibility: hidden;
+  pointer-events: none;
+}
+.selector-seccion[data-medido] .indicador-seccion {
+  visibility: visible;
+  transition: transform 320ms cubic-bezier(.45, 0, .2, 1), width 320ms cubic-bezier(.45, 0, .2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .selector-seccion[data-medido] .indicador-seccion { transition: none; }
+}
+@media (forced-colors: active) {
+  .selector-seccion a { mix-blend-mode: normal; }
+  .selector-seccion a[aria-current="location"] { outline: 2px solid Highlight; }
+}
+
+.portada-responsive {
+  min-height: 100svh;
+  padding-block: clamp(6rem, 17svh, 10.5rem) clamp(1rem, 3svh, 2.5rem);
+}
+.portada-responsive .display-hero { font-size: clamp(4.25rem, min(21.5vw, 21svh), 13.5rem); }
+
+@media (min-width: 42rem) {
+  .pliego-responsive { grid-template-columns: minmax(0, 1fr) minmax(0, .98fr); }
+}
+@media (min-width: 64rem) {
+  section.portada-responsive { padding-inline: max(3rem, (100% - 84rem) / 2); }
+  .pliego-responsive { column-gap: clamp(2rem, 5vw, 5rem); }
+}
+@media (min-width: 42rem) and (max-width: 63.99rem) and (max-height: 32rem) {
+  .portada-responsive {
+    display: grid;
+    grid-template-columns: 1fr 0.92fr;
+    align-items: end;
+    gap: .75rem 2rem;
+  }
+  .portada-responsive h1 { align-self: start; }
+  .portada-responsive > p, .portada-responsive > a { grid-column: 1; margin-top: 0; }
+  .portada-responsive > a { justify-self: start; }
+  .portada-responsive .portada-ficha { grid-column: 2; grid-row: 1 / span 3; padding-top: 0; }
+}
+
+
+.frase-responsive { padding-block: clamp(4rem, 11svh, 8rem); }
+.capitulo-responsive {
+  padding-block: clamp(5rem, 12svh, 7.5rem) clamp(2.5rem, 7svh, 6rem);
+}
+.capitulo-responsive .display-section { font-size: clamp(3.25rem, min(7.8vw, 12svh), 7rem); }
+.avance-responsive .display-figure { font-size: clamp(7rem, min(17vw, 25svh), 15rem); }
+@media (min-width: 42rem) {
+  .solicitud-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .solicitud-grid button[type="submit"] { justify-self: start; }
+  .avance-responsive { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 64rem) {
+  section.frase-responsive { padding-block: clamp(6.75rem, 12svh, 8rem) clamp(4rem, 11svh, 8rem); }
+  section.capitulo-responsive { padding-block: clamp(6.75rem, 12svh, 8rem) clamp(2.5rem, 7svh, 6rem); }
+}
+/* El reflejo recorre únicamente el canto; el centro queda libre para los enlaces. */
+@supports (mask-composite: exclude) {
+  .header-glass::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    padding: 1.5px;
+    border-radius: inherit;
+    pointer-events: none;
+    background: conic-gradient(from 87deg, transparent, rgb(237 223 194 / 72%) 12%, transparent 30%, rgb(197 223 239 / 22%) 51%, rgb(251 251 247 / 87%) 66%, transparent 82%);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .header-glass {
+    background-color: rgb(6 13 22 / 61%);
+    -webkit-backdrop-filter: blur(14px) saturate(155%);
+    backdrop-filter: blur(14px) saturate(155%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  .header-glass {
+    background: var(--color-ink-deep);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .header-glass::before {
+    display: none;
+  }
+}
+
+/* Línea de titular con máscara: el texto sube desde su propia caja. */
+@utility line-mask {
+  display: block;
+  overflow: hidden;
+  padding-top: 0.06em;
+}
+
+@media (min-width: 96rem) {
+  .display-hero {
+    font-size: min(11.67vw, 13.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
