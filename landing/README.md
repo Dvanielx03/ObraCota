@@ -196,13 +196,12 @@ atrás sin tirones), sin audio, en 1280 y 960 px de ancho. Los cuatro archivos p
 
 - Modelo 3D e hitos: ReStage, RWTH Aachen, CC BY 4.0 (ver arriba).
 - Portada y avance: recreaciones con IA (Higgsfield) a partir del modelo de ReStage.
-- Fotografía del contacto: imagen generada con Google Flow para el caso ficticio Pabellón
-  Arrayán. Pendiente de sustituir por el mismo edificio.
+- Contacto: la foto ocupa toda la sección y el formulario flota en una tarjeta. El fondo pasa del terreno a una casa totalmente terminada con un barrido, y un recuadro mantiene el inicio a la vista. Ambas imágenes están generadas con IA (Higgsfield); el acabado final es ilustrativo y la página lo dice.
 
 ## Pendientes conocidos
 
 - Conectar el formulario a un canal de contacto real y redactar la política de datos.
-- Rehacer la foto de contacto y la imagen para redes (`og.jpg`) con el mismo edificio.
+- Rehacer la imagen para redes (`og.jpg`) con el mismo edificio.
 - Probar el vídeo ligado al scroll en un iPhone real.
 - En el servidor de desarrollo, las pruebas que entran directo a una sección pueden fallar por hacer clic antes de la hidratación; contra la compilación de producción pasan.
 - Definir el dominio (`NEXT_PUBLIC_SITE_URL`) antes de publicar.
