@@ -13,3 +13,7 @@ PostgreSQL conserva la contraseña con BCrypt y el identificador de la sesión a
 `POST /api/projects` crea un proyecto y devuelve 201 con Location. `GET /api/projects` lista únicamente las obras del propietario. `GET`, `PUT` y `DELETE /api/projects/{id}` consultan, renombran y eliminan una obra del mismo usuario. La API responde 404 cuando la obra no es visible para el solicitante. El proyecto público de ejemplo pertenece al catálogo estático de la interfaz.
 
 El agregado Project registra eventos de alta, cambio y eliminación. El caso de uso persiste mediante ProjectRepository, publica los eventos y los limpia en la misma transacción de entrada. Los futuros consumidores deben usar TransactionalEventListener en fase AFTER_COMMIT. Flyway conserva el vínculo con el propietario y su índice. La API prueba validación, persistencia, aislamiento de propietarios, mapeo sin repetir eventos y revocación de sesiones.
+
+## Archivos del proyecto
+
+ModelFile agrupa las entregas de un IFC o DWG por proyecto. El catálogo comprueba el propietario. Un identificador explícito permite asociar una revisión cuyo nombre ha cambiado.
