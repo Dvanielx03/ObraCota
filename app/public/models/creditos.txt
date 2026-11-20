@@ -1,0 +1,5 @@
+ReStage · RWTH Aachen
+Chu Han Wu, Görkem Can Ertemli, Martin von Hilchen, Sigrid Brell-Cokcan y Marit Zöcklein.
+Fuente: https://zenodo.org/records/21470658
+Licencia: Creative Commons Attribution 4.0 International · https://creativecommons.org/licenses/by/4.0/
+Adaptación de ObraCota: conversión de IFC a GLB, exclusión del entorno del campus, simplificación de refuerzos, tornillería e instalaciones y aplicación de colores propios.
