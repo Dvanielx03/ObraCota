@@ -473,6 +473,8 @@ export function Recorrido() {
         <p className="shrink-0 tabular-nums">
           {ELEMENTOS} elementos · {ficha.niveles.length} plantas · {ficha.fuente.esquema}
         </p>
+        {process.env.NEXT_PUBLIC_PANEL_URL && <a className="inline-flex min-h-11 items-center font-semibold text-bone underline underline-offset-4"
+          href={process.env.NEXT_PUBLIC_PANEL_URL.replace(/\/$/, "") + "/proyectos/restage/visor?desde=recorrido"}>Abrir ReStage en el visor ↗</a>}
         <details className="max-w-[44rem] lg:text-right">
           <summary className="cursor-pointer py-2 font-semibold text-bone">ReStage · Créditos</summary>
           <p className="py-2">

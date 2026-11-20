@@ -113,7 +113,9 @@ export function SiteHeader() {
     };
   }, [enInicio]);
 
-  const destino = (id: string) => (enInicio ? `#${id}` : `/#${id}`);
+  const panelUrl = process.env.NEXT_PUBLIC_PANEL_URL;
+  const entryUrl = panelUrl || (enInicio ? "#contacto" : "/#contacto");
+  const entryLabel = panelUrl ? "Entrar al panel" : "Solicitar demostración";
 
   return (
     <header className="fixed inset-x-0 top-3 z-50 px-3 lg:top-6 lg:px-8">
@@ -129,10 +131,10 @@ export function SiteHeader() {
         <SelectorSeccion activa={activa} enInicio={enInicio} />
 
         <a
-          href={destino("contacto")}
+          href={entryUrl}
           className="group hidden h-12 items-center gap-3 justify-self-end rounded-full bg-bone pl-6 pr-1.5 text-[15px] font-semibold text-ink transition-transform duration-200 ease-out-quart active:scale-[0.98] lg:flex"
         >
-          Solicitar demostración
+          {entryLabel}
           <span className="grid size-9 place-items-center rounded-full bg-ink text-bone">
             <ArrowRight
               aria-hidden="true"
@@ -161,7 +163,7 @@ export function SiteHeader() {
           >
             <SheetTitle className="sr-only">Menú principal</SheetTitle>
             <SheetDescription className="sr-only">
-              Enlaces a las secciones de la página y a la solicitud de demostración.
+              Enlaces a las secciones de la página y al espacio de trabajo.
             </SheetDescription>
             <div className="flex h-[60px] items-center justify-between pl-[18px] pr-2">
               <Logo />
@@ -181,13 +183,13 @@ export function SiteHeader() {
             <SheetClose
               render={
                 <a
-                  href={destino("contacto")}
+                  href={entryUrl}
                   style={{ animationDelay: "420ms" }}
                   className="animate-menu-link mx-[6px] mb-3 flex h-14 min-h-11 items-center justify-between rounded-full bg-bone pl-6 pr-2 text-base font-semibold text-ink"
                 />
               }
             >
-              Solicitar demostración
+              {entryLabel}
               <span className="grid size-10 place-items-center rounded-full bg-ink text-bone">
                 <ArrowRight aria-hidden="true" weight="bold" className="size-4" />
               </span>

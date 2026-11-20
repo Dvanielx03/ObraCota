@@ -1,0 +1,62 @@
+.panel-shell {
+  --panel-line: #c9c6bc;
+  display: grid;
+  grid-template-columns: clamp(195px, 17vw, 270px) minmax(0, 1fr);
+  min-height: 100dvh;
+  background: #f1ede4;
+  color: #0a1522;
+}
+.panel-shell a { color: inherit; text-underline-offset: .2em; }
+.panel-rail { display: flex; flex-direction: column; padding: 22px 14px; border-right: 1px solid var(--panel-line); background: #f7f4ed; }
+.panel-brand { display: inline-flex; align-items: center; gap: 9px; padding: 6px 12px; font-weight: 800; font-size: 23px; letter-spacing: -.05em; text-decoration: none; }
+.panel-rail nav { display: flex; flex-direction: column; margin: 38px 0 auto; gap: 3px; }
+.panel-rail nav a, .panel-site { padding: 12px 14px; min-height: 44px; text-decoration: none; border-left: 3px solid transparent; }
+.panel-rail nav a:hover, .panel-site:hover { background: #eae6dd; }
+.panel-rail nav a[aria-current] { border-color: #f2b25c; background: #e9e5db; font-weight: 750; }
+.panel-site { margin-top: 22px; font-size: 13px; }
+.panel-body { min-width: 0; }
+.panel-trail { padding: 20px clamp(20px, 4vw, 78px); border-bottom: 1px solid var(--panel-line); color: #49555e; font-size: 13px; }
+.panel-trail a { padding-block: 12px; }
+.panel-content { max-width: 1500px; margin-inline: auto; padding: clamp(28px, 5vw, 90px) clamp(20px, 4vw, 78px); }
+.panel-content h1 { font: clamp(42px, 5.1vw, 88px)/1 Bebas, sans-serif; margin-bottom: clamp(30px, 5vh, 55px); }
+.panel-content h2 { font-size: clamp(17px, 1.3vw, 23px); line-height: 1.35; }
+.panel-content p { color: #47545e; line-height: 1.65; max-width: 62ch; margin-top: 9px; }
+.panel-content .panel-caption { font-size: 13px; color: #4e5960; margin-bottom: 12px; }
+.project-row { display: flex; gap: 22px; align-items: center; padding: 16px 0; border-block: 1px solid var(--panel-line); }
+.project-row img { object-fit: cover; border-radius: 4px; }
+.project-row p { margin: 2px 0; }
+.panel-action { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 16px; border: 1px solid currentColor; border-radius: 5px; font-weight: 700; text-decoration: none; margin-top: 18px; }
+.panel-action:hover { background: #0a1522; color: #f1ede4; }
+.project-row .panel-action { margin: 0 0 0 auto; }
+.panel-content .panel-note { margin-top: 20px; }
+.panel-summary, .panel-columns { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: clamp(22px, 3.5vw, 70px); }
+.panel-preview { width: 100%; height: auto; display: block; border-radius: 5px; }
+.panel-caption-row { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12px; margin-top: 10px; }
+.panel-facts a, .panel-columns section { display: block; border-top: 1px solid var(--panel-line); padding-block: 18px; }
+.panel-facts a { text-decoration: none; }
+.panel-facts a:hover h2 { text-decoration: underline; }
+.panel-facts p, .file-name { overflow-wrap: anywhere; }
+.file-name { font-weight: 700; }
+.panel-menu { display: none; }
+.estimate-sheet { overflow-x: auto; }
+.estimate-sheet table { border-collapse: collapse; width: 100%; }
+.estimate-sheet caption { text-align: left; font-weight: 700; margin-bottom: 18px; }
+.estimate-sheet th { padding: 12px 10px 12px 0; text-align: left; border-block: 1px solid var(--panel-line); }
+.estimate-sheet td { padding-block: 24px; }
+.panel-skip { position: absolute; left: 8px; top: 8px; padding: 12px; transform: translateY(-160%); background: white; z-index: 3; }
+.panel-skip:focus { transform: none; }
+@media (max-width: 720px) {
+  .panel-shell { display: block; }
+  .panel-rail { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--panel-line); }
+  .panel-brand { padding: 4px; font-size: 20px; }
+  .panel-menu { display: block; border: 1px solid var(--panel-line); padding: 0 12px; border-radius: 4px; }
+  .panel-site { margin: 0; padding: 12px 4px; font-size: 12px; grid-column: 3; grid-row: 1; }
+  .panel-rail nav { grid-column: 1/-1; grid-row: 2; display: none; margin: 0; }
+  .panel-rail nav[data-expanded="true"] { display: flex; }
+  .panel-summary, .panel-columns { grid-template-columns: minmax(0,1fr); }
+  .project-row { flex-wrap: wrap; gap: 12px; }
+  .project-row img { width: 82px; height: 62px; }
+  .project-row .panel-action { margin: 0; }
+  .estimate-sheet thead { display: none; }
+  .estimate-sheet caption { border-bottom: 1px solid var(--panel-line); padding-bottom: 12px; margin: 0; }
+}
