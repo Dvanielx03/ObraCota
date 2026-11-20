@@ -82,7 +82,7 @@ La página queda en `http://localhost:3000`.
 
 ## Despliegue con Docker
 
-Requisito: Docker Desktop en marcha.
+Con Docker Desktop en marcha, copia `.env.example` como `.env`. Define una contraseña de PostgreSQL y una clave JWT independiente de al menos 32 bytes aleatorios en Base64. Puedes generar cada valor con `openssl rand -base64 48`. Conserva el archivo local entre despliegues. Para HTTPS configura `COOKIE_SECURE=true`.
 
 ```bash
 docker compose up -d --build
@@ -92,15 +92,15 @@ La landing queda en `http://localhost:3200`. «Entrar al panel» abre la aplicac
 
 | Comando | Qué hace |
 |---|---|
-| `docker compose up -d --build` | Reconstruye y levanta la landing y el panel |
-| `docker compose --profile datos up -d --build` | Añade PostgreSQL con `pgvector` |
+| `docker compose up -d --build` | Levanta landing, panel, API y PostgreSQL con migraciones Flyway |
+| `docker compose ps` | Comprueba la salud de los cuatro servicios |
 | `docker compose logs -f landing` | Muestra los registros |
 | `docker compose down` | Detiene los contenedores; los datos se conservan |
 
-Para cambiar los orígenes públicos, configura `SITE_URL` y `PANEL_URL` en el archivo local `.env` y reconstruye las imágenes. Ambos enlaces se fijan en la compilación. En desarrollo sin Compose las variables son `NEXT_PUBLIC_PANEL_URL` en la landing y `NEXT_PUBLIC_SITE_URL` en la aplicación. El perfil `datos` exige definir `POSTGRES_PASSWORD`.
+Para cambiar los orígenes públicos, configura `SITE_URL` y `PANEL_URL` en el archivo local `.env` y reconstruye las imágenes. Ambos enlaces se fijan en la compilación. En desarrollo sin Compose las variables son `NEXT_PUBLIC_PANEL_URL` en la landing y `NEXT_PUBLIC_SITE_URL` en la aplicación.
 
 > [!NOTE]
-> La imagen usa el modo `standalone` de Next.js: solo lleva el servidor, los archivos estáticos y `public/`. El backend y el resto de servicios se añadirán a `compose.yaml` cuando exista su código.
+> La imagen usa el modo `standalone` de Next.js: solo lleva el servidor, los archivos estáticos y `public/`. La API de proyectos se documenta en [la arquitectura del backend](backend/docs/ARCHITECTURE.md) y [el mapa de contextos](backend/docs/CONTEXT-MAP.md).
 
 ## Estructura del repositorio
 
