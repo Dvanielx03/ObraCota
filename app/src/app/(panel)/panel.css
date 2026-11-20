@@ -38,6 +38,10 @@
 .panel-facts p, .file-name { overflow-wrap: anywhere; }
 .file-name { font-weight: 700; }
 .panel-menu { display: none; }
+.account-form { max-width: 26rem; display: grid; gap: 16px; }
+.account-form label { display: grid; gap: 6px; font-weight: 650; }
+.account-form input { min-height: 44px; padding: 8px 12px; border: 1px solid #858981; background: #faf8f2; border-radius: 4px; }
+.account-form .panel-action { width: fit-content; margin: 0; }
 .estimate-sheet { overflow-x: auto; }
 .estimate-sheet table { border-collapse: collapse; width: 100%; }
 .estimate-sheet caption { text-align: left; font-weight: 700; margin-bottom: 18px; }

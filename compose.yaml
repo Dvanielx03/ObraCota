@@ -10,9 +10,13 @@ name: obracota
 
 services:
   app:
+    depends_on:
+      backend:
+        condition: service_healthy
     build:
       context: ./app
       args:
+        API_INTERNAL_URL: http://backend:8080
         NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost:${LANDING_PORT:-3200}}
     image: obracota-app:local
     ports:
@@ -30,9 +34,24 @@ services:
       - "${LANDING_PORT:-3200}:3000"
     restart: unless-stopped
 
-  # Base de datos del backend: PostgreSQL con la extensión pgvector para el RAG.
+  backend:
+    build: ./backend
+    image: obracota-backend:local
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-obracota}
+      POSTGRES_USER: ${POSTGRES_USER:-obracota}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
+      JWT_SECRET: ${JWT_SECRET:?Configura JWT_SECRET en .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+    restart: unless-stopped
+
   db:
-    profiles: ["datos"]
     image: pgvector/pgvector:pg17
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-obracota}
