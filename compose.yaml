@@ -10,6 +10,8 @@ name: obracota
 
 services:
   app:
+    environment:
+      API_INTERNAL_URL: http://backend:8080
     depends_on:
       backend:
         condition: service_healthy
@@ -36,6 +38,8 @@ services:
 
   backend:
     build: ./backend
+    volumes:
+      - modelos-originales:/srv/originals
     image: obracota-backend:local
     depends_on:
       db:
@@ -70,4 +74,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  modelos-originales:
   datos-postgres:

@@ -20,7 +20,7 @@ function Detail({ id }: { id: string }) {
   }, [id, version]);
   return <PanelView project={false} title={project?.name || "Proyecto"}>
     {error ? <p role="alert">{error} <button onClick={() => { setError(""); reload(version + 1); }}>Reintentar</button></p>
-      : project ? <section><h2>Archivos del proyecto</h2><p>Todavía no hay archivos. La carga de entregas se habilitará con el control de versiones.</p></section>
+      : project ? <section><h2>Archivos del proyecto</h2><Link className="panel-action" href={"/proyectos/"+id+"/archivos"}>Archivos y versiones</Link></section>
       : <p role="status">Cargando proyecto…</p>}
     <Link className="panel-action" href="/proyectos">Volver a proyectos</Link></PanelView>;
 }

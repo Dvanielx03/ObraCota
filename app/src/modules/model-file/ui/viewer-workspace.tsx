@@ -8,9 +8,14 @@ import { Explorer,type SidebarTab } from "./explorer";
 import {DeliveryReview} from "./delivery-review";
 import {VisualTour} from "./visual-tour";
 
-export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel" }: { returnHref: string; returnLabel?: string }) {
+import { NotesContext } from "./notes-source";
+import type { VersionNotes } from "@/modules/model-version/domain/model-version";
+
+export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", initialFile, storedNotes }: {
+  returnHref: string; returnLabel?: string; initialFile?: File; storedNotes?: VersionNotes;
+}) {
   const container = useRef<HTMLDivElement>(null), viewer = useRef<ViewerPort|null>(null), input = useRef<HTMLInputElement>(null);
-  const request = useRef<AbortController|null>(null), last = useRef<File|null>(null);
+  const request = useRef<AbortController|null>(null), last = useRef<File|null>(initialFile ?? null);
   const [model,setModel] = useState<ModelInfo|null>(null), [selected,setSelected] = useState<string|null>(null);
   const [status,setStatus] = useState("Abriendo ReStage…"), [error,setError] = useState(""), [pan,setPan] = useState(false);
   const [panel,setPanel] = useState(true), [session,setSession] = useState(0);
@@ -89,7 +94,8 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel" }:
       if(guide==="off")helpButton.current?.focus();
     }
   },[ready,guide]);
-  return <main className="workspace" data-guide={ready?guide:"off"}>
+  const serverNotes = initialFile && last.current === initialFile ? storedNotes : undefined;
+  return <NotesContext.Provider value={serverNotes}><main className="workspace" data-guide={ready?guide:"off"}>
     <header><a href={returnHref} className="brand viewer-back" aria-label={returnLabel} title={returnLabel}><svg width="25" height="23" viewBox="0 0 25 23" fill="currentColor" aria-hidden="true"><path d="M1 2h23l-5 5H6l-5 5zm0 13 5-5v7h13l5 5H1z"/></svg>ObraCota</a>
       <span className="separator">/</span><span className="project">{model?.name || "Visor de modelos"}</span>
       <input hidden ref={input} type="file" accept=".ifc,.dwg" onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(file)void open(file);}}/>
@@ -97,10 +103,10 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel" }:
       <button ref={helpButton} className="help-icon" aria-label="Guía de uso" title="Guía de uso" aria-haspopup="dialog" disabled={!ready} onClick={()=>setGuide("welcome")}><QuestionIcon aria-hidden="true"/></button>
     </header>
     <div className={"workarea " + (panel?"":"collapsed")}>
-      <aside id="explorer" hidden={!panel} inert={!!status} aria-busy={!!status}><Explorer tab={tab} changeTab={setTab} onNoteSaved={()=>{if(!paused)setGuide(step=>step==="note"?"review":step);}} key={model?.versionId??model?.name} version={model?.versionId} elements={model?.elements || []} selected={chosen} drawing={model?.drawing} locate={(id,preview)=>{pick(id);if(preview && guide!=="select")setTab("reading");viewer.current?.locate(id);}}/><SidebarWidth/></aside>
+      <aside id="explorer" hidden={!panel} inert={!!status} aria-busy={!!status}><Explorer tab={tab} changeTab={setTab} onNoteSaved={()=>{if(!paused)setGuide(step=>step==="note"?"review":step);}} key={(serverNotes?"server:":"local:")+(model?.versionId??model?.name)} version={model?.versionId ?? (serverNotes ? "server" : undefined)} elements={model?.elements || []} selected={chosen} drawing={model?.drawing} locate={(id,preview)=>{pick(id);if(preview && guide!=="select")setTab("reading");viewer.current?.locate(id);}}/><SidebarWidth/></aside>
       <section className="stage" aria-label={plan?"Mesa de planos":"Modelo 3D"}>
         <div className="stagebar"><button aria-label={panel?"Ocultar explorador":"Mostrar explorador"} aria-expanded={panel} onClick={()=>setPanel(!panel)}><SidebarSimpleIcon/></button><span>{plan?"Plano 2D":"Vista 3D"}</span>
-          {ready && model && <DeliveryReview guided={guide==="review"&&!paused} onDownloaded={()=>{if(guide==="review"&&!paused){setGuide("done");rememberGuide();}}} key={model.versionId??model.name} model={model} locate={id=>{setPanel(true);pick(id);viewer.current?.locate(id);}}/>}
+          {ready && model && <DeliveryReview guided={guide==="review"&&!paused} onDownloaded={()=>{if(guide==="review"&&!paused){setGuide("done");rememberGuide();}}} key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} model={model} locate={id=>{setPanel(true);pick(id);viewer.current?.locate(id);}}/>}
           {model && <><small>{model.schema}</small><button className="close" aria-label="Cerrar modelo" onClick={closeModel}><XIcon/></button></>}
         </div>
         <div className="view" style={{visibility:ready?"visible":"hidden"}} ref={container}/>
@@ -135,5 +141,5 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel" }:
       if(dialog){dialog.close();return;}
       setPanel(true);setTab(guide==="review"?"properties":"reading");setGuide(guide==="review"?"note":"select");
     }}/>}
-  </main>;
+  </main></NotesContext.Provider>;
 }

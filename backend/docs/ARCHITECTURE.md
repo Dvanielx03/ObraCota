@@ -17,3 +17,7 @@ El agregado Project registra eventos de alta, cambio y eliminación. El caso de 
 ## Archivos del proyecto
 
 ModelFile agrupa las entregas de un IFC o DWG por proyecto. El catálogo comprueba el propietario. Un identificador explícito permite asociar una revisión cuyo nombre ha cambiado.
+
+Una entrega entra como flujo binario en `POST /api/projects/{project}/uploads?name=...`. El parámetro opcional `file` identifica un archivo ya catalogado. El servicio valida extensión y cabecera, calcula SHA-256 y cuenta los bytes durante la escritura. El máximo por original es 256 MiB. Las revisiones se numeran bajo bloqueo del proyecto. El volumen Docker `modelos-originales` contiene una ruta exclusiva por proyecto y versión. Un rollback elimina el original de la transacción. Al respaldar o restaurar, coordinar el volumen y PostgreSQL. Una interrupción del proceso durante la escritura puede dejar un original huérfano.
+
+El visor descarga el original autenticado y lo procesa con el mismo lector que utiliza para archivos locales. Abrir localmente mantiene la privacidad del archivo. Al abrir la versión subida se pueden importar explícitamente las observaciones locales de esa misma huella. Las observaciones de otra revisión se consultan abriendo esa revisión.
