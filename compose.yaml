@@ -1,0 +1,54 @@
+# ObraCota en Docker, desde la raíz del repositorio.
+#
+#   docker compose up -d --build                    landing en http://localhost:3200
+#   docker compose --profile datos up -d --build    añade PostgreSQL con pgvector
+#   docker compose down                             detiene todo (los datos se conservan)
+#
+# Aplicación con visor local: docker compose up -d --build app (puerto 3201).
+
+name: obracota
+
+services:
+  app:
+    build:
+      context: ./app
+      args:
+        NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost:${LANDING_PORT:-3200}}
+    image: obracota-app:local
+    ports:
+      - "${APP_PORT:-3201}:3000"
+    restart: unless-stopped
+
+  landing:
+    build:
+      context: ./landing
+      args:
+        NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost:${LANDING_PORT:-3200}}
+        NEXT_PUBLIC_PANEL_URL: ${PANEL_URL:-http://localhost:${APP_PORT:-3201}}
+    image: obracota-landing:local
+    ports:
+      - "${LANDING_PORT:-3200}:3000"
+    restart: unless-stopped
+
+  # Base de datos del backend: PostgreSQL con la extensión pgvector para el RAG.
+  db:
+    profiles: ["datos"]
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-obracota}
+      POSTGRES_USER: ${POSTGRES_USER:-obracota}
+      # PostgreSQL exige una contraseña al inicializarse. El visor puede arrancar por separado.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - datos-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  datos-postgres:

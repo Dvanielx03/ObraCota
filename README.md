@@ -6,7 +6,7 @@
 
 **Del terreno a la obra.** Planos, modelos BIM y avance de obra en un solo proyecto.
 
-[Vista general](#vista-general) · [Qué incluye](#qué-incluye) · [Puesta en marcha](#puesta-en-marcha) · [Estructura](#estructura-del-repositorio) · [Datos y créditos](#datos-y-créditos)
+[Vista general](#vista-general) · [Qué incluye](#qué-incluye) · [Puesta en marcha](#puesta-en-marcha) · [Docker](#despliegue-con-docker) · [Estructura](#estructura-del-repositorio) · [Datos y créditos](#datos-y-créditos)
 
 ![Portada de ObraCota: titular «Del terreno a la obra» junto al terreno con la cimentación recién fundida](docs/capturas/01-portada-terreno.jpg)
 
@@ -79,6 +79,28 @@ La página queda en `http://localhost:3000`.
 
 > [!TIP]
 > Para probar un servidor que ya está abierto, sin compilar: `SITIO_EN_MARCHA=http://localhost:3000 npx playwright test`.
+
+## Despliegue con Docker
+
+Requisito: Docker Desktop en marcha.
+
+```bash
+docker compose up -d --build
+```
+
+La landing queda en `http://localhost:3200`. «Entrar al panel» abre la aplicación en `http://localhost:3201`. En Windows, `.\desplegar.ps1` levanta ambos servicios.
+
+| Comando | Qué hace |
+|---|---|
+| `docker compose up -d --build` | Reconstruye y levanta la landing y el panel |
+| `docker compose --profile datos up -d --build` | Añade PostgreSQL con `pgvector` |
+| `docker compose logs -f landing` | Muestra los registros |
+| `docker compose down` | Detiene los contenedores; los datos se conservan |
+
+Para cambiar los orígenes públicos, configura `SITE_URL` y `PANEL_URL` en el archivo local `.env` y reconstruye las imágenes. Ambos enlaces se fijan en la compilación. En desarrollo sin Compose las variables son `NEXT_PUBLIC_PANEL_URL` en la landing y `NEXT_PUBLIC_SITE_URL` en la aplicación. El perfil `datos` exige definir `POSTGRES_PASSWORD`.
+
+> [!NOTE]
+> La imagen usa el modo `standalone` de Next.js: solo lleva el servidor, los archivos estáticos y `public/`. El backend y el resto de servicios se añadirán a `compose.yaml` cuando exista su código.
 
 ## Estructura del repositorio
 
