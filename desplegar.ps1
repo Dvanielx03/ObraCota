@@ -1,6 +1,6 @@
 # Reconstruye y levanta ObraCota en Docker desde esta carpeta.
-#   .\desplegar.ps1            solo la landing
-#   .\desplegar.ps1 -Datos     landing y PostgreSQL con pgvector
+#   .\desplegar.ps1            landing, panel, backend y base de datos
+#   .\desplegar.ps1 -Datos     compatible con el despliegue anterior
 param([switch]$Datos)
 
 $ErrorActionPreference = "Stop"

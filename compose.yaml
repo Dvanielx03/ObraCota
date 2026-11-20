@@ -1,10 +1,10 @@
 # ObraCota en Docker, desde la raíz del repositorio.
 #
 #   docker compose up -d --build                    landing en http://localhost:3200
-#   docker compose --profile datos up -d --build    añade PostgreSQL con pgvector
+#   docker compose ps                              comprueba los cuatro servicios
 #   docker compose down                             detiene todo (los datos se conservan)
 #
-# Aplicación con visor local: docker compose up -d --build app (puerto 3201).
+# Aplicación con visor local en el puerto 3201.
 
 name: obracota
 
@@ -56,7 +56,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-obracota}
       POSTGRES_USER: ${POSTGRES_USER:-obracota}
-      # PostgreSQL exige una contraseña al inicializarse. El visor puede arrancar por separado.
+      # La contraseña se configura en el archivo local .env.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"

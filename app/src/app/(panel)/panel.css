@@ -42,6 +42,11 @@
 .account-form label { display: grid; gap: 6px; font-weight: 650; }
 .account-form input { min-height: 44px; padding: 8px 12px; border: 1px solid #858981; background: #faf8f2; border-radius: 4px; }
 .account-form .panel-action { width: fit-content; margin: 0; }
+.owned-projects, .panel-note:has(+ .panel-caption) { margin-bottom: 2rem; }
+.owned-projects ul { list-style: none; padding: 0; }
+.owned-projects li { border-bottom: 1px solid var(--panel-line); }
+.owned-projects li a { display: block; padding: 14px 0; overflow-wrap: anywhere; }
+.owned-projects .account-form { margin-top: 18px; }
 .estimate-sheet { overflow-x: auto; }
 .estimate-sheet table { border-collapse: collapse; width: 100%; }
 .estimate-sheet caption { text-align: left; font-weight: 700; margin-bottom: 18px; }
