@@ -55,7 +55,10 @@ test("Una cuenta nueva completa la bienvenida con el teclado y no la vuelve a ve
   await expect(page.getByRole("radio", { name: /Proyecto de muestra/ })).toBeFocused();
   await page.keyboard.press("Enter");
 
-  await expect(page).toHaveURL(/\/proyectos\/restage\/visor$/);
+  await expect(page).toHaveURL(/\/proyectos\/restage\/visor\?guia=rapida$/);
+  // La muestra abre con el recorrido rápido en marcha, sin diálogo intermedio.
+  await expect(page.locator("main")).toHaveAttribute("data-quick", "select", { timeout: 60_000 });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   const saved = await page.evaluate(stored);
   expect(saved).toMatchObject({ role: "site-engineer", firstReview: "model", start: "sample", skipped: false });
   expect(Number.isNaN(Date.parse(saved.completedAt))).toBe(false);

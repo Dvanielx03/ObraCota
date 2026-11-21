@@ -39,7 +39,7 @@ test("Omitir y retomar en móvil",async({page})=>{
 });
 test("Primera visita automática, ayuda superpuesta y recuerdo al recargar",async({page})=>{
   await page.goto("/proyectos/restage/visor");
-  const welcome=page.getByRole("dialog",{name:"Tu primera revisión"});
+  const welcome=page.getByRole("dialog",{name:"Empieza por aquí"});
   await expect(welcome).toBeVisible();
   await page.reload();
   const help=page.getByRole("button",{name:"Guía de uso",exact:true});
