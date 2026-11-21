@@ -22,12 +22,8 @@
 .panel-content h2 { font-size: clamp(17px, 1.3vw, 23px); line-height: 1.35; }
 .panel-content p { color: #47545e; line-height: 1.65; max-width: 62ch; margin-top: 9px; }
 .panel-content .panel-caption { font-size: 13px; color: #4e5960; margin-bottom: 12px; }
-.project-row { display: flex; gap: 22px; align-items: center; padding: 16px 0; border-block: 1px solid var(--panel-line); }
-.project-row img { object-fit: cover; border-radius: 4px; }
-.project-row p { margin: 2px 0; }
 .panel-action { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 16px; border: 1px solid currentColor; border-radius: 5px; font-weight: 700; text-decoration: none; margin-top: 18px; }
 .panel-action:hover { background: #0a1522; color: #f1ede4; }
-.project-row .panel-action { margin: 0 0 0 auto; }
 .panel-content .panel-note { margin-top: 20px; }
 .panel-summary, .panel-columns { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: clamp(22px, 3.5vw, 70px); }
 .panel-preview { width: 100%; height: auto; display: block; border-radius: 5px; }
@@ -42,11 +38,6 @@
 .account-form label { display: grid; gap: 6px; font-weight: 650; }
 .account-form input { min-height: 44px; padding: 8px 12px; border: 1px solid #858981; background: #faf8f2; border-radius: 4px; }
 .account-form .panel-action { width: fit-content; margin: 0; }
-.owned-projects, .panel-note:has(+ .panel-caption) { margin-bottom: 2rem; }
-.owned-projects ul { list-style: none; padding: 0; }
-.owned-projects li { border-bottom: 1px solid var(--panel-line); }
-.owned-projects li a { display: block; padding: 14px 0; overflow-wrap: anywhere; }
-.owned-projects .account-form { margin-top: 18px; }
 .estimate-sheet { overflow-x: auto; }
 .estimate-sheet table { border-collapse: collapse; width: 100%; }
 .estimate-sheet caption { text-align: left; font-weight: 700; margin-bottom: 18px; }
@@ -71,9 +62,70 @@
   .panel-rail nav { grid-column: 1/-1; grid-row: 2; display: none; margin: 0; }
   .panel-rail nav[data-expanded="true"] { display: flex; }
   .panel-summary, .panel-columns { grid-template-columns: minmax(0,1fr); }
-  .project-row { flex-wrap: wrap; gap: 12px; }
-  .project-row img { width: 82px; height: 62px; }
-  .project-row .panel-action { margin: 0; }
   .estimate-sheet thead { display: none; }
   .estimate-sheet caption { border-bottom: 1px solid var(--panel-line); padding-bottom: 12px; margin: 0; }
 }
+
+/* Projects board and guides. Desktop and laptop only. */
+.project-board { --card-line: #dcdfe4; --card-shadow: 0 8px 32px rgb(10 21 34 / .08); }
+.project-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+.project-tabs { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid #dcdfe4; border-radius: 14px; background: #f7f6f2; }
+.project-tabs button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border: 0; border-radius: 10px; background: none; color: #47545e; font: 650 14px Manrope, sans-serif; cursor: pointer; }
+.project-tabs button span { min-width: 22px; padding: 1px 6px; border-radius: 99px; background: rgb(10 21 34 / .08); font-size: 12px; font-variant-numeric: tabular-nums; }
+.project-tabs button:hover { color: #0a1522; }
+.project-tabs button[aria-selected=true] { background: #fff; color: #0a1522; box-shadow: inset 0 -3px 0 #f2b25c, 0 1px 3px rgb(10 21 34 / .1); }
+.project-new { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 1px solid #0a1522; border-radius: 10px; background: #0a1522; color: #f7f6f2; font: 700 14px Manrope, sans-serif; text-decoration: none; cursor: pointer; }
+.panel-shell a.project-new { color: #f7f6f2; }
+.project-new:hover { background: #1b2a3b; }
+.project-new:disabled { opacity: .6; cursor: progress; }
+.project-board :focus-visible, .guide-strip :focus-visible, .guide-feature :focus-visible, .guide-grid :focus-visible, .guide-detail :focus-visible { outline: 2px solid #0a1522; outline-offset: 3px; }
+.panel-content .project-heading { margin: 0 0 14px; font: 700 13px Manrope, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #4e5960; }
+.project-grid + .project-heading, .project-empty + .project-heading { margin-top: 40px; }
+.project-grid, .guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; list-style: none; margin: 0; padding: 0; }
+.project-card { position: relative; display: flex; flex-direction: column; border: 1px solid #dcdfe4; border-radius: 14px; background: #fff; overflow: hidden; transition: box-shadow .18s ease, transform .18s ease; }
+.project-card:hover, .project-card:focus-within { box-shadow: 0 8px 32px rgb(10 21 34 / .08); transform: translateY(-2px); }
+.project-thumb { display: block; width: 100%; height: 150px; object-fit: cover; }
+.project-initials { display: grid; place-items: center; color: #f1ede4; background-color: #0a1522; background-image: radial-gradient(rgb(241 237 228 / .16) 1px, transparent 1px); background-size: 18px 18px; font: 54px/1 Bebas, sans-serif; letter-spacing: .04em; }
+.project-card[data-archived] .project-initials { background-color: #55616d; }
+.project-card-body { padding: 14px 16px 4px; min-width: 0; }
+.panel-content .project-card h3 { font: 700 16px/1.3 Manrope, sans-serif; overflow-wrap: anywhere; }
+.project-card h3 a { text-decoration: none; }
+.project-card-link::after, .project-card-open::after { content: ""; position: absolute; inset: 0; }
+.panel-content .project-card p { margin-top: 4px; font-size: 13px; line-height: 1.4; }
+.project-card-action, .project-card-open { position: static; display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; min-height: 40px; margin: 6px 8px 8px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: #0a1522; font: 650 13px Manrope, sans-serif; text-decoration: none; cursor: pointer; }
+.project-card-action { position: relative; z-index: 1; }
+.project-card-action:hover { background: #f1ede4; }
+.panel-content .project-empty { margin: 0; padding: 26px; border: 1px dashed #b9bdc4; border-radius: 14px; max-width: none; }
+.project-dialog { width: min(440px, 92vw); padding: 28px; border: 1px solid #dcdfe4; border-radius: 16px; background: #fff; color: #0a1522; box-shadow: 0 8px 32px rgb(10 21 34 / .16); }
+.project-dialog::backdrop { background: rgb(10 21 34 / .45); }
+.project-dialog h2 { font: 36px/1 Bebas, sans-serif; }
+.project-dialog .account-form { max-width: none; }
+.project-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.project-dialog-actions button[type=button] { min-height: 44px; padding: 0 16px; border: 1px solid #dcdfe4; border-radius: 10px; background: none; font: 650 14px Manrope, sans-serif; cursor: pointer; }
+.project-dialog :focus-visible { outline: 2px solid #0a1522; outline-offset: 2px; }
+.guide-strip { margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--panel-line); }
+.guide-strip-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.panel-content .guide-strip-head h2, .panel-content .guide-feature h2 { font: clamp(30px, 2.6vw, 44px)/1 Bebas, sans-serif; }
+.guide-strip-head a { font-weight: 650; font-size: 14px; }
+.guide-card { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 18px; border: 1px solid #dcdfe4; border-radius: 14px; background: #fff; transition: box-shadow .18s ease, transform .18s ease; }
+.guide-card:hover, .guide-card:focus-within { box-shadow: 0 8px 32px rgb(10 21 34 / .08); transform: translateY(-2px); }
+.guide-number { font: 30px/1 Bebas, sans-serif; color: #8a929b; }
+.panel-content .guide-card h3 { font: 700 16px/1.3 Manrope, sans-serif; }
+.guide-card h3 a { text-decoration: none; }
+.guide-card h3 a::after { content: ""; position: absolute; inset: 0; border-radius: 14px; }
+.panel-content .guide-card p { margin: 0; font-size: 13px; line-height: 1.5; }
+.guide-meta { margin-top: auto; padding-top: 8px; font-size: 12px; font-weight: 650; color: #4e5960; }
+.guide-feature { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: clamp(22px, 3vw, 56px); align-items: center; padding: clamp(20px, 2.4vw, 36px); margin-bottom: 44px; border: 1px solid #dcdfe4; border-radius: 16px; background: #fff; }
+.guide-feature img { width: 100%; height: auto; max-height: 340px; object-fit: cover; border-radius: 10px; }
+.panel-content .guide-eyebrow { margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #4e5960; }
+.guide-feature-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 24px; }
+.guide-feature-actions .panel-action { margin: 0; border-radius: 10px; }
+.guide-detail { max-width: 860px; margin-inline: 0; }
+.panel-content.guide-detail h1 { margin-bottom: 14px; }
+.panel-content .guide-lead { font-size: 17px; margin: 0 0 34px; }
+.guide-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.guide-steps li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding: 18px; border: 1px solid #dcdfe4; border-radius: 14px; background: #fff; }
+.guide-steps li > span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #0a1522; color: #f1ede4; font: 24px/1 Bebas, sans-serif; }
+.panel-content .guide-steps h2 { font: 700 16px/1.3 Manrope, sans-serif; }
+.panel-content .guide-steps p { margin-top: 4px; }
+@media (prefers-reduced-motion: reduce) { .project-card, .guide-card { transition: none; } .project-card:hover, .guide-card:hover { transform: none; } }

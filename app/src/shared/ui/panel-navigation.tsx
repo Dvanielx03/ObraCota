@@ -17,6 +17,7 @@ export function PanelNavigation({ siteUrl }: { siteUrl?: string }) {
   const items = [
     ["/proyectos", "Proyectos"],
     ...(project ? (base === "/proyectos/restage" ? projectViews : projectViews.filter(([slug])=>slug!=="visor")).map(([slug, label]) => [slug ? base + "/" + slug : base, label]) : []),
+    ["/guias", "Guías"],
     ["/cuenta", "Cuenta"],
   ];
   return <div className="panel-rail">
@@ -25,7 +26,7 @@ export function PanelNavigation({ siteUrl }: { siteUrl?: string }) {
     </Link>
     <button className="panel-menu" aria-expanded={expanded} aria-controls="panel-nav" onClick={() => setExpanded(!expanded)}>Menú</button>
     <nav id="panel-nav" data-expanded={expanded} aria-label="Panel">
-      {items.map(([href, label]) => <Link key={href} href={href} aria-current={path === href ? "page" : undefined} onClick={() => setExpanded(false)}>{label}</Link>)}
+      {items.map(([href, label]) => <Link key={href} href={href} aria-current={path === href || (href === "/guias" && path.startsWith("/guias/")) ? "page" : undefined} onClick={() => setExpanded(false)}>{label}</Link>)}
     </nav>
     {siteUrl && <a className="panel-site" href={siteUrl}>Sitio de ObraCota ↗</a>}
   </div>;

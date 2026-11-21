@@ -7,3 +7,6 @@ export function createProject(repository: OwnedProjectRepository, value: string)
   if (!name || name.length > 120) throw new Error("Escribe un nombre de hasta 120 caracteres.");
   return repository.create(name);
 }
+export function archiveProject(repository: OwnedProjectRepository, id: string, archived: boolean) {
+  return repository.setArchived(id, archived);
+}
