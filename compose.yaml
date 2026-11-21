@@ -47,7 +47,7 @@ services:
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       IFC_ENGINE_URL: http://ifc-engine:8000
-      AI_MONTHLY_LIMIT_CENTS: ${AI_MONTHLY_LIMIT_CENTS:-1000}
+      AI_MONTHLY_LIMIT_CENTS: ${AI_MONTHLY_LIMIT_CENTS:-800}
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-obracota}
       POSTGRES_USER: ${POSTGRES_USER:-obracota}
