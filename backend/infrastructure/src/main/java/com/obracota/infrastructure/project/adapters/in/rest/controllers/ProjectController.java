@@ -21,9 +21,10 @@ public class ProjectController {
     private final ListProjectUseCase list;
     private final UpdateProjectUseCase update;
     private final DeleteProjectUseCase delete;
+    private final ArchiveProjectUseCase archive;
     public ProjectController(RegisterProjectUseCase register, GetProjectByIdUseCase get, ListProjectUseCase list,
-                             UpdateProjectUseCase update, DeleteProjectUseCase delete) {
-        this.register=register; this.get=get; this.list=list; this.update=update; this.delete=delete;
+                             UpdateProjectUseCase update, DeleteProjectUseCase delete, ArchiveProjectUseCase archive) {
+        this.register=register; this.get=get; this.list=list; this.update=update; this.delete=delete; this.archive=archive;
     }
     @PostMapping @Transactional
     public ResponseEntity<ProjectResponse> create(@AuthenticationPrincipal UUID user,@Valid @RequestBody CreateProjectRequest request) {
@@ -37,6 +38,10 @@ public class ProjectController {
     @PutMapping("/{id}") @Transactional public ProjectResponse update(@AuthenticationPrincipal UUID user,@PathVariable UUID id,
             @Valid @RequestBody UpdateProjectRequest request) {
         return update.execute(new UpdateProjectCommand(new ProjectId(id),new UserId(user),request.name()));
+    }
+    @PutMapping("/{id}/archived") @Transactional public ProjectResponse archive(@AuthenticationPrincipal UUID user,@PathVariable UUID id,
+            @Valid @RequestBody ArchiveProjectRequest request) {
+        return archive.execute(new ProjectId(id),new UserId(user),request.archived());
     }
     @DeleteMapping("/{id}") @Transactional @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal UUID user,@PathVariable UUID id) { delete.execute(new ProjectId(id),new UserId(user)); }

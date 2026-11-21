@@ -34,6 +34,13 @@ class ProjectRepositoryAdapterTest {
         mvc.perform(delete(path).header("Authorization",other)).andExpect(status().isNotFound());
         mvc.perform(put(path).header("Authorization",owner).contentType("application/json").content("{\"name\":\"Renombrado\"}")).andExpect(status().isOk());
         mvc.perform(get("/api/projects").header("Authorization",owner)).andExpect(jsonPath("$[0].name").value("Renombrado"));
+        mvc.perform(put(path+"/archived").header("Authorization",other).contentType("application/json").content("{\"archived\":true}")).andExpect(status().isNotFound());
+        mvc.perform(put(path+"/archived").header("Authorization",owner).contentType("application/json").content("{}")).andExpect(status().isBadRequest());
+        mvc.perform(put(path+"/archived").header("Authorization",owner).contentType("application/json").content("{\"archived\":true}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.archived").value(true));
+        mvc.perform(get("/api/projects").header("Authorization",owner)).andExpect(jsonPath("$[0].archived").value(true))
+            .andExpect(jsonPath("$[0].updatedAt").isNotEmpty());
+        mvc.perform(put(path+"/archived").header("Authorization",owner).contentType("application/json").content("{\"archived\":false}")).andExpect(jsonPath("$.archived").value(false));
         mvc.perform(delete(path).header("Authorization",owner)).andExpect(status().isNoContent());
         mvc.perform(get(path).header("Authorization",owner)).andExpect(status().isNotFound());
     }

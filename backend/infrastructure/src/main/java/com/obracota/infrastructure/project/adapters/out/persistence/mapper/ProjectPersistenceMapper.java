@@ -7,6 +7,6 @@ import com.obracota.infrastructure.project.adapters.out.persistence.entity.Proje
 
 public class ProjectPersistenceMapper {
     public ProjectJpaEntity toNewEntity(Project p) { return new ProjectJpaEntity(p.id().value(),p.owner().value(),p.name()); }
-    public void synchronize(Project p, ProjectJpaEntity entity) { entity.name=p.name(); }
-    public Project toDomain(ProjectJpaEntity e) { return Project.restore(new ProjectId(e.id),new UserId(e.ownerId),e.name); }
+    public void synchronize(Project p, ProjectJpaEntity entity) { entity.name=p.name(); entity.archived=p.archived(); }
+    public Project toDomain(ProjectJpaEntity e) { return Project.restore(new ProjectId(e.id),new UserId(e.ownerId),e.name,e.archived,e.updatedAt()); }
 }
