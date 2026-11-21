@@ -109,6 +109,24 @@ test("Una opción se descarga como PNG con brillo, calidez y nitidez ajustados",
     await expect(sharpness).toHaveValue("0");
     expect(near((await pixel(page, (await save()).file, 0.5, 0.4)).colour, colours[2])).toBe(true);
 
+    // Primer plano: es un recorte de los mismos píxeles, con su propio nombre de archivo.
+    const zoom = panel.getByRole("slider", { name: "Acercar" });
+    const horizontal = panel.getByRole("slider", { name: "Horizontal" });
+    await expect(horizontal).toBeDisabled();
+    await zoom.fill("200");
+    await expect(horizontal).toBeEnabled();
+    await horizontal.fill("100");
+    const close = await save();
+    expect(close.name).toMatch(/-opcion-2-primer-plano\.png$/);
+    const cropped = await pixel(page, close.file, 0.5, 0.4);
+    expect(cropped.size).toEqual([240, 150]);
+    expect(near(cropped.colour, colours[2])).toBe(true);
+    expect(near((await pixel(page, close.file, 0.97, 0.9)).colour, colours[2], 12)).toBe(false);
+    await page.screenshot({ animations: "disabled", path: process.env.EVIDENCE_DIR ? process.env.EVIDENCE_DIR + "/primer-plano-1366.png" : info.outputPath("primer-plano.png") });
+    await reset.click();
+    await expect(zoom).toHaveValue("100");
+    expect((await pixel(page, (await save()).file, 0.5, 0.4)).size).toEqual([480, 300]);
+
     // Descargar y comparar no se pisan; cerrar quita el panel.
     await dialog.getByRole("button", { name: "Comparar opción 3" }).click();
     await expect(dialog.locator(".option-download")).toHaveCount(0);
