@@ -243,3 +243,16 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .area-controls p{font-size:12px;line-height:1.45;color:var(--mute);margin:0}
 .area-controls button{border:1px solid var(--line);border-radius:8px;padding:0 12px;min-height:36px;white-space:nowrap}
 .capture-details summary small{color:var(--mute);font-weight:600}
+.option-download{margin-block:.25rem 1rem}
+.option-download canvas{display:block;max-width:100%;max-height:min(42dvh,24rem);width:auto;height:auto;margin-inline:auto;border-radius:12px;border:1px solid #dcdfe4;background:#0a1522}
+.option-download canvas[hidden]{display:none}
+.option-download-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:12px}
+.delivery-review .option-download-controls label,.option-download-controls label{display:grid;gap:4px;margin:0;font:650 13px Manrope,Arial,sans-serif}
+.option-download-controls label span{display:flex;justify-content:space-between;gap:8px}
+.option-download-controls b{font-weight:650;font-variant-numeric:tabular-nums;color:var(--mute)}
+.option-download-controls input[type=range]{width:100%;min-height:28px;margin:0;accent-color:#0a1522}
+.option-download-controls input:focus-visible,.option-download-actions button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.option-download-actions{display:flex;gap:8px;flex:none}
+.option-download-actions button{border:1px solid var(--line);border-radius:8px;padding:0 12px;min-height:36px;white-space:nowrap}
+.option-download-actions button:disabled{opacity:.5}
+.option-download-actions .option-download-run{background:var(--ink);border-color:var(--ink);color:#fff}

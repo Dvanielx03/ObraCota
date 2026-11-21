@@ -3,6 +3,7 @@ import {useState,useEffect,useRef} from "react";
 import {authenticated,authenticatedResponse} from "@/core/http/http-client";
 import type {ElementInfo,GroupCapture} from "@/viewer/domain/viewer.port";
 import {CompareSlider} from "./compare-slider";
+import {OptionDownload} from "./option-download";
 import {ChipChoice,ChipToggles} from "./option-chips";
 import {AreaMarker,areaMask} from "./area-marker";
 import type {Area} from "../domain/selection-area";
@@ -36,12 +37,19 @@ function OptionComparison({images,slot,onClose}:{images:string;slot:number;onClo
   return <CompareSlider before={before.url} after={after.url} beforeLabel="Vista del modelo" afterLabel={"Opción "+slot+" · Generado con IA"}
     label={"Comparar la opción "+slot+" con la vista del modelo"} onClose={onClose}/>;
 }
+function OptionDownloadPanel({images,slot,element,onClose}:{images:string;slot:number;element:string;onClose:()=>void}) {
+  const image=usePrivateImage(images+"/"+slot);
+  if(image.error)return <p role="alert">No se pudo cargar la imagen. <button onClick={onClose}>Cerrar descarga</button></p>;
+  if(!image.url)return <p role="status">Preparando la imagen…</p>;
+  return <OptionDownload image={image.url} slot={slot} element={element} onClose={onClose}/>;
+}
 export function VisualOptions({project,version,element,capture,groupCapture}:{project:string;version:string;element:ElementInfo;capture:()=>string;groupCapture?:()=>GroupCapture}) {
   const dialog=useRef<HTMLDialogElement>(null);
   const [preview,setPreview]=useState(""),[request,setRequest]=useState(""),[message,notify]=useState("");
   const [history,setHistory]=useState<History>(),[busy,setBusy]=useState(false),[refresh,reload]=useState(0);
   const retryId=useRef<string|null>(null);
   const [compare,setCompare]=useState<{batch:string;slot:number}|null>(null);
+  const [download,setDownload]=useState<{batch:string;slot:number}|null>(null);
   const [choices,setChoices]=useState<OptionChoices>(DEFAULT_CHOICES);
   // Optional rectangle over the capture; it travels as the mask the image model already accepts.
   const [area,setArea]=useState<Area|null>(null);
@@ -109,15 +117,18 @@ export function VisualOptions({project,version,element,capture,groupCapture}:{pr
       {b.state==="FAILED"?<p>La generación quedó incompleta. {b.runs.some(r=>r.error_code==="HTTP_429")?"Gemini alcanzó un límite de solicitudes o de cuota. Revisa la cuota del modelo antes de volver a enviar la captura.":"Consulta el detalle en Consumo de la generación."}</p>:b.state!=="READY" && <p role="status">Preparando las opciones…</p>}
       {b.state==="FAILED" && !!b.drafts?.length && <section aria-label="Alternativas de texto"><h4>Propuestas de Gemini</h4><ol>{b.drafts.map(d=><li key={d}>{d}</li>)}</ol></section>}
       {compare?.batch===b.id && <OptionComparison key={compare.slot} images={base+"/"+b.id+"/images"} slot={compare.slot} onClose={()=>setCompare(null)}/>}
+      {download?.batch===b.id && <OptionDownloadPanel key={"d"+download.slot} images={base+"/"+b.id+"/images"} slot={download.slot} element={element.name||element.type} onClose={()=>setDownload(null)}/>}
       <div className="visual-grid">{b.options.map(o=><figure key={o.slot}>{(preview||groupCapture) && <PrivateImage path={base+"/"+b.id+"/images/"+o.slot} label={"Opción "+o.slot}/>}
         <figcaption><small>Generado con IA</small><p>{o.description}</p>
         <button disabled={busy||b.state!=="READY"||b.selected===o.slot} onClick={()=>select(b.id,o.slot)}>{b.selected===o.slot?"Elegida":"Elegir opción "+o.slot}</button>
         <button className="compare-open" disabled={b.state!=="READY"} aria-pressed={compare?.batch===b.id && compare.slot===o.slot}
-          onClick={()=>setCompare(compare?.batch===b.id && compare.slot===o.slot?null:{batch:b.id,slot:o.slot})}>{"Comparar opción "+o.slot}</button></figcaption></figure>)}</div>
+          onClick={()=>{setDownload(null);setCompare(compare?.batch===b.id && compare.slot===o.slot?null:{batch:b.id,slot:o.slot});}}>{"Comparar opción "+o.slot}</button>
+        <button className="compare-open" disabled={b.state!=="READY"} aria-pressed={download?.batch===b.id && download.slot===o.slot}
+          onClick={()=>{setCompare(null);setDownload(download?.batch===b.id && download.slot===o.slot?null:{batch:b.id,slot:o.slot});}}>{"Descargar opción "+o.slot}</button></figcaption></figure>)}</div>
       <details><summary>Consumo de la generación</summary>{b.runs.map((r,n)=><p key={n}>{r.model_id} · {r.status} · {r.total_tokens===null?"Consumo sin confirmar":r.total_tokens+" tokens"} {r.error_code}</p>)}</details>
     </section>)}</>;
   if(groupCapture)return <section className="prism-request" data-working={working}>{content}</section>;
   return <><button className="review-trigger" onClick={open}>Opciones visuales</button>
-    <dialog className="delivery-review visual-options" ref={dialog} onClose={()=>{setPreview("");setCompare(null);}} aria-label="Opciones visuales">
+    <dialog className="delivery-review visual-options" ref={dialog} onClose={()=>{setPreview("");setCompare(null);setDownload(null);}} aria-label="Opciones visuales">
     <div className="review-heading"><h2>Opciones visuales</h2><button aria-label="Cerrar opciones" onClick={()=>dialog.current?.close()}>×</button></div>{content}</dialog></>;
 }
