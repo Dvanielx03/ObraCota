@@ -3,7 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import type { ElementInfo, ModelInfo } from "../domain/viewer.port";
 
-export type SceneModel = ModelInfo & {root: T.Group};
+export type SceneModel = ModelInfo & {root: T.Group;coordination?: number[]};
 interface SampleIndex {
   fuente: {esquema: string};
   niveles: {nombre: string}[];
@@ -42,7 +42,7 @@ async function readSample(signal: AbortSignal): Promise<SceneModel> {
 }
 
 interface Part {key:number; matrix:number[]; color:number[]}
-interface Payload {schema:string; versionId?:string; geometry:Map<number,{vertices:Float32Array;indices:Uint32Array}>; elements:(ElementInfo & {parts:Part[]})[]}
+interface Payload {schema:string; versionId?:string; walk?:number[]; geometry:Map<number,{vertices:Float32Array;indices:Uint32Array}>; elements:(ElementInfo & {parts:Part[]})[]}
 function assemble(file:File, payload:Payload):SceneModel {
   const root = new T.Group();
   const geometries = new Map<number,T.BufferGeometry>();
@@ -67,11 +67,14 @@ function assemble(file:File, payload:Payload):SceneModel {
       const mesh = new T.Mesh(geometries.get(part.key),material);
       mesh.applyMatrix4(new T.Matrix4().fromArray(part.matrix));
       mesh.userData.elementId = info.id;
+      mesh.userData.ifcType=info.type.toUpperCase();
       root.add(mesh);
     }
     return info;
   });
-  return {root,elements,schema:payload.schema,name:file.name,sample:false,versionId:payload.versionId};
+  const matrix=payload.walk;
+  const compatible=matrix?.length===16 && matrix.every(Number.isFinite) && Math.abs(new T.Matrix4().fromArray(matrix).determinant())>.99;
+  return {root,elements,schema:payload.schema,name:file.name,sample:false,walk:compatible,coordination:compatible?matrix:undefined,versionId:payload.versionId};
 }
 
 async function readWorker<T>(format:"ifc"|"dwg",file:File,signal:AbortSignal,status:(s:string)=>void,indexOnly=false) {
@@ -95,7 +98,7 @@ interface DrawingData {
   versionId?:string;
   labels:ElementInfo[];
   version:string; units:number; depth:number; omissions:string;
-  groups:{id:string;layer:string;kind:"faces"|"lines"|"points";color:number;count:number;positions:Float32Array}[];
+  groups:{id:string;layer:string;kind:"faces"|"lines"|"points";color:number;count:number;positions:Float32Array;cad:ElementInfo["cad"]}[];
 }
 export function drawingUnits(code:number){
   const names:Record<number,string>={0:"Sin unidad declarada",1:"in",2:"ft",4:"mm",5:"cm",6:"m",7:"km"};
@@ -122,7 +125,7 @@ export async function loadModel(file: File | null, signal: AbortSignal, status:(
     else node=new T.LineSegments(geometry,new T.LineBasicMaterial({color}));
     node.userData.elementId=group.id;root.add(node);
     const type={faces:"Caras",points:"Puntos",lines:"Trazos"}[group.kind];
-    return {id:group.id,name:type+" · "+group.layer,level:group.layer,type,count:group.count};
+    return {id:group.id,name:type+" · "+group.layer,level:group.layer,type,count:group.count,cad:group.cad};
   });
 
   return {root,elements:[...elements,...data.labels],sample:false,name:file.name,schema:"DWG "+data.version,versionId:data.versionId,

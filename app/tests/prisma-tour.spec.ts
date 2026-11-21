@@ -1,0 +1,133 @@
+import {expect,test} from "@playwright/test";
+import {readFile} from "node:fs/promises";
+import {unzipSync} from "three/addons/libs/fflate.module.js";
+
+for(const width of [1366,390])test("Guía de Prisma · práctica sin Gemini · "+width,async({page},info)=>{
+  await page.setViewportSize({width,height:width===390?844:768});
+  if(width===390)await page.emulateMedia({reducedMotion:"reduce"});
+  const requests:string[]=[];
+  page.on("request",request=>{if(request.method()==="POST")requests.push(request.url());});
+  await page.goto("/proyectos/restage/visor");
+  const launch=page.getByRole("button",{name:"Abrir Prisma"});
+  await expect(launch).toBeVisible();
+  await expect(launch).toHaveText(/Prisma/);
+  await page.getByRole("button",{name:"Guía de uso"}).click();
+  await page.getByRole("dialog").getByRole("button",{name:"Guía de Prisma"}).click();
+  const tour=page.getByRole("region",{name:"Guía visual de Prisma"});
+  await expect(tour).toContainText("Abre Prisma");
+  await expect(launch).toHaveAttribute("aria-describedby",/prisma-instruction/);
+  await page.screenshot({path:info.outputPath("entrada-"+width+".png")});
+  await launch.click();
+  const panel=page.getByRole("region",{name:"Asistente de diseño"});
+  await expect(panel).toBeVisible();
+  const mascot=panel.locator("svg").first();
+  const mascotEntry=mascot.locator("..");
+  if(width===390){
+    await expect(mascotEntry).toHaveCSS("animation-name","none");
+    await expect(page.locator(".tour-pointer")).toHaveCSS("transition-property","none");
+  }else await expect(mascotEntry).toHaveCSS("animation-name",/prism-arrival/);
+  const group=panel.getByRole("button",{name:"Agrupar"});
+  const search=panel.getByRole("textbox",{name:"Buscar pieza para la propuesta"});
+  if(await panel.getByRole("listitem").count()===0){
+    await expect(search).toHaveAttribute("aria-describedby",/prisma-instruction/);
+    await search.fill("acero");
+    await panel.locator('[data-prisma-tour="result"]').first().click();
+  }
+  await expect(tour).toContainText("Activa Agrupar");
+  await tour.getByRole("button",{name:"Pausar"}).click();
+  await expect(page.locator(".tour-pointer")).toHaveCount(0);
+  await tour.getByRole("button",{name:"Reanudar"}).click();
+  await group.click();
+  await expect(tour).toContainText("Busca otra pieza");
+  await search.fill("fachada");
+  await expect(tour).toContainText("Añade esta pieza");
+  await panel.locator('[data-prisma-tour="result"]').first().click();
+  await expect(panel.getByRole("listitem")).toHaveCount(2);
+  await panel.getByRole("button",{name:"Plegar asistente"}).click();
+  await expect(tour).toContainText("Abre Prisma");
+  await launch.click();
+  await expect(tour).toContainText("Encuadra la selección");
+  await panel.getByRole("button",{name:"Encuadrar selección"}).click();
+  await expect(tour).toContainText("Prueba un acabado");
+  await panel.getByRole("button",{name:"Probar color"}).click();
+  await expect(tour).toContainText("Exporta la propuesta");
+  if(width===390){
+    const pointer=await page.locator(".tour-pointer").boundingBox();
+    expect(pointer!.y+pointer!.height).toBeLessThanOrEqual(844);
+  }
+  await page.screenshot({path:info.outputPath("exportar-"+width+".png")});
+  const download=page.waitForEvent("download");
+  await panel.getByRole("button",{name:"Exportar PNG"}).click();
+  expect((await download).suggestedFilename()).toMatch(/\.png$/);
+  await expect(tour).toContainText("Edita con una máscara");
+  const edit=panel.getByText("Editar en Gemini con máscara",{exact:true});
+  await expect(edit).toHaveAttribute("aria-describedby",/prisma-instruction/);
+  await edit.click();
+  await expect(tour).toContainText("Describe el cambio");
+  await panel.getByLabel("Cambio para Gemini").fill("Aplica zinc oscuro a las piezas seleccionadas.");
+  const prepare=panel.getByRole("button",{name:"Preparar paquete para Gemini"});
+  await expect(prepare).toHaveAttribute("aria-describedby",/prisma-instruction/);
+  if(width===1366){
+    await page.getByRole("button",{name:"Desplazar",exact:true}).click();
+    const canvas=(await page.locator(".view canvas").boundingBox())!;
+    for(let drag=0;drag<5;drag++){
+      const y=canvas.y+canvas.height*.44;
+      await page.mouse.move(canvas.x+canvas.width*.85,y);
+      await page.mouse.down();
+      await page.mouse.move(canvas.x+canvas.width*.16,y,{steps:4});
+      await page.mouse.up();
+    }
+    await prepare.click();
+    await expect(panel.getByRole("alert")).toContainText("Hay piezas fuera de vista");
+    const recover=panel.getByRole("button",{name:"Reencuadrar y preparar de nuevo"});
+    await expect(recover).toHaveAttribute("aria-describedby",/prisma-instruction/);
+    await recover.click();
+  }else await prepare.click();
+  const packageButton=panel.getByRole("link",{name:"Descargar paquete para Gemini"});
+  await expect(packageButton).toHaveAttribute("aria-describedby",/prisma-instruction/);
+  const mask=panel.getByRole("img",{name:"Área editable de la selección"});
+  await expect(mask).toBeVisible();
+  await expect.poll(async()=>{
+    const card=await tour.boundingBox(),image=await mask.boundingBox();
+    return !!card && !!image && (card.y+card.height<=image.y || card.y>=image.y+image.height ||
+      card.x+card.width<=image.x || card.x>=image.x+image.width);
+  }).toBe(true);
+  await page.screenshot({path:info.outputPath("paquete-listo-"+width+".png")});
+  const downloadZIP=page.waitForEvent("download");
+  await packageButton.click();
+  const zip=await downloadZIP;
+  expect(zip.suggestedFilename()).toBe("ObraCota-edicion-Gemini.zip");
+  const original=unzipSync(await readFile((await zip.path())!))["01-vista-original.png"];
+  await expect(tour).toContainText("Importa el resultado de Gemini");
+  const importButton=panel.getByRole("button",{name:"Seleccionar imagen de Gemini"});
+  await expect(importButton).toHaveAttribute("aria-describedby",/prisma-instruction/);
+  await expect(tour).toContainText("El paquete ya está cargado");
+  const retryZIP=page.waitForEvent("download");
+  await packageButton.click();
+  expect((await retryZIP).suggestedFilename()).toBe(zip.suggestedFilename());
+  await page.screenshot({path:info.outputPath("importar-mascara-"+width+".png")});
+  const choosingImage=page.waitForEvent("filechooser");
+  await importButton.click();
+  const imageChooser=await choosingImage;
+  expect(await imageChooser.element().getAttribute("accept")).toBe("image/png,image/jpeg,image/webp");
+  await imageChooser.setFiles({name:"ensayo-mismo-encuadre.png",mimeType:"image/png",buffer:Buffer.from(original)});
+  const saveProtected=panel.getByRole("button",{name:"Guardar PNG protegido"});
+  await expect(saveProtected).toHaveAttribute("aria-describedby",/prisma-instruction/);
+  const downloadProtected=page.waitForEvent("download");
+  await saveProtected.click();
+  expect((await downloadProtected).suggestedFilename()).toBe("ObraCota-edicion-protegida.png");
+  await expect(tour).toContainText("Guía de Prisma completada");
+  await tour.getByRole("button",{name:"Finalizar"}).click();
+  await expect(tour).toHaveCount(0);
+  expect(requests).toEqual([]);
+  await panel.getByRole("button",{name:"Guía de Prisma"}).click();
+  await expect(tour).toBeVisible();
+  await tour.getByRole("button",{name:"Omitir"}).click();
+  await expect(tour).toHaveCount(0);
+  await page.getByRole("button",{name:"Guía de uso"}).click();
+  await page.getByRole("button",{name:"Iniciar guía",exact:true}).click();
+  const reviewTour=page.getByRole("region",{name:"Tutorial visual"});
+  await expect(reviewTour).toBeVisible();
+  await reviewTour.getByRole("button",{name:"Omitir"}).click();
+  await expect(reviewTour).toHaveCount(0);
+});

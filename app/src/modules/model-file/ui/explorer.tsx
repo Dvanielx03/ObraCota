@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CaretRightIcon, CubeIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
 import type {ElementInfo,ModelInfo} from "@/viewer/domain/viewer.port";
+import {DoorEvidence} from "@/modules/knowledge/ui/door-evidence";
+import {DrawingEvidence} from "./drawing-evidence";
 import {ReviewNotes} from "./review-notes";
 
 export type SidebarTab="reading"|"properties";
-export function Explorer({tab,changeTab,elements,selected,drawing,locate,version,onNoteSaved}:{tab:SidebarTab;changeTab:(tab:SidebarTab)=>void;onNoteSaved:()=>void;version?:string;locate:(id:string,preview?:boolean)=>void;drawing?:ModelInfo["drawing"];elements:ElementInfo[];selected:ElementInfo|null}) {
+export function Explorer({tab,changeTab,elements,selected,drawing,locate,version,onNoteSaved,options,scope}:{scope?:{project:string;version:string};options?:import("react").ReactNode;tab:SidebarTab;changeTab:(tab:SidebarTab)=>void;onNoteSaved:()=>void;version?:string;locate:(id:string,preview?:boolean)=>void;drawing?:ModelInfo["drawing"];elements:ElementInfo[];selected:ElementInfo|null}) {
   const [query,setQuery] = useState("");
   const activeRow = useRef<HTMLButtonElement>(null);
   const inspector = useRef<HTMLElement>(null);
@@ -14,7 +16,7 @@ export function Explorer({tab,changeTab,elements,selected,drawing,locate,version
   const groups = useMemo(()=>{
     const result = new Map<string,ElementInfo[]>();
     for (const item of elements) {
-      if (query && ![item.name,item.level,item.type,item.guid].join(" ").toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) continue;
+      if (query && ![item.name,item.level,item.type,item.guid,item.id,item.annotation?.handle,item.annotation?.raw,...Object.keys(item.cad?.types??{})].join(" ").toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) continue;
       const bucket = result.get(item.level);
       if (bucket) bucket.push(item); else result.set(item.level,[item]);
     }
@@ -80,6 +82,9 @@ export function Explorer({tab,changeTab,elements,selected,drawing,locate,version
         {selected.annotation ? <><dt>Handle CAD</dt><dd>{selected.annotation.handle || "Sin identificador"}</dd></> : selected.count && !selected.guid ? <><dt>{drawing?"Entidades":"Piezas"}</dt><dd>{selected.count}</dd></> : <><dt>Material</dt><dd>{selected.material || "Sin dato disponible"}</dd></>}
       </dl>{selected.annotation && <details><summary>Texto de origen</summary><code>{selected.annotation.raw}</code></details>}
       <button className="locate" onClick={()=>locate(selected.id)}>Volver a encuadrar</button></> : <p>Selecciona un resultado para consultar sus propiedades.</p>}
+      {selected?.evidence && <DoorEvidence key={"evidence:"+selected.id} item={selected} scope={scope}/>}
+      {drawing && selected && <DrawingEvidence key={"dwg:"+selected.id} item={selected} units={drawing.units} scope={scope}/>}
+      {options}
       {version && <ReviewNotes onSaved={onNoteSaved} key={version} version={version} selected={selected} elements={elements} locate={id=>{setQuery("");locate(id);}}/>}
       {drawing && <details className="drawing-info"><summary>Datos de importación{drawing.omissions?" · parcial":""}</summary><dl><dt>Unidad</dt><dd>{drawing.units}</dd><dt>Rango Z visible</dt><dd>{drawing.depth.toLocaleString("es-CO",{maximumSignificantDigits:8})} {drawing.units}</dd></dl>{drawing.omissions && <p>Sin representar: {drawing.omissions}.</p>}</details>}
     </section>

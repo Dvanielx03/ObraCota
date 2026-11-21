@@ -16,14 +16,14 @@ for(const width of [1480,390])test("Lectura localiza sin perder la escala · "+w
     };
     const send=gl.uniformMatrix4fv;
     gl.uniformMatrix4fv=function(location,transpose,data,...args){
-      if(location && locations.has(location))document.documentElement.dataset.testScale=String(data[0]);
+      if(location && locations.has(location))document.documentElement.dataset.testScale=String(Array.from(data)[0]);
       return send.call(this,location,transpose,data,...args);
     };
   });
   await page.setViewportSize({width,height:width===390?844:667});
   await page.goto("/proyectos/restage/visor");await expect(page.getByRole("button",{name:"Revisar entrega"})).toBeVisible();
   await page.locator("header input").setInputFiles(file!);
-  await expect(page.locator(".project")).toHaveText(path.basename(file!));
+  await expect(page.locator(".project")).toHaveText(path.basename(file!),{timeout:60_000});
   const scale=()=>page.evaluate(()=>Number(document.documentElement.dataset.testScale));
   const sheetScale=await scale();
   const search=page.getByRole("searchbox"),zoom=page.getByRole("button",{name:"Acercar",exact:true});

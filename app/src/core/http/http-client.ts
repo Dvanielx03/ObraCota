@@ -20,16 +20,21 @@ export const sessionStore = {
   },
 };
 
-export async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
+async function send(path: string, init: RequestInit = {}, token?: string): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set("X-ObraCota-Client", "web");
-  if (init.body !== undefined) headers.set("Content-Type", "application/json");
+  if (init.body !== undefined && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", "Bearer " + token);
   const response = await fetch("/api/" + path, { ...init, headers, cache: "no-store", credentials: "same-origin" });
   if (!response.ok) {
     const error = await response.json().catch(() => null);
     throw new HttpError(response.status, error?.message || "No se pudo completar la solicitud.");
   }
+  return response;
+}
+
+export async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
+  const response = await send(path, init, token);
   return response.status === 204 ? undefined as T : response.json();
 }
 
@@ -54,14 +59,19 @@ export function refreshSession(): Promise<SessionState> {
   return refreshing;
 }
 
-export async function authenticated<T>(path: string, init?: RequestInit): Promise<T> {
+export async function authenticatedResponse(path: string, init?: RequestInit): Promise<Response> {
   const initial = current ?? await refreshSession();
   if (!initial) throw new HttpError(401, "Inicia sesión para continuar.");
-  try { return await request<T>(path, init, initial.accessToken); }
+  try { return await send(path, init, initial.accessToken); }
   catch (error) {
     if (!(error instanceof HttpError) || error.status !== 401) throw error;
     const renewed = current !== initial ? current : await refreshSession();
     if (!renewed || renewed.email !== initial.email) throw error;
-    return request<T>(path, init, renewed.accessToken);
+    return send(path, init, renewed.accessToken);
   }
+}
+
+export async function authenticated<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await authenticatedResponse(path, init);
+  return response.status === 204 ? undefined as T : response.json();
 }

@@ -10,6 +10,8 @@ name: obracota
 
 services:
   app:
+    environment:
+      API_INTERNAL_URL: http://backend:8080
     depends_on:
       backend:
         condition: service_healthy
@@ -36,11 +38,16 @@ services:
 
   backend:
     build: ./backend
+    volumes:
+      - modelos-originales:/srv/originals
     image: obracota-backend:local
     depends_on:
       db:
         condition: service_healthy
     environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      IFC_ENGINE_URL: http://ifc-engine:8000
+      AI_MONTHLY_LIMIT_CENTS: ${AI_MONTHLY_LIMIT_CENTS:-1000}
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-obracota}
       POSTGRES_USER: ${POSTGRES_USER:-obracota}
@@ -50,6 +57,17 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     restart: unless-stopped
+
+  ifc-engine:
+    build: ./ifc-engine
+    restart: unless-stopped
+    volumes:
+      - modelos-originales:/srv/originals:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8000/health', timeout=3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
   db:
     image: pgvector/pgvector:pg17
@@ -70,4 +88,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  modelos-originales:
   datos-postgres:

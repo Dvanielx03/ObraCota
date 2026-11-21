@@ -1,8 +1,8 @@
-import {useLayoutEffect,useRef,useState} from "react";
+import {useCallback,useLayoutEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 
 type Phase="select"|"note"|"review";
-type Stop={node:HTMLElement;title:string;action:string};
+export type Stop={node:HTMLElement;title:string;action:string;keepVisible?:HTMLElement};
 function target(phase:Phase,hasSelection:boolean):Stop|null{
   const dialog=document.querySelector<HTMLDialogElement>(".delivery-review[open]");
   const find=(selector:string,title:string,action:string):Stop|null=>{
@@ -36,8 +36,15 @@ function target(phase:Phase,hasSelection:boolean):Stop|null{
   return find(".review-notes > button","Guarda tu observación","Pulsa para vincular la nota al elemento y a esta versión del archivo.");
 }
 
-type Frame={host:HTMLElement;stop:Stop;x:number;y:number;w:number;h:number;cx:number;cy:number};
+type Frame={host:HTMLElement;stop:Stop;x:number;y:number;w:number;h:number;cx:number;cy:number;px:number;py:number};
 export function VisualTour({phase,selected,paused,pause,back,restart,exit}:{phase:Phase;selected:boolean;paused:boolean;pause:()=>void;back:()=>void;restart:()=>void;exit:()=>void}){
+  const resolve=useCallback(()=>target(phase,selected),[phase,selected]);
+  return <GuidedPointer resolve={resolve} id="tour-instruction" label="Tutorial visual" paused={paused} pause={pause} back={phase!=="select"?back:undefined} restart={restart} exit={exit}/>;
+}
+
+export function GuidedPointer({resolve,id,label,paused,pause,back,restart,exit,completed=false}:{
+  resolve:()=>Stop|null;id:string;label:string;paused:boolean;pause:()=>void;back?:()=>void;restart:()=>void;exit:()=>void;completed?:boolean;
+}){
   const [frame,setFrame]=useState<Frame|null>(null);
   const card=useRef<HTMLElement>(null);
   useLayoutEffect(()=>{
@@ -45,7 +52,7 @@ export function VisualTour({phase,selected,paused,pause,back,restart,exit}:{phas
     const observer=new ResizeObserver(schedule);
     observer.observe(document.documentElement);
     function measure(){
-      const stop=target(phase,selected);
+      const stop=resolve();
       if(!stop){setFrame(null);return;}
       if(previous!==stop.node){
         if(previous)observer.unobserve(previous);
@@ -60,12 +67,16 @@ export function VisualTour({phase,selected,paused,pause,back,restart,exit}:{phas
       const w=card.current?.offsetWidth??Math.min(268,right-left-16),h=card.current?.offsetHeight??150;
       const clamp=(v:number,min:number,max:number)=>Math.max(min,Math.min(v,max));
       const places=[[r.right+15,r.top],[r.left-w-15,r.top],[r.left,r.bottom+16],[r.left,r.top-h-16]];
+      const preview=stop.keepVisible?.getBoundingClientRect();
+      if(preview)places.push([r.left,preview.top-h-16]);
       const ranked=places.map(([x,y])=>{
         x=clamp(x,left+8,right-w-8);y=clamp(y,top+8,bottom-h-8);
-        const overlap=Math.max(0,Math.min(x+w,r.right+6)-Math.max(x,r.left-6))*Math.max(0,Math.min(y+h,r.bottom+6)-Math.max(y,r.top-6));
-        return {x,y,overlap};
-      }).sort((a,b)=>a.overlap-b.overlap);
-      setFrame({host,stop,x:r.left,y:r.top,w:r.width,h:r.height,cx:ranked[0].x,cy:ranked[0].y});
+        const area=(rect:DOMRect,padding=0)=>Math.max(0,Math.min(x+w,rect.right+padding)-Math.max(x,rect.left-padding))
+          *Math.max(0,Math.min(y+h,rect.bottom+padding)-Math.max(y,rect.top-padding));
+        return {x,y,targetOverlap:area(r,6),previewOverlap:preview?area(preview):0};
+      }).sort((a,b)=>a.targetOverlap-b.targetOverlap || a.previewOverlap-b.previewOverlap);
+      setFrame({host,stop,x:r.left,y:r.top,w:r.width,h:r.height,cx:ranked[0].x,cy:ranked[0].y,
+        px:Math.round(clamp(r.left+r.width*.68,left,right-26)),py:Math.round(clamp(r.top+r.height*.62,top,bottom-32))});
     }
     function schedule(){cancelAnimationFrame(raf);raf=requestAnimationFrame(measure);}
     const mutations=new MutationObserver(records=>{
@@ -76,23 +87,23 @@ export function VisualTour({phase,selected,paused,pause,back,restart,exit}:{phas
     window.visualViewport?.addEventListener("resize",schedule);window.visualViewport?.addEventListener("scroll",schedule);
     measure();schedule();
     return ()=>{cancelAnimationFrame(raf);observer.disconnect();mutations.disconnect();document.removeEventListener("input",schedule,true);document.removeEventListener("scroll",schedule,true);window.visualViewport?.removeEventListener("scroll",schedule);window.visualViewport?.removeEventListener("resize",schedule);};
-  },[phase,selected,paused]);
+  },[resolve,paused]);
   const active=frame?.stop.node;
   useLayoutEffect(()=>{
     if(!active || paused)return;
     const original=active.getAttribute("aria-describedby");
-    active.setAttribute("aria-describedby",[original,"tour-instruction"].filter(Boolean).join(" "));
+    active.setAttribute("aria-describedby",[original,id].filter(Boolean).join(" "));
     return ()=>{if(original)active.setAttribute("aria-describedby",original);else active.removeAttribute("aria-describedby");};
-  },[active,paused]);
+  },[active,paused,id]);
   if(!frame)return null;
-  const {x,y,w,h,cx,cy,stop,host}=frame;
+  const {x,y,w,h,cx,cy,px,py,stop,host}=frame;
   return createPortal(<div data-visual-tour="">
-    {!paused && <><div className="tour-light" aria-hidden="true" style={{left:x-3,top:y-3,width:w+6,height:h+6}}/>
-      <svg className="tour-pointer" aria-hidden="true" style={{transform:"translate("+Math.round(x+w*.68)+"px,"+Math.round(y+h*.62)+"px)"}} viewBox="0 0 26 32"><path d="M2 2 23 17 13 18 9 28Z" fill="#ffbe55" stroke="#17242c" strokeWidth="2"/></svg></>}
-    <section ref={card} className="tour-card" style={{left:cx,top:cy}} aria-label="Tutorial visual">
-      <div id="tour-instruction" aria-live="polite"><b>{paused?"Tutorial en pausa":stop.title}</b>{!paused && <p>{stop.action}</p>}</div>
-      <div className="tour-controls">{!paused && phase!=="select" && <button onClick={back}>Atrás</button>}
-        <button onClick={pause}>{paused?"Reanudar":"Pausar"}</button><button onClick={restart}>Reiniciar</button><button onClick={exit}>Omitir</button></div>
+    {!paused && !completed && <><div className="tour-light" aria-hidden="true" style={{left:x-3,top:y-3,width:w+6,height:h+6}}/>
+      <svg className="tour-pointer" aria-hidden="true" style={{transform:`translate(${px}px,${py}px)`}} viewBox="0 0 26 32"><path d="M2 2 23 17 13 18 9 28Z" fill="#ffbe55" stroke="#17242c" strokeWidth="2"/></svg></>}
+    <section ref={card} className="tour-card" style={{left:cx,top:cy}} aria-label={label}>
+      <div id={id} aria-live="polite"><b>{paused?"Tutorial en pausa":stop.title}</b>{!paused && <p>{stop.action}</p>}</div>
+      <div className="tour-controls">{!paused && back && <button onClick={back}>Atrás</button>}
+        {!completed && <button onClick={pause}>{paused?"Reanudar":"Pausar"}</button>}<button onClick={restart}>Reiniciar</button><button onClick={exit}>{completed?"Finalizar":"Omitir"}</button></div>
     </section>
   </div>,host);
 }

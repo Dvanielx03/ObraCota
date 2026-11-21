@@ -12,11 +12,11 @@ const projectViews = [
 export function PanelNavigation({ siteUrl }: { siteUrl?: string }) {
   const path = usePathname();
   const [expanded, setExpanded] = useState(false);
-  const base = "/proyectos/restage";
+  const base = path.match(/^\/proyectos\/([0-9a-f-]{36}|restage)(?:\/|$)/i)?.[0].replace(/\/$/, "") || "/proyectos/restage";
   const project = path === base || path.startsWith(base + "/");
   const items = [
     ["/proyectos", "Proyectos"],
-    ...(project ? projectViews.map(([slug, label]) => [slug ? base + "/" + slug : base, label]) : []),
+    ...(project ? (base === "/proyectos/restage" ? projectViews : projectViews.filter(([slug])=>slug!=="visor")).map(([slug, label]) => [slug ? base + "/" + slug : base, label]) : []),
     ["/cuenta", "Cuenta"],
   ];
   return <div className="panel-rail">

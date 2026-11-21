@@ -3,6 +3,7 @@
   <parent><groupId>com.obracota</groupId><artifactId>backend</artifactId><version>0.1.0</version></parent>
   <artifactId>infrastructure</artifactId>
   <dependencies>
+    <dependency><groupId>org.apache.pdfbox</groupId><artifactId>pdfbox</artifactId><version>3.0.8</version></dependency>
     <dependency><groupId>com.obracota</groupId><artifactId>domain</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>com.obracota</groupId><artifactId>application</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>

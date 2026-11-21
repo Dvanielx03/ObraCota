@@ -1,6 +1,7 @@
-import { IfcAPI, IFCRELCONTAINEDINSPATIALSTRUCTURE, IFCRELASSOCIATESMATERIAL } from "../ifc/web-ifc-api.js";
+import { IfcAPI, IFCPROJECT, IFCRELCONTAINEDINSPATIALSTRUCTURE, IFCRELASSOCIATESMATERIAL } from "../ifc/web-ifc-api.js";
 
 import {fileVersion} from "./file-version.js";
+import {readDoorEvidence} from "./door-evidence.js";
 // This worker owns the WASM heap. Only JavaScript-owned buffers cross the boundary.
 self.onmessage = async ({data: file}) => {
   const api = new IfcAPI();
@@ -59,7 +60,14 @@ self.onmessage = async ({data: file}) => {
         type, level: levels.get(id) || "Sin nivel directo", material: materials.get(id), parts});
     });
     if (!elements.length) throw new Error("El IFC no contiene geometría visible.");
-    self.postMessage({schema, geometry, elements,versionId:await fileVersion(bytes)}, buffers);
+    readDoorEvidence(api,model,elements.filter(element=>element.type.toUpperCase()==="IFCDOOR"),geometry);
+    const projects=api.GetLineIDsWithType(model,IFCPROJECT);
+    const project=projects.size()===1?api.GetLine(model,projects.get(0)):null;
+    const units=project?.UnitsInContext?api.GetLine(model,project.UnitsInContext.value)?.Units??[]:[];
+    const length=units.map(ref=>api.GetLine(model,ref.value)).filter(unit=>unit?.UnitType?.value==="LENGTHUNIT");
+    const metric=length.length===1 && length[0].Name?.value==="METRE" &&
+      [undefined,null,"MILLI","CENTI","DECI","KILO"].includes(length[0].Prefix?.value);
+    self.postMessage({schema, geometry, elements,walk:metric?Array.from(api.GetCoordinationMatrix(model)):undefined,versionId:await fileVersion(bytes)}, buffers);
   } catch (error) {
     self.postMessage({error: error instanceof Error ? error.message : "No se pudo procesar el IFC."});
   } finally {

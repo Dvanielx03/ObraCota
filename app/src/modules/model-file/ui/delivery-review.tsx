@@ -1,5 +1,6 @@
 import {DrawingComparison} from "./drawing-comparison";
-import {useRef,useState} from "react";
+import {NotesContext,localNotes} from "./notes-source";
+import {useContext,useRef,useState} from "react";
 import type {ModelInfo} from "@/viewer/domain/viewer.port";
 import {reviewDelivery} from "../application/review-delivery";
 
@@ -7,14 +8,11 @@ export function DeliveryReview({model,locate,guided,onDownloaded}:{guided:boolea
   const dialog=useRef<HTMLDialogElement>(null);
   const [input,setInput]=useState(""),[error,setError]=useState("");
   const [report,setReport]=useState<ReturnType<typeof reviewDelivery>|null>(null);
-  function run(){
+  const stored=useContext(NotesContext);
+  async function run(){
     setReport(null);setError("");
     try{
-      const notes:Record<string,string>={};
-      if(model.versionId){
-        const prefix="obracota.review.v1."+model.versionId+".";
-        for(const key of Object.keys(localStorage))if(key.startsWith(prefix))notes[key.slice(prefix.length)]=localStorage.getItem(key)??"";
-      }
+      const notes=stored ? await stored.load() : model.versionId ? await localNotes(model.versionId).load() : {};
       setReport(reviewDelivery(model,input,notes));
     }catch(e){setError(e instanceof Error?e.message:"No se pudo preparar la revisión.");}
   }
