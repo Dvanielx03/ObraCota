@@ -8,7 +8,10 @@ async function pointsTo(page:Page,target:Locator){
     const [a,b,c,p]=await Promise.all([target.boundingBox(),marker.boundingBox(),page.locator(".tour-card").boundingBox(),page.locator(".tour-pointer").boundingBox()]);
     if(!a||!b||!c||!p)return false;
     const overlap=Math.min(a.x+a.width,c.x+c.width)>Math.max(a.x,c.x) && Math.min(a.y+a.height,c.y+c.height)>Math.max(a.y,c.y);
-    return !overlap && Math.abs(b.x-a.x+3)<2 && Math.abs(b.y-a.y+3)<2 && Math.abs(b.width-a.width-6)<2 && Math.abs(p.x-(a.x+a.width*.68))<2 && Math.abs(p.y-(a.y+a.height*.62))<2;
+    const viewport=page.viewportSize()!;
+    const pointerX=Math.max(0,Math.min(a.x+a.width*.68,viewport.width-26));
+    const pointerY=Math.max(0,Math.min(a.y+a.height*.62,viewport.height-32));
+    return !overlap && Math.abs(b.x-a.x+3)<2 && Math.abs(b.y-a.y+3)<2 && Math.abs(b.width-a.width-6)<2 && Math.abs(p.x-pointerX)<2 && Math.abs(p.y-pointerY)<2;
   }).toBe(true);
 }
 for(const width of [1006,390]){
