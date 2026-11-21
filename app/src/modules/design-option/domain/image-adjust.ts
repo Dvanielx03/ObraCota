@@ -49,8 +49,21 @@ export function adjustPixels(source: Uint8ClampedArray, width: number, height: n
   return out;
 }
 
-/** "obracota-muro-exterior-opcion-2.png" */
-export function downloadName(element: string, slot: number): string {
-  const slug = element.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
-  return "obracota-" + (slug || "pieza") + "-opcion-" + slot + ".png";
+/** A close-up: zoom in percent (100 is the whole image) and where the crop is centred, in percent. */
+export interface Framing { zoom: number; x: number; y: number }
+export const FULL_FRAME: Framing = { zoom: 100, x: 50, y: 50 };
+export function isFullFrame(value: Framing): boolean { return value.zoom <= 100; }
+
+/** Rectangle of the original, in whole pixels, that a framing keeps. It never leaves the image. */
+export function cropRect(width: number, height: number, framing: Framing): { x: number; y: number; width: number; height: number } {
+  const zoom = Math.min(300, Math.max(100, framing.zoom || 100)) / 100;
+  const w = Math.max(1, Math.round(width / zoom)), h = Math.max(1, Math.round(height / zoom));
+  const at = (value: number) => Math.min(100, Math.max(0, Number.isFinite(value) ? value : 50)) / 100;
+  return { x: Math.round((width - w) * at(framing.x)), y: Math.round((height - h) * at(framing.y)), width: w, height: h };
+}
+
+/** "obracota-muro-exterior-opcion-2.png", with "-primer-plano" when it is a crop. */
+export function downloadName(element: string, slot: number, closeUp = false): string {
+  const slug = element.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
+  return "obracota-" + (slug || "pieza") + "-opcion-" + slot + (closeUp ? "-primer-plano" : "") + ".png";
 }
