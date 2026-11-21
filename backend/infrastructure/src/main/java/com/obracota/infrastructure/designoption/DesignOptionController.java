@@ -22,8 +22,10 @@ public class DesignOptionController {
     private final JdbcTemplate db;
     private final GeminiModels gemini;
     private final int cap;
+    /** Cents reserved from the monthly budget by each batch of three options. */
+    private static final int RESERVE_CENTS=100;
     public DesignOptionController(ProjectVersions versions,JdbcTemplate db,GeminiModels gemini,
-            @Value("${AI_MONTHLY_LIMIT_CENTS:1000}") int cap) {
+            @Value("${AI_MONTHLY_LIMIT_CENTS:800}") int cap) {
         this.versions=versions;this.db=db;this.gemini=gemini;this.cap=cap;
     }
     public record Input(UUID id,String element,String name,String request,String jpeg,String mask) {}
@@ -59,7 +61,10 @@ public class DesignOptionController {
             b.put("options",db.query("select slot,description from design_option where batch_id=? order by slot",(r,n)->Map.of("slot",r.getInt(1),"description",r.getString(2)),id));
             b.put("runs",db.queryForList("select slot, model_id, status, error_code, input_tokens,output_tokens,total_tokens from ai_run where batch_id=? order by slot",id));
         }
-        return Map.of("available",gemini.configured(),"batches",batches);
+        var used=db.queryForList("select reserved_cents from ai_month_budget where month_key=?",Integer.class,YearMonth.now(ZoneOffset.UTC).toString());
+        int remaining=Math.max(0,cap-(used.isEmpty()?0:used.getFirst()));
+        // The client shows the cost before sending; the limit is still enforced on submit.
+        return Map.of("available",gemini.configured(),"batches",batches,"budget",Map.of("reserve_cents",RESERVE_CENTS,"remaining_cents",remaining));
     }
     @PostMapping @Transactional @ResponseStatus(HttpStatus.ACCEPTED)
     public Map<String,UUID> submit(@PathVariable UUID project,@PathVariable UUID version,@AuthenticationPrincipal UUID user,@RequestBody Input input) {

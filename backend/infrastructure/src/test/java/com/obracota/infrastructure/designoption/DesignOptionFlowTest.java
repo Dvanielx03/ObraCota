@@ -64,7 +64,8 @@ class DesignOptionFlowTest {
         mvc.perform(put(base+"/"+id+"/selection/1").header("Authorization",user)).andExpect(status().isConflict());
         worker.process();
         mvc.perform(get(base).param("element","guid-1").header("Authorization",user)).andExpect(jsonPath("$.batches[0].state").value("READY"))
-          .andExpect(jsonPath("$.batches[0].runs.length()").value(4)).andExpect(jsonPath("$.batches[0].options.length()").value(3));
+          .andExpect(jsonPath("$.batches[0].runs.length()").value(4)).andExpect(jsonPath("$.batches[0].options.length()").value(3))
+          .andExpect(jsonPath("$.budget.reserve_cents").value(100)).andExpect(jsonPath("$.budget.remaining_cents").isNumber());
         for(int slot=1;slot<=3;slot++)
             mvc.perform(get(base+"/"+id+"/images/"+slot).header("Authorization",user)).andExpect(content().contentType("image/png"));
         mvc.perform(get(base+"/"+id+"/images/0").header("Authorization",user)).andExpect(content().bytes(capture));
