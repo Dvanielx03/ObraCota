@@ -11,13 +11,14 @@ test("La cuenta conserva su proyecto y renueva la sesión", async ({ page }) => 
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Crear cuenta" }).click();
   await expect(page.getByRole("heading", { name: "Mis proyectos" })).toBeVisible();
+  await page.getByRole("button", { name: "Nuevo proyecto" }).click();
   await page.getByLabel("Nombre del proyecto").fill(project);
   await page.getByRole("button", { name: "Crear proyecto" }).click();
   await page.getByRole("link", { name: project }).click();
-  await expect(page.getByRole("heading", { name: project })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: project })).toBeVisible();
   const projectUrl = page.url();
   await page.reload();
-  await expect(page.getByRole("heading", { name: project })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: project })).toBeVisible();
   await page.getByRole("link", { name: "Cuenta", exact: true }).click();
   await expect(page.getByText(email)).toBeVisible();
   await page.getByRole("button", { name: "Cerrar sesión" }).click();
@@ -33,7 +34,7 @@ test("La cuenta conserva su proyecto y renueva la sesión", async ({ page }) => 
   const renewed = page.waitForResponse(res => res.url().endsWith("/api/auth/refresh") && res.ok());
   await page.getByRole("link", { name: project }).click();
   await renewed;
-  await expect(page.getByRole("heading", { name: project })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: project })).toBeVisible();
 });
 
 test("La API limita cada proyecto a su propietario y revoca el acceso al salir", async ({ playwright, baseURL }) => {
