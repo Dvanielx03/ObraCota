@@ -12,7 +12,7 @@
 
 </div>
 
-ObraCota es una plataforma para ingenieros y diseñadores que coordinan planos, modelos BIM y avance de obra en Colombia. Este repositorio contiene su landing: una página que explica el producto recorriendo un edificio real, desde el terreno hasta el último hito terminado, y termina en una solicitud de demostración.
+ObraCota es una plataforma para ingenieros y diseñadores que coordinan planos, modelos BIM y avance de obra en Colombia. El repositorio contiene la landing pública, el panel de proyectos, la API y el motor IFC. El panel permite abrir un modelo, proponer un cambio de tipo de puerta, revisar el costo estimado y recorrer las revisiones del IFC en primera persona.
 
 > [!NOTE]
 > ObraCota es un proyecto académico en fase de definición. El formulario valida y confirma, pero no envía datos. El edificio del recorrido 3D sí es real: es el demostrador ReStage de RWTH Aachen, publicado como dato abierto.
@@ -85,19 +85,28 @@ La página queda en `http://localhost:3000`.
 Con Docker Desktop en marcha, copia `.env.example` como `.env`. Define una contraseña de PostgreSQL y una clave JWT independiente de al menos 32 bytes aleatorios en Base64. Puedes generar cada valor con `openssl rand -base64 48`. Conserva el archivo local entre despliegues. Para HTTPS configura `COOKIE_SECURE=true`.
 
 ```bash
-docker compose up -d --build
+docker compose up -d --build --wait
 ```
 
 La landing queda en `http://localhost:3200`. «Entrar al panel» abre la aplicación en `http://localhost:3201`. En Windows, `.\desplegar.ps1` levanta ambos servicios.
 
 | Comando | Qué hace |
 |---|---|
-| `docker compose up -d --build` | Levanta landing, panel, API y PostgreSQL con migraciones Flyway |
-| `docker compose ps` | Comprueba la salud de los cuatro servicios |
+| `docker compose up -d --build --wait` | Levanta landing, panel, API, PostgreSQL y el motor privado IfcOpenShell |
+| `docker compose ps` | Comprueba la salud de los cinco servicios |
 | `docker compose logs -f landing` | Muestra los registros |
 | `docker compose down` | Detiene los contenedores; los datos se conservan |
 
 Para cambiar los orígenes públicos, configura `SITE_URL` y `PANEL_URL` en el archivo local `.env` y reconstruye las imágenes. Ambos enlaces se fijan en la compilación. En desarrollo sin Compose las variables son `NEXT_PUBLIC_PANEL_URL` en la landing y `NEXT_PUBLIC_SITE_URL` en la aplicación.
+
+## Probar un cambio IFC
+
+1. Entra al panel, crea un proyecto y guarda el IFC desde **Archivos y versiones**.
+2. Abre la versión con **Prisma**, selecciona una puerta y pulsa **Proponer cambio IFC**. Elige un tipo del mismo archivo y usa una captura del visor o un PNG como referencia visual.
+3. Introduce precios y sus fuentes si dispones de ellos. Revisa las medidas y los avisos. Registra la propuesta, abre **Cambios de diseño** y decide si aplicarla.
+4. Abre la nueva versión. Pulsa **Recorrer**, elige un punto libre en el piso y alterna **Anterior** y **Nueva**. Si quieres restaurar el original, vuelve a **Cambios de diseño** y crea una revisión de restauración.
+
+El motor solo aplica tipos de puerta con representación verificable y medidas nominales compatibles con el hueco actual. Los avisos son informativos. El flujo admite una referencia visual local y funciona sin llamar a un proveedor de IA. Consulta el alcance técnico en la [arquitectura](backend/docs/ARCHITECTURE.md).
 
 > [!NOTE]
 > La imagen usa el modo `standalone` de Next.js: solo lleva el servidor, los archivos estáticos y `public/`. La API de proyectos se documenta en [la arquitectura del backend](backend/docs/ARCHITECTURE.md) y [el mapa de contextos](backend/docs/CONTEXT-MAP.md).
