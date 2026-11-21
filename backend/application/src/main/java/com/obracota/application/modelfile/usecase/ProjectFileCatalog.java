@@ -16,8 +16,11 @@ public record ProjectFileCatalog(ProjectRepository projects, ModelFileRepository
         requireOwner(project,user);
         return files.list(project);
     }
-    public ModelFile resolveUpload(UUID project, UUID user, UUID fileId, String name) {
+    public void requireOwnerForUpdate(UUID project, UUID user) {
         projects.findForUpdate(new ProjectId(project),new UserId(user)).orElseThrow(NotFoundApplicationException::new);
+    }
+    public ModelFile resolveUpload(UUID project, UUID user, UUID fileId, String name) {
+        requireOwnerForUpdate(project,user);
         String format = ModelFile.formatOf(name);
         Optional<ModelFile> existing = fileId == null ? files.named(project,name) : Optional.of(
             files.find(project,fileId).orElseThrow(NotFoundApplicationException::new));

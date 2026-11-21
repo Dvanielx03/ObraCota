@@ -11,7 +11,10 @@ import java.util.stream.Collectors;
 @Repository
 public class VersionAdapter implements VersionRepository {
     @PersistenceContext private EntityManager db;
-    public void insert(ModelVersion v) { db.persist(new VersionRow(v)); }
+    public void insert(ModelVersion v) {
+        db.persist(new VersionRow(v));
+        db.flush();
+    }
     public List<ModelVersion> history(UUID file) {
         return db.createQuery("from VersionRow where fileId=:file order by revision desc",VersionRow.class)
             .setParameter("file",file).getResultList().stream().map(VersionRow::toDomain).toList();

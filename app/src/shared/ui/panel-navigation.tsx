@@ -16,7 +16,7 @@ export function PanelNavigation({ siteUrl }: { siteUrl?: string }) {
   const project = path === base || path.startsWith(base + "/");
   const items = [
     ["/proyectos", "Proyectos"],
-    ...(project ? (base === "/proyectos/restage" ? projectViews : projectViews.slice(0,2)).map(([slug, label]) => [slug ? base + "/" + slug : base, label]) : []),
+    ...(project ? (base === "/proyectos/restage" ? projectViews : projectViews.filter(([slug])=>slug!=="visor")).map(([slug, label]) => [slug ? base + "/" + slug : base, label]) : []),
     ["/cuenta", "Cuenta"],
   ];
   return <div className="panel-rail">
