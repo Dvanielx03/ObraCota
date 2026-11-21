@@ -34,7 +34,8 @@ export const STEP_COUNT = 3;
 
 /** Where the person lands once the onboarding ends. */
 export function destinationFor(answers: OnboardingAnswers): string {
-  return answers.start === "sample" ? "/proyectos/restage/visor" : "/proyectos";
+  // The sample opens with the quick tour already running on the real controls.
+  return answers.start === "sample" ? "/proyectos/restage/visor?guia=rapida" : "/proyectos";
 }
 
 const ids = <T extends readonly { id: string }[]>(list: T) => list.map((item) => item.id);

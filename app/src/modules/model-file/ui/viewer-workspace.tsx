@@ -7,6 +7,7 @@ import {SidebarWidth} from "./sidebar-width";
 import { Explorer,type SidebarTab } from "./explorer";
 import {DeliveryReview} from "./delivery-review";
 import {VisualTour} from "./visual-tour";
+import {QuickTour,type QuickStep} from "./quick-tour";
 
 import { VisualOptions } from "@/modules/design-option/ui/visual-options";
 import { SelectionAssistant } from "@/modules/design-option/ui/selection-assistant";
@@ -67,15 +68,23 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   const [windowMode,setWindowMode] = useState(false);
   const [guide,setGuide]=useState<"off"|"welcome"|"select"|"note"|"review"|"done">("off");
   const [paused,setPaused]=useState(false);
+  const [quick,setQuick]=useState<QuickStep|null>(null),[quickPaused,setQuickPaused]=useState(false);
+  const quickRef=useRef<QuickStep|null>(null);
+  quickRef.current=quickPaused?null:quick;
   const pauseRef=useRef(false);
   const helpDialog=useRef<HTMLDialogElement>(null),helpButton=useRef<HTMLButtonElement>(null);
   function pauseTour(value:boolean){pauseRef.current=value;setPaused(value);}
   function startTour(){
     document.querySelector<HTMLDialogElement>(".delivery-review[open]")?.close();
-    setPrismaStep(null);setAssistant(false);pauseTour(false);setPanel(true);setTab("reading");setGuide("select");
+    setQuick(null);setPrismaStep(null);setAssistant(false);pauseTour(false);setPanel(true);setTab("reading");setGuide("select");
+  }
+  function startQuickTour(){
+    document.querySelector<HTMLDialogElement>(".delivery-review[open]")?.close();
+    rememberGuide();pauseTour(false);setGuide("off");
+    setPrismaStep(null);setAssistant(false);setPanel(true);setTab("reading");setQuickPaused(false);setQuick("select");
   }
   function startPrismaTour(){
-    stopTour();
+    stopTour();setQuick(null);
     setPrismaPaused(false);
     setPrismaStep(assistant && panel?"select":"open");
   }
@@ -83,7 +92,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     if(!prismaPaused)setPrismaStep(step=>step===from?to:step);
   }
   function startMaskGuide(step:MaskStep){
-    stopTour();
+    stopTour();setQuick(null);
     setPrismaPaused(false);
     setPrismaStep(step);
   }
@@ -100,6 +109,8 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   },[prismaStep,prismaPaused,assistant,panel,ids.length,grouping,color]);
   function stopTour(){rememberGuide();pauseTour(false);setGuide("off");}
   useEffect(()=>{
+    // Arriving from the onboarding starts the quick tour on the real controls, without a dialog.
+    if(new URLSearchParams(window.location.search).get("guia")==="rapida"){rememberGuide();setQuick("select");return;}
     try{if(!localStorage.getItem("obracota.guide.v1"))setGuide("welcome");}
     catch{setGuide("welcome");}
   },[]);
@@ -110,6 +121,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     if(id)setTab("properties");
     setSelected(id);viewer.current?.select(id);
     if(id && !pauseRef.current)setGuide(step=>step==="select"?"note":step);
+    if(id && quickRef.current==="select")setQuick("options");
   },[]);
   const open = useCallback(async (file:File|null)=>{
     if (!viewer.current) return;
@@ -154,7 +166,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     return ()=>{active=false;request.current?.abort();viewer.current?.dispose();viewer.current=null;};
   },[open,pick,session]);
   function closeModel() {
-    setPrismaStep(null);
+    setPrismaStep(null);setQuick(null);
     setAssistant(false);setIds([]);setColor(null);
     request.current?.abort();viewer.current?.clear();last.current=null;
     setModel(null);setSelected(null);setError("");setStatus("");
@@ -163,6 +175,12 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   const plan=model?.environment==="plan";
   const ready = !!model && !status && !error;
   const prismaAvailable=ready && !plan && !model?.drawing;
+  // The quick tour follows what the person does and skips a stop whose control this file lacks.
+  useEffect(()=>{
+    if(!ready || !quick || quickPaused)return;
+    if(quick==="options" && (!prismaAvailable || (assistant && panel)))setQuick("walk");
+    else if(quick==="walk" && !model?.walk)setQuick("done");
+  },[ready,quick,quickPaused,prismaAvailable,assistant,panel,model]);
   useEffect(()=>{
     const dialog=helpDialog.current;
     if(!dialog)return;
@@ -176,7 +194,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   },[ready,guide]);
   const serverNotes = initialFile && last.current === initialFile ? storedNotes : undefined;
   function startWalk(){
-    stopTour();setPrismaStep(null);
+    stopTour();setPrismaStep(null);setQuick(null);
     beforeWalk.current=panel;setPanel(false);setWalk("mark");setWalkError("");
     viewer.current?.enterWalk(message=>{setWalkError(message??"");if(!message)setWalk("active");});
   }
@@ -193,7 +211,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     }finally{if(!operation.signal.aborted)setWalkLoading("");}
   }
   const touring=walk!=="idle";
-  return <NotesContext.Provider value={serverNotes}><main className="workspace" data-walk={touring?"on":undefined} data-guide={ready?guide:"off"}>
+  return <NotesContext.Provider value={serverNotes}><main className="workspace" data-walk={touring?"on":undefined} data-guide={ready?guide:"off"} data-quick={ready && quick?quick:undefined}>
     <header><a href={returnHref} className="brand viewer-back" aria-label={returnLabel} title={returnLabel}><svg width="25" height="23" viewBox="0 0 25 23" fill="currentColor" aria-hidden="true"><path d="M1 2h23l-5 5H6l-5 5zm0 13 5-5v7h13l5 5H1z"/></svg>ObraCota</a>
       <span className="separator">/</span><span className="project">{model?.name || "Visor de modelos"}</span>
       <input hidden ref={input} type="file" accept=".ifc,.dwg" onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(file)void open(file);}}/>
@@ -252,12 +270,14 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
       </section>
     </div>
     <dialog className="help-sheet" ref={helpDialog} aria-labelledby="help-title" onCancel={stopTour}>
-      <h2 id="help-title">{guide==="done"?"Guía completada":"Tu primera revisión"}</h2>
-      <p>{guide==="done"?"Abre el archivo .txt en tus descargas para leer tu observación junto a la referencia del modelo.":"El cursor te llevará desde la selección de una referencia hasta la descarga de tu primer informe. Puedes practicar con ReStage o con tu propio archivo."}</p>
-      {guide==="done"?<button onClick={stopTour}>Finalizar</button>:<><button onClick={startTour} disabled={!ready}>Iniciar guía</button>{prismaAvailable && <button onClick={startPrismaTour}>Guía de Prisma</button>}<button onClick={stopTour}>Ahora no</button></>}
+      <h2 id="help-title">{guide==="done"?"Guía completada":"Empieza por aquí"}</h2>
+      <p>{guide==="done"?"Abre el archivo .txt en tus descargas para leer tu observación junto a la referencia del modelo.":"El recorrido rápido te muestra lo esencial en tres pasos: elegir una pieza, pedir opciones y recorrer el modelo. Las otras guías practican una revisión de entrega y una edición con Prisma."}</p>
+      {guide==="done"?<button onClick={stopTour}>Finalizar</button>:<><button className="help-primary" onClick={startQuickTour} disabled={!ready}>Recorrido rápido</button><button onClick={startTour} disabled={!ready}>Iniciar guía</button>{prismaAvailable && <button onClick={startPrismaTour}>Guía de Prisma</button>}<button onClick={stopTour}>Ahora no</button></>}
       {model?.sample && <p><a href="/models/creditos.txt" target="_blank" rel="noreferrer">Créditos del modelo ReStage ↗</a></p>}
     </dialog>
     {guide==="note" && !model?.versionId && <button className="guide-skip-note" onClick={()=>setGuide("review")}>Continuar sin nota local</button>}
+    {ready && quick && guide==="off" && !prismaStep && <QuickTour step={quick} paused={quickPaused} onPause={()=>setQuickPaused(!quickPaused)}
+      onBack={quick==="options"?()=>{setAssistant(false);setTab("reading");setQuick("select");}:undefined} onRestart={startQuickTour} onExit={()=>setQuick(null)}/>}
     {prismaAvailable && prismaStep && guide==="off" && <PrismaTour step={prismaStep} paused={prismaPaused} onPause={()=>setPrismaPaused(!prismaPaused)} onRestart={startPrismaTour} onExit={()=>setPrismaStep(null)}/>}
     {ready && (guide==="select"||guide==="note"||guide==="review") && <VisualTour phase={guide} selected={!!chosen} paused={paused} pause={()=>pauseTour(!paused)} restart={startTour} exit={stopTour} back={()=>{
       const dialog=document.querySelector<HTMLDialogElement>(".delivery-review[open]");

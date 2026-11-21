@@ -161,3 +161,4 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .estimate-sheet article{padding:1.2rem 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
 .estimate-sheet section{margin:12px 0}
 .estimate-sheet .restore-action{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.help-sheet .help-primary{background:var(--ink);color:#fff;border-color:var(--ink)}.help-sheet .help-primary:hover{background:#283645}
