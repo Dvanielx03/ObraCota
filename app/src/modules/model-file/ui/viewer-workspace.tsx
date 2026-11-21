@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { QuestionIcon, SelectionIcon, HouseIcon, ArrowsOutCardinalIcon, CornersOutIcon, CubeIcon, DiamondIcon, FolderOpenIcon, HandIcon, MinusIcon, PlusIcon, SidebarSimpleIcon, XIcon } from "@phosphor-icons/react";
+import { QuestionIcon, SelectionIcon, HouseIcon, ArrowsOutCardinalIcon, CornersOutIcon, CubeIcon, DiamondIcon, FolderOpenIcon, HandIcon, MinusIcon, PersonSimpleWalkIcon, PlusIcon, SidebarSimpleIcon, XIcon } from "@phosphor-icons/react";
 import type {ModelInfo,ViewerPort} from "@/viewer/domain/viewer.port";
 import { ViewCube } from "./view-cube";
 import {SidebarWidth} from "./sidebar-width";
@@ -214,9 +214,11 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   return <NotesContext.Provider value={serverNotes}><main className="workspace" data-walk={touring?"on":undefined} data-guide={ready?guide:"off"} data-quick={ready && quick?quick:undefined}>
     <header><a href={returnHref} className="brand viewer-back" aria-label={returnLabel} title={returnLabel}><svg width="25" height="23" viewBox="0 0 25 23" fill="currentColor" aria-hidden="true"><path d="M1 2h23l-5 5H6l-5 5zm0 13 5-5v7h13l5 5H1z"/></svg>ObraCota</a>
       <span className="separator">/</span><span className="project">{model?.name || "Visor de modelos"}</span>
+      {model && !touring && <span className="stage-meta">{plan?"Plano 2D":"Vista 3D"}<small>{model.schema}</small></span>}
       <input hidden ref={input} type="file" accept=".ifc,.dwg" onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(file)void open(file);}}/>
       <button className="open" onClick={()=>input.current?.click()} disabled={touring || (!viewer.current && !!error)}><FolderOpenIcon/>Abrir archivo</button>
       <button ref={helpButton} className="help-icon" aria-label="Guía de uso" title="Guía de uso" aria-haspopup="dialog" disabled={!ready || touring} onClick={()=>setGuide("welcome")}><QuestionIcon aria-hidden="true"/></button>
+      {model && !touring && <button className="header-close" aria-label="Cerrar modelo" title="Cerrar modelo" onClick={closeModel}><XIcon aria-hidden="true"/></button>}
     </header>
     <div className={"workarea " + (panel?"":"collapsed")}>
       <aside id="explorer" hidden={!panel} inert={!!status} aria-busy={!!status}>{assistant && ready && viewer.current && model?
@@ -235,13 +237,16 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           </div>}
           <button className="close" onClick={stopWalk}>Salir</button>
         </div>:<div className="stagebar"><button aria-label={panel?"Ocultar explorador":"Mostrar explorador"} aria-expanded={panel} onClick={()=>setPanel(!panel)}><SidebarSimpleIcon/></button><span>{plan?"Plano 2D":"Vista 3D"}</span>
+          <div className="stage-actions" role="toolbar" aria-label="Acciones del modelo">
           {prismaAvailable && <button className="assistant-trigger" data-prisma-tour="open" aria-controls="explorer" aria-pressed={assistant && panel}
             aria-label={assistant && panel?"Volver a lectura":"Abrir Prisma"} onClick={()=>{
               if(guide!=="off")stopTour();
               if(assistant && !panel)setPanel(true);else toggleAssistant();
             }}><DiamondIcon aria-hidden="true"/><span>Prisma</span><span className="assistant-trigger-caption">{assistant && panel?"Volver a lectura":"Asistente de diseño"}</span></button>}
           {ready && model && <DeliveryReview guided={guide==="review"&&!paused} onDownloaded={()=>{if(guide==="review"&&!paused){setGuide("done");rememberGuide();}}} key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} model={model} locate={id=>{setPanel(true);pick(id);viewer.current?.locate(id);}}/>}
-          {ready && model?.walk && <button className="walk-trigger" onClick={startWalk}>Recorrer</button>}
+          {prismaAvailable && <button className="walk-trigger" disabled={!model?.walk} onClick={startWalk}
+            title={model?.walk?undefined:"Disponible al abrir un IFC guardado en uno de tus proyectos"}><PersonSimpleWalkIcon aria-hidden="true"/>Recorrer</button>}
+          </div>
           {model && <><small>{model.schema}</small><button className="close" aria-label="Cerrar modelo" onClick={closeModel}><XIcon/></button></>}
         </div>}
         <div className="view" style={{visibility:ready?"visible":"hidden"}} ref={container}/>

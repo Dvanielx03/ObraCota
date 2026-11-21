@@ -28,9 +28,9 @@ function target(step: QuickStep): Stop | null {
       "Prisma prueba acabados sobre la pieza elegida y prepara una edición con IA. Púlsalo para abrirlo.",
     );
   if (step === "walk")
-    return point(".walk-trigger", "3 de 3 · Recórrelo por dentro", "Camina por el modelo en primera persona para anticipar problemas antes de la obra.");
+    return point(".walk-trigger:enabled", "3 de 3 · Recórrelo por dentro", "Camina por el modelo en primera persona para anticipar problemas antes de la obra.");
   // The sample cannot be walked: say where that control appears instead of skipping it silently.
-  const walkable = !!document.querySelector(".walk-trigger");
+  const walkable = !!document.querySelector(".walk-trigger:enabled");
   return point(
     ".help-icon",
     "Listo: ya conoces lo esencial",

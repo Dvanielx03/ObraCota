@@ -141,8 +141,8 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
   .walk-keyboard{display:none}
 }
 @media(max-width:560px){
-  .stage:has(.walk-trigger)>.stagebar>span,.stage:has(.walk-trigger)>.stagebar small{display:none}
-  .stage:has(.walk-trigger)>.stagebar{gap:4px}
+  .stage:has(.walk-trigger:enabled)>.stagebar>span,.stage:has(.walk-trigger:enabled)>.stagebar small{display:none}
+  .stage:has(.walk-trigger:enabled)>.stagebar{gap:4px}
 }
 .door-proposal{display:grid;gap:10px;padding:14px 0;border-top:1px solid var(--line);font-size:13px}
 .door-proposal h3,.estimate-sheet h3{margin:.35em 0;font-size:14px}
@@ -162,3 +162,39 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .estimate-sheet section{margin:12px 0}
 .estimate-sheet .restore-action{background:transparent;color:var(--ink);border:1px solid var(--line)}
 .help-sheet .help-primary{background:var(--ink);color:#fff;border-color:var(--ink)}.help-sheet .help-primary:hover{background:#283645}
+
+/* Espacio de trabajo en escritorio (F3-01): acciones flotando arriba, cámara abajo, sin franja.
+   Por debajo de 721 px se conserva la disposición anterior, que queda congelada. */
+.stage-actions{display:contents}
+.stage-actions svg,.stage-meta,.header-close{display:none}
+@media(max-width:720px){.walk-trigger:disabled{display:none}}
+@media(min-width:721px){
+  .stage{grid-template-rows:minmax(0,1fr);background-color:#f7f6f2;background-image:radial-gradient(rgb(10 21 34/.07) 1px,transparent 1px);background-size:22px 22px}
+  .stage>.view{grid-row:1}
+  .feedback{inset:0}
+  .orientation{top:16px}
+  .stage>.stagebar:not(.walk-bar){position:absolute;z-index:3;inset:16px 16px auto;justify-content:center;min-height:58px;padding:0;gap:0;pointer-events:none}
+  .stage>.stagebar:not(.walk-bar)>*{pointer-events:auto}
+  .stage>.stagebar:not(.walk-bar)>span,.stage>.stagebar:not(.walk-bar)>small,.stage>.stagebar:not(.walk-bar)>.close{display:none}
+  .stage>.stagebar:not(.walk-bar)>button:first-child{position:absolute;left:0;top:7px;width:44px;height:44px;border-radius:12px;background:rgb(255 255 255/.96);border:1px solid #dcdfe4;box-shadow:0 8px 32px rgb(10 21 34/.08),0 2px 8px rgb(10 21 34/.03)}
+  .stage>.stagebar:not(.walk-bar)>button:first-child:hover{background:#f1efe9}
+  .stage-actions{display:flex;align-items:center;gap:6px;padding:7px;border-radius:16px;background:rgb(255 255 255/.96);border:1px solid #dcdfe4;box-shadow:0 8px 32px rgb(10 21 34/.08),0 2px 8px rgb(10 21 34/.03)}
+  .stage-actions:empty{display:none}
+  .stage-actions svg{display:block;width:20px;height:20px}
+  .stagebar .stage-actions>button{display:flex;align-items:center;gap:9px;height:44px;min-height:44px;padding:0 18px;border:0;border-radius:11px;background:transparent;color:var(--ink);font:700 13px Manrope,Arial,sans-serif;white-space:nowrap}
+  .stagebar .stage-actions>button:hover{background:#f1efe9}
+  .stagebar .stage-actions>button:disabled{opacity:.45;cursor:not-allowed;background:transparent}
+  .stagebar .stage-actions>button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .stagebar .stage-actions>.assistant-trigger{background:var(--ink);color:var(--bone);padding:0 20px}
+  .stagebar .stage-actions>.assistant-trigger:hover{background:#1c2b3c}
+  .stagebar .stage-actions>.assistant-trigger[aria-pressed=true]{background:rgb(242 178 92/.3);color:var(--ink)}
+  .stagebar .stage-actions>.assistant-trigger:focus-visible{outline-color:#875100}
+  .stage-actions .assistant-trigger-caption{display:none}
+  .stage>.walk-bar{position:absolute;z-index:3;inset:0 0 auto}
+  .tools{bottom:18px;padding:5px;gap:2px;border-radius:14px;background:rgb(255 255 255/.96);border-color:#dcdfe4;box-shadow:0 8px 32px rgb(10 21 34/.08),0 2px 8px rgb(10 21 34/.03)}
+  .tools button{border-radius:10px}
+  .tools button[aria-pressed=true]{background:rgb(242 178 92/.3)}
+  .stage-meta{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;white-space:nowrap}
+  .stage-meta small{font:11px monospace;border-left:1px solid var(--line);padding-left:8px}
+  .header-close{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;padding:0;border-radius:50%}
+}

@@ -1,6 +1,7 @@
 import {DrawingComparison} from "./drawing-comparison";
 import {NotesContext,localNotes} from "./notes-source";
 import {useContext,useRef,useState} from "react";
+import {ListChecksIcon} from "@phosphor-icons/react";
 import type {ModelInfo} from "@/viewer/domain/viewer.port";
 import {reviewDelivery} from "../application/review-delivery";
 
@@ -33,7 +34,7 @@ export function DeliveryReview({model,locate,guided,onDownloaded}:{guided:boolea
     const link=document.createElement("a");link.href=url;link.download=model.name+"-revision.txt";link.click();onDownloaded();setTimeout(()=>URL.revokeObjectURL(url),1000);
     if(guided)dialog.current?.close();
   }
-  return <><button className="review-trigger" onClick={()=>{setReport(null);setError("");dialog.current?.showModal();}}>Revisar entrega</button>
+  return <><button className="review-trigger" onClick={()=>{setReport(null);setError("");dialog.current?.showModal();}}><ListChecksIcon aria-hidden="true"/>Revisar entrega</button>
     <dialog className="delivery-review" ref={dialog} aria-labelledby="delivery-title">
       <div className="review-heading"><h2 id="delivery-title">Revisión de entrega</h2><button aria-label="Cerrar revisión" onClick={()=>dialog.current?.close()}>×</button></div>
       <p>{model.name} · {model.schema}</p>{guided && <p className="guide-tip" role="status">{report?"Paso 4 de 4 · Comprueba que tu observación aparece en el resultado y pulsa Descargar informe para conservarlo.":model.drawing?"Paso 3 de 4 · Escribe un concepto que hayas visto en el plano y pulsa Preparar informe.":"Paso 3 de 4 · Pulsa Preparar informe para reunir los datos y tu observación."}</p>}
