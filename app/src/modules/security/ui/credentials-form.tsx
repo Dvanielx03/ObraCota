@@ -6,7 +6,7 @@ import { PanelView } from "@/shared/ui/panel-view";
 import { identify } from "../application/session-actions";
 import { sessionHttp } from "../infrastructure/session-http";
 
-export function CredentialsForm({ registration = false }: { registration?: boolean }) {
+export function CredentialsForm({ registration = false, assistant = false }: { registration?: boolean; assistant?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -19,7 +19,7 @@ export function CredentialsForm({ registration = false }: { registration?: boole
       await identify(sessionHttp, registration ? "register" : "login", {
         email: String(data.get("email")), password: String(data.get("password")),
       });
-      router.replace("/proyectos");
+      router.replace(assistant ? "/proyectos/restage/asistente" : "/proyectos");
     } catch (e) { setError(e instanceof Error ? e.message : "No se pudo acceder."); setBusy(false); }
   }
   return <PanelView title={title} project={false}><form className="account-form" onSubmit={submit}>
@@ -29,6 +29,6 @@ export function CredentialsForm({ registration = false }: { registration?: boole
     {registration && <p>Usa al menos 10 caracteres y hasta 72 bytes.</p>}
     {error && <p role="alert">{error}</p>}
     <button className="panel-action" disabled={busy}>{busy ? "Procesando…" : title}</button>
-    <Link href={registration ? "/ingresar" : "/registro"}>{registration ? "Ya tengo cuenta" : "Crear cuenta"}</Link>
+    <Link href={(registration ? "/ingresar" : "/registro")+(assistant?"?desde=asistente":"")}>{registration ? "Ya tengo cuenta" : "Crear cuenta"}</Link>
   </form></PanelView>;
 }
