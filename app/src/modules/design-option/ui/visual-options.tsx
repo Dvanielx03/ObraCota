@@ -2,27 +2,42 @@
 import {useState,useEffect,useRef} from "react";
 import {authenticated,authenticatedResponse} from "@/core/http/http-client";
 import type {ElementInfo,GroupCapture} from "@/viewer/domain/viewer.port";
+import {CompareSlider} from "./compare-slider";
 
 type Batch={id:string;request:string;state:"QUEUED"|"WORKING"|"READY"|"FAILED";selected:number|null;
   drafts?:string[];options:{slot:number;description:string}[];runs:{model_id:string;status:string;error_code:string|null;total_tokens:number|null}[]};
 type History={available:boolean;batches:Batch[]};
 
-function PrivateImage({path,label}:{path:string;label:string}) {
+function usePrivateImage(path:string|null) {
   const [url,setUrl]=useState(""),[error,setError]=useState(false);
   useEffect(()=>{
+    setUrl("");setError(false);
+    if(!path)return;
     const controller=new AbortController();let objectUrl="";
     authenticatedResponse(path,{signal:controller.signal}).then(r=>r.blob()).then(blob=>{
       if(!controller.signal.aborted){objectUrl=URL.createObjectURL(blob);setUrl(objectUrl);}
     }).catch(()=>{if(!controller.signal.aborted)setError(true);});
     return ()=>{controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl);};
   },[path]);
+  return {url,error};
+}
+function PrivateImage({path,label}:{path:string;label:string}) {
+  const {url,error}=usePrivateImage(path);
   return url?<img src={url} alt={label}/>:<p>{error?"No se pudo cargar la imagen.":"Cargando imagen…"}</p>;
+}
+function OptionComparison({images,slot,onClose}:{images:string;slot:number;onClose:()=>void}) {
+  const before=usePrivateImage(images+"/0"),after=usePrivateImage(images+"/"+slot);
+  if(before.error||after.error)return <p role="alert">No se pudo cargar la comparación. <button onClick={onClose}>Cerrar comparación</button></p>;
+  if(!before.url||!after.url)return <p role="status">Preparando la comparación…</p>;
+  return <CompareSlider before={before.url} after={after.url} beforeLabel="Vista del modelo" afterLabel={"Opción "+slot+" · Generado con IA"}
+    label={"Comparar la opción "+slot+" con la vista del modelo"} onClose={onClose}/>;
 }
 export function VisualOptions({project,version,element,capture,groupCapture}:{project:string;version:string;element:ElementInfo;capture:()=>string;groupCapture?:()=>GroupCapture}) {
   const dialog=useRef<HTMLDialogElement>(null);
   const [preview,setPreview]=useState(""),[request,setRequest]=useState(""),[message,notify]=useState("");
   const [history,setHistory]=useState<History>(),[busy,setBusy]=useState(false),[refresh,reload]=useState(0);
   const retryId=useRef<string|null>(null);
+  const [compare,setCompare]=useState<{batch:string;slot:number}|null>(null);
   const base="projects/"+project+"/versions/"+version+"/options";
   const key=element.guid || element.id;
   useEffect(()=>{
@@ -69,13 +84,16 @@ export function VisualOptions({project,version,element,capture,groupCapture}:{pr
       <details><summary>Ver captura original</summary>{(preview||groupCapture) && <PrivateImage path={base+"/"+b.id+"/images/0"} label="Captura usada para esta terna"/>}</details>
       {b.state==="FAILED"?<p>La generación quedó incompleta. {b.runs.some(r=>r.error_code==="HTTP_429")?"Gemini alcanzó un límite de solicitudes o de cuota. Revisa la cuota del modelo antes de volver a enviar la captura.":"Consulta el detalle en Consumo de la generación."}</p>:b.state!=="READY" && <p role="status">Preparando las opciones…</p>}
       {b.state==="FAILED" && !!b.drafts?.length && <section aria-label="Alternativas de texto"><h4>Propuestas de Gemini</h4><ol>{b.drafts.map(d=><li key={d}>{d}</li>)}</ol></section>}
+      {compare?.batch===b.id && <OptionComparison key={compare.slot} images={base+"/"+b.id+"/images"} slot={compare.slot} onClose={()=>setCompare(null)}/>}
       <div className="visual-grid">{b.options.map(o=><figure key={o.slot}>{(preview||groupCapture) && <PrivateImage path={base+"/"+b.id+"/images/"+o.slot} label={"Opción "+o.slot}/>}
         <figcaption><small>Generado con IA</small><p>{o.description}</p>
-        <button disabled={busy||b.state!=="READY"||b.selected===o.slot} onClick={()=>select(b.id,o.slot)}>{b.selected===o.slot?"Elegida":"Elegir opción "+o.slot}</button></figcaption></figure>)}</div>
+        <button disabled={busy||b.state!=="READY"||b.selected===o.slot} onClick={()=>select(b.id,o.slot)}>{b.selected===o.slot?"Elegida":"Elegir opción "+o.slot}</button>
+        <button className="compare-open" disabled={b.state!=="READY"} aria-pressed={compare?.batch===b.id && compare.slot===o.slot}
+          onClick={()=>setCompare(compare?.batch===b.id && compare.slot===o.slot?null:{batch:b.id,slot:o.slot})}>{"Comparar opción "+o.slot}</button></figcaption></figure>)}</div>
       <details><summary>Consumo de la generación</summary>{b.runs.map((r,n)=><p key={n}>{r.model_id} · {r.status} · {r.total_tokens===null?"Consumo sin confirmar":r.total_tokens+" tokens"} {r.error_code}</p>)}</details>
     </section>)}</>;
   if(groupCapture)return <section className="prism-request" data-working={working}>{content}</section>;
   return <><button className="review-trigger" onClick={open}>Opciones visuales</button>
-    <dialog className="delivery-review visual-options" ref={dialog} onClose={()=>setPreview("")} aria-label="Opciones visuales">
+    <dialog className="delivery-review visual-options" ref={dialog} onClose={()=>{setPreview("");setCompare(null);}} aria-label="Opciones visuales">
     <div className="review-heading"><h2>Opciones visuales</h2><button aria-label="Cerrar opciones" onClick={()=>dialog.current?.close()}>×</button></div>{content}</dialog></>;
 }

@@ -198,3 +198,22 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
   .stage-meta small{font:11px monospace;border-left:1px solid var(--line);padding-left:8px}
   .header-close{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;padding:0;border-radius:50%}
 }
+
+/* Comparador antes/después de una opción visual (F3-03). */
+.compare{margin-block:.25rem 1rem}
+.compare-stage{position:relative;overflow:hidden;width:min(100%,calc(min(50dvh,28rem)*var(--ratio,1.6)));aspect-ratio:var(--ratio,1.6);margin-inline:auto;border-radius:12px;border:1px solid #dcdfe4;background:#0a1522;line-height:0;user-select:none}
+.compare-stage img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
+.compare-stage .compare-before{clip-path:inset(0 calc(100% - var(--compare)) 0 0)}
+.compare-range{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:ew-resize;min-height:0}
+.compare-handle{position:absolute;top:0;bottom:0;left:var(--compare);width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 0 1px rgb(10 21 34/.35);pointer-events:none}
+.compare-handle i{position:absolute;top:50%;left:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:#fff;border:1px solid #dcdfe4;box-shadow:0 2px 8px rgb(10 21 34/.25)}
+.compare-handle i::before,.compare-handle i::after{content:"";position:absolute;top:50%;width:6px;height:6px;margin-top:-3px;border-top:2px solid #0a1522;border-left:2px solid #0a1522}
+.compare-handle i::before{left:8px;transform:rotate(-45deg)}.compare-handle i::after{right:8px;transform:rotate(135deg)}
+.compare-range:focus-visible+.compare-handle i{outline:3px solid #f2b25c;outline-offset:2px}
+.compare-tag{position:absolute;bottom:10px;padding:4px 9px;border-radius:8px;background:rgb(10 21 34/.82);color:#f1ede4;font:650 12px/1.3 Manrope,Arial,sans-serif;pointer-events:none}
+.compare-tag-before{left:10px}.compare-tag-after{right:10px}
+.compare-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
+.compare-footer p{font-size:12px;color:var(--mute);line-height:1.45;margin:0}
+.compare-footer button,.visual-grid .compare-open{border:1px solid var(--line);border-radius:8px;padding:0 12px;min-height:36px;white-space:nowrap}
+.visual-grid .compare-open{margin-left:6px}
+.visual-grid .compare-open[aria-pressed=true]{background:rgb(242 178 92/.3);border-color:#b9781c}
