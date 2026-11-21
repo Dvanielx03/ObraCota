@@ -16,6 +16,7 @@ async function pointsTo(page:Page,target:Locator){
 }
 for(const width of [1006,390]){
   test("Cursor y spotlight desde selección a descarga · "+width,async({page})=>{
+    test.skip(width<721,"Móvil fuera de alcance: la aplicación se diseña solo para escritorio.");
     await page.setViewportSize({width,height:width===390?844:667});
     await page.emulateMedia({reducedMotion:width===390?"reduce":"no-preference"});
     await page.goto("/proyectos/restage/visor");await page.getByRole("button",{name:"Iniciar guía"}).click();
