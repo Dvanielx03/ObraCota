@@ -17,6 +17,7 @@ export function Account() {
         : failed ? <><p role="alert">No se pudo consultar la sesión.</p><button onClick={retry}>Reintentar</button></> : <p role="status">Consultando sesión…</p>}
       {error && <p role="alert">{error}</p>}
     </section>
-    <section><h2>Preferencias</h2><p>Las preferencias personales se podrán guardar cuando se habiliten los ajustes de cuenta.</p></section>
+    <section><h2>Preferencias</h2><p>Las preferencias personales se podrán guardar cuando se habiliten los ajustes de cuenta.</p>
+      <Link className="panel-action" href="/bienvenida">Repetir la bienvenida</Link></section>
   </div></PanelView>;
 }

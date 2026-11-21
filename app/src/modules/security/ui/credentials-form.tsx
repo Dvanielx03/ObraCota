@@ -5,6 +5,8 @@ import Link from "next/link";
 import { PanelView } from "@/shared/ui/panel-view";
 import { identify } from "../application/session-actions";
 import { sessionHttp } from "../infrastructure/session-http";
+import { entryRoute } from "@/modules/user-profile/application/onboarding.use-case";
+import { localUserProfileRepository } from "@/modules/user-profile/infrastructure/local-user-profile.repository";
 
 export function CredentialsForm({ registration = false, assistant = false }: { registration?: boolean; assistant?: boolean }) {
   const router = useRouter();
@@ -19,10 +21,12 @@ export function CredentialsForm({ registration = false, assistant = false }: { r
       await identify(sessionHttp, registration ? "register" : "login", {
         email: String(data.get("email")), password: String(data.get("password")),
       });
-      router.replace(assistant ? "/proyectos/restage/asistente" : "/proyectos");
+      const usual = assistant ? "/proyectos/restage/asistente" : "/proyectos";
+      // A new account meets the onboarding once; signing in keeps the usual destination.
+      router.replace(registration && !assistant ? entryRoute(localUserProfileRepository, usual) : usual);
     } catch (e) { setError(e instanceof Error ? e.message : "No se pudo acceder."); setBusy(false); }
   }
-  return <PanelView title={title} project={false}><form className="account-form" onSubmit={submit}>
+  return <PanelView title={title} project={false}><form className="account-form" method="post" onSubmit={submit}>
     <label>Correo electrónico<input type="email" name="email" autoComplete="username" maxLength={254} required/></label>
     <label>Contraseña<input type="password" name="password" autoComplete={registration ? "new-password" : "current-password"}
       minLength={registration ? 10 : 1} maxLength={72} required/></label>
