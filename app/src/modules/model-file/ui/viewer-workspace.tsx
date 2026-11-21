@@ -10,6 +10,7 @@ import {VisualTour} from "./visual-tour";
 import {QuickTour,type QuickStep} from "./quick-tour";
 
 import { VisualOptions } from "@/modules/design-option/ui/visual-options";
+import { SceneStrip } from "@/modules/scene-view/ui/scene-strip";
 import { SelectionAssistant } from "@/modules/design-option/ui/selection-assistant";
 import { PrismaTour,type MaskStep,type PrismaStep } from "@/modules/design-option/ui/prisma-tour";
 import { NotesContext } from "./notes-source";
@@ -257,6 +258,8 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
             <button onClick={()=>{setError("");setStatus("Iniciando visor…");setSession(s=>s+1);}}>Reintentar</button>}</div>}
           {status && viewer.current && <button onClick={()=>{request.current?.abort();setStatus("");}}>Cancelar</button>}
         </div>}
+        {ready && !plan && !touring && serverNotes && storedVersion && <SceneStrip key={storedVersion.version} {...storedVersion}
+          pose={()=>viewer.current?.pose()??null} apply={next=>viewer.current?.applyPose(next)}/>}
         {!plan && !touring && <div className="cube-host" hidden={!ready}><ViewCube flat={false} orient={view=>viewer.current?.orient(view)}/></div>}
         {touring && <div className="walk-hint" role="status">{walkError||walkLoading||(walk==="mark"?"Elige un punto libre en el piso. Pulsa Intro para probar el centro.":<><span className="walk-keyboard">Arrastra para mirar · WASD o flechas para caminar</span><span className="walk-touch">Arrastra para mirar. Mantén pulsada una flecha para caminar.</span></>)}</div>}
         {walk==="active" && <div className="walk-pad" aria-label="Dirección del recorrido">{([["forward","Adelante","↑"],["left","Izquierda","←"],["back","Atrás","↓"],["right","Derecha","→"]]).map(([direction,label,icon])=><button key={direction} data-direction={direction} aria-label={label}

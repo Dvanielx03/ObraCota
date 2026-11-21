@@ -31,6 +31,9 @@ export interface ViewerPort {
   switchWalk(file:File,signal:AbortSignal,status:(text:string)=>void):Promise<void>;
   walkMove(key:string,held:boolean):void;
   orient(view: ViewDirection): void;
+  /** Camera of the 3D view, or null while it cannot be read (plans, walking, nothing open). */
+  pose(): CameraPose | null;
+  applyPose(pose: CameraPose): void;
   extents(): void;
   windowZoom(): void;
   open(file: File | null, signal: AbortSignal, status: (text: string) => void): Promise<ModelInfo>;
@@ -42,6 +45,8 @@ export interface ViewerPort {
   pan(enabled: boolean): void;
   dispose(): void;
 }
+/** Where the camera is, what it looks at and how tall the visible area is, in model units. */
+export interface CameraPose { position: [number, number, number]; target: [number, number, number]; span: number }
 export interface GroupCapture {
   image:string;
   mask:string;

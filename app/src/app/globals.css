@@ -259,3 +259,26 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .option-download-actions button{border:1px solid var(--line);border-radius:8px;padding:0 12px;min-height:36px;white-space:nowrap}
 .option-download-actions button:disabled{opacity:.5}
 .option-download-actions .option-download-run{background:var(--ink);border-color:var(--ink);color:#fff}
+.scene-strip{display:none}
+@media(min-width:721px){
+  .scene-strip{position:absolute;z-index:2;left:16px;top:88px;display:flex;flex-direction:column;gap:8px;width:216px;max-height:calc(100% - 190px);padding:12px;border-radius:16px;background:rgb(255 255 255/.96);border:1px solid #dcdfe4;box-shadow:0 8px 32px rgb(10 21 34/.08),0 2px 8px rgb(10 21 34/.03);font:13px/1.4 Manrope,Arial,sans-serif;color:var(--ink)}
+  .scene-strip header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0;border:0}
+  .scene-strip h2{display:flex;align-items:center;gap:6px;margin:0;font:700 12px Manrope,Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+  .scene-strip svg{width:16px;height:16px;flex:none}
+  .scene-strip p{margin:0;color:var(--mute);font-size:12px}
+  .scene-strip .scene-status:empty{display:none}
+  .scene-strip button{min-height:32px;border-radius:8px;font:650 12px Manrope,Arial,sans-serif;color:var(--ink)}
+  .scene-strip button:hover:not(:disabled){background:#f1efe9}
+  .scene-strip button:disabled{opacity:.5}
+  .scene-strip button:focus-visible,.scene-strip input:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+  .scene-save{display:inline-flex;align-items:center;gap:5px;padding:0 9px;border:1px solid #dcdfe4;white-space:nowrap}
+  .scene-strip ul{list-style:none;margin:0;padding:0;display:grid;gap:2px;overflow-y:auto;min-height:0}
+  .scene-strip li{display:flex;align-items:center;gap:2px;border-radius:10px;border-left:3px solid transparent}
+  .scene-strip li[data-current]{border-left-color:#f2b25c;background:#f7f6f2}
+  .scene-apply{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0 6px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .scene-apply span{font:17px/1 Bebas,sans-serif;color:#8a929b}
+  .scene-icon{flex:none;width:32px;display:grid;place-items:center;padding:0}
+  .scene-strip form{display:flex;gap:4px;flex:1;min-width:0;padding:2px}
+  .scene-strip input{flex:1;min-width:0;min-height:32px;padding:0 8px;border:1px solid #858981;border-radius:8px;font:inherit;background:#fff}
+  .scene-strip form button{padding:0 8px;border:1px solid #dcdfe4}
+}

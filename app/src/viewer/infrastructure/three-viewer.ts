@@ -3,7 +3,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import {PlanSheet} from "./plan-sheet";
 import { loadModel, type SceneModel } from "./model-source";
 import { walking, walkWorld, type WalkWorld } from "./walk";
-import type { ElementInfo, GroupCaptureView, ViewerPort, ViewDirection } from "../domain/viewer.port";
+import type { ElementInfo, GroupCaptureView, ViewerPort, ViewDirection,CameraPose} from "../domain/viewer.port";
 
 function release(root:T.Object3D) {
   const geometry = new Set<T.BufferGeometry>(), materials = new Set<T.Material>();
@@ -305,6 +305,25 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     controls.update();resize();
   }
   const directions:Record<ViewDirection,number[]> = {front:[0,0,1],back:[0,0,-1],right:[1,0,0],left:[-1,0,0],top:[0,1,0.000001],bottom:[0,-1,0.000001],iso:[1,1,1]};
+  function viewSpan(){
+    const width=Math.max(container.clientWidth,1),height=Math.max(container.clientHeight,1);
+    return Math.max(baseHeight,baseWidth/(width/height));
+  }
+  function pose():CameraPose|null {
+    if(plan || walk || !root)return null;
+    // Cursor zoom leaves the frustum off-centre; fold that shift into the saved position.
+    const shift=new T.Vector3(offsetX,offsetY,0).applyQuaternion(camera.quaternion);
+    const position=camera.position.clone().add(shift),target=controls.target.clone().add(shift);
+    return {position:[position.x,position.y,position.z],target:[target.x,target.y,target.z],span:viewSpan()/camera.zoom};
+  }
+  function applyPose(next:CameraPose) {
+    if(plan || walk || !root || !(next.span>0))return;
+    offsetX=0;offsetY=0;
+    camera.position.fromArray(next.position);controls.target.fromArray(next.target);
+    camera.lookAt(controls.target);
+    camera.zoom=T.MathUtils.clamp(viewSpan()/next.span,controls.minZoom,controls.maxZoom);
+    fitting=true;controls.update();fitting=false;resize();
+  }
   function orient(view:ViewDirection) {
     if(plan)return;
     const distance = camera.position.distanceTo(controls.target);
@@ -585,7 +604,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       fit();
       return {environment:plan?"plan":"model",name:next.name,schema:next.schema,sample:next.sample,elements:next.elements,drawing:next.drawing,versionId:next.versionId,walk:!!next.coordination && !plan};
     },
-      fit,select(id){canvas.removeAttribute("data-group-preview");select(id);},locate,orient,extents:()=>fit(false),
+      fit,select(id){canvas.removeAttribute("data-group-preview");select(id);},locate,orient,pose,applyPose,extents:()=>fit(false),
     windowZoom(){if(windowMode)exitWindow();else{windowMode=true;canvas.style.cursor="crosshair";canvas.focus();}},
     clear() {
       cancelWalk();activeModel=undefined;originalFile=null;
