@@ -217,3 +217,18 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .compare-footer button,.visual-grid .compare-open{border:1px solid var(--line);border-radius:8px;padding:0 12px;min-height:36px;white-space:nowrap}
 .visual-grid .compare-open{margin-left:6px}
 .visual-grid .compare-open[aria-pressed=true]{background:rgb(242 178 92/.3);border-color:#b9781c}
+
+/* Petición con opciones cerradas y costo visible (F4-03 y F4-04). */
+.option-request{border:0;padding:0;margin:0 0 .5rem;display:grid;gap:12px;min-width:0}
+.option-request legend{padding:0;font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
+.chip-group{display:grid;gap:6px}
+.chip-legend{font-size:13px;font-weight:650}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-height:37px;padding:0 14px;border:1px solid #dcdfe4;border-radius:12px;background:#fff;font-size:13px;font-weight:650;white-space:nowrap}
+.chip:hover{background:#f1efe9}
+.chip[aria-checked=true],.chip[aria-pressed=true]{background:rgb(242 178 92/.3);border-color:#b9781c}
+.chip:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.request-preview{font-size:13px;line-height:1.5;margin:.25rem 0 .5rem;padding:8px 12px;border-left:3px solid #b9781c;background:rgb(242 178 92/.12)}
+.request-preview[data-empty]{border-left-color:var(--line);background:transparent;color:var(--mute)}
+.run-cost{font-weight:600;opacity:.85}
+.budget-note{font-size:12px;color:var(--mute);margin:.35rem 0 0}

@@ -3,10 +3,12 @@ import {useState,useEffect,useRef} from "react";
 import {authenticated,authenticatedResponse} from "@/core/http/http-client";
 import type {ElementInfo,GroupCapture} from "@/viewer/domain/viewer.port";
 import {CompareSlider} from "./compare-slider";
+import {ChipChoice,ChipToggles} from "./option-chips";
+import {DAYLIGHTS,DEFAULT_CHOICES,FINISHES,KEEPS,REQUEST_LIMIT,TONES,asksForChange,composeRequest,formatUsd,type OptionChoices} from "../domain/option-request";
 
 type Batch={id:string;request:string;state:"QUEUED"|"WORKING"|"READY"|"FAILED";selected:number|null;
   drafts?:string[];options:{slot:number;description:string}[];runs:{model_id:string;status:string;error_code:string|null;total_tokens:number|null}[]};
-type History={available:boolean;batches:Batch[]};
+type History={available:boolean;batches:Batch[];budget?:{reserve_cents:number;remaining_cents:number}};
 
 function usePrivateImage(path:string|null) {
   const [url,setUrl]=useState(""),[error,setError]=useState(false);
@@ -38,6 +40,10 @@ export function VisualOptions({project,version,element,capture,groupCapture}:{pr
   const [history,setHistory]=useState<History>(),[busy,setBusy]=useState(false),[refresh,reload]=useState(0);
   const retryId=useRef<string|null>(null);
   const [compare,setCompare]=useState<{batch:string;slot:number}|null>(null);
+  const [choices,setChoices]=useState<OptionChoices>(DEFAULT_CHOICES);
+  // The chips only compose the text that was already being sent as the request.
+  const composed=composeRequest(choices,request);
+  function choose(next:Partial<OptionChoices>){setChoices(current=>({...current,...next}));retryId.current=null;}
   const base="projects/"+project+"/versions/"+version+"/options";
   const key=element.guid || element.id;
   useEffect(()=>{
@@ -62,8 +68,8 @@ export function VisualOptions({project,version,element,capture,groupCapture}:{pr
       const frame=groupCapture?.();
       if(frame?.missing){notify("Hay piezas ocultas o fuera del encuadre. Gira la cámara o encuadra la selección antes de enviar.");return;}
       retryId.current??=crypto.randomUUID();
-      await authenticated(base,{method:"POST",body:JSON.stringify({id:retryId.current,element:key,name:element.name.slice(0,512),request:request.trim(),jpeg:(frame?.image??preview).split(",")[1],mask:frame?.mask.split(",")[1]})});
-      retryId.current=null;setRequest("");reload(n=>n+1);
+      await authenticated(base,{method:"POST",body:JSON.stringify({id:retryId.current,element:key,name:element.name.slice(0,512),request:composed,jpeg:(frame?.image??preview).split(",")[1],mask:frame?.mask.split(",")[1]})});
+      retryId.current=null;setRequest("");setChoices(DEFAULT_CHOICES);reload(n=>n+1);
     }catch(e){notify(e instanceof Error?e.message:"No se pudo iniciar la generación.");}
     finally{setBusy(false);}
   }
@@ -76,9 +82,18 @@ export function VisualOptions({project,version,element,capture,groupCapture}:{pr
   const content=<>
     <p>{element.name}</p>{preview && <details><summary>Captura que se enviará a Gemini</summary><img src={preview} alt="Encuadre original del visor"/></details>}
     {groupCapture && <small>Al enviar se comparte con Gemini el encuadre actual y la máscara de las piezas seleccionadas.</small>}
-    <label>Cambio solicitado<textarea maxLength={2000} value={request} onChange={e=>{setRequest(e.target.value);retryId.current=null;}}/></label>
+    <fieldset className="option-request" disabled={busy}><legend>Qué quieres probar</legend>
+      <ChipChoice legend="Acabado o material" items={FINISHES} value={choices.finish} onChange={finish=>choose({finish})}/>
+      <ChipChoice legend="Tono" items={TONES} value={choices.tone} onChange={tone=>choose({tone})}/>
+      <ChipChoice legend="Luz del día" items={DAYLIGHTS} value={choices.daylight} onChange={daylight=>choose({daylight})}/>
+      <ChipToggles legend="Qué conservar" items={KEEPS} value={choices.keep} onChange={keep=>choose({keep})}/>
+    </fieldset>
+    <label>Cambio solicitado <small>(opcional si eliges opciones)</small><textarea maxLength={REQUEST_LIMIT} value={request} onChange={e=>{setRequest(e.target.value);retryId.current=null;}}/></label>
+    <p className="request-preview" data-empty={!composed || undefined}><b>Se enviará:</b> <span data-request-preview="">{composed || "elige al menos una opción o escribe el cambio."}</span></p>
     {history && !history.available && <p>Para generar imágenes falta configurar Gemini en el servidor.</p>}
-    <button className="review-run" disabled={busy || !history?.available || !request.trim()} onClick={submit}>Enviar captura y generar tres opciones</button>
+    {history?.budget && history.budget.remaining_cents<history.budget.reserve_cents && <p role="alert">Se agotó el presupuesto mensual de IA. No se pueden generar más opciones este mes.</p>}
+    <button className="review-run" disabled={busy || !history?.available || !asksForChange(choices,request) || (!!history.budget && history.budget.remaining_cents<history.budget.reserve_cents)} onClick={submit}>Enviar captura y generar tres opciones{history?.budget && <span className="run-cost"> · reserva {formatUsd(history.budget.reserve_cents)}</span>}</button>
+    {history?.budget && <p className="budget-note">Cada envío reserva {formatUsd(history.budget.reserve_cents)} del presupuesto mensual de IA. Quedan {formatUsd(history.budget.remaining_cents)}.</p>}
     <p role="status">{message}</p>{message && <button onClick={()=>reload(n=>n+1)}>Actualizar historial</button>}
     {history?.batches.map(b=><section key={b.id}><h3>{b.request}</h3>
       <details><summary>Ver captura original</summary>{(preview||groupCapture) && <PrivateImage path={base+"/"+b.id+"/images/0"} label="Captura usada para esta terna"/>}</details>
