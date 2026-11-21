@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QuestionIcon, SelectionIcon, HouseIcon, ArrowsOutCardinalIcon, CornersOutIcon, CubeIcon, DiamondIcon, FolderOpenIcon, HandIcon, MinusIcon, PersonSimpleWalkIcon, PlusIcon, SidebarSimpleIcon, XIcon } from "@phosphor-icons/react";
-import type {ModelInfo,ViewerPort} from "@/viewer/domain/viewer.port";
+import type {CameraPose,ModelInfo,ViewerPort} from "@/viewer/domain/viewer.port";
 import { ViewCube } from "./view-cube";
 import {SidebarWidth} from "./sidebar-width";
 import { Explorer,type SidebarTab } from "./explorer";
@@ -194,6 +194,8 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     }
   },[ready,guide]);
   const serverNotes = initialFile && last.current === initialFile ? storedNotes : undefined;
+  const readPose=useCallback(()=>viewer.current?.pose()??null,[]);
+  const applyPose=useCallback((next:CameraPose)=>viewer.current?.applyPose(next),[]);
   function startWalk(){
     stopTour();setPrismaStep(null);setQuick(null);
     beforeWalk.current=panel;setPanel(false);setWalk("mark");setWalkError("");
@@ -259,7 +261,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           {status && viewer.current && <button onClick={()=>{request.current?.abort();setStatus("");}}>Cancelar</button>}
         </div>}
         {ready && !plan && !touring && serverNotes && storedVersion && <SceneStrip key={storedVersion.version} {...storedVersion}
-          pose={()=>viewer.current?.pose()??null} apply={next=>viewer.current?.applyPose(next)}/>}
+          pose={readPose} apply={applyPose}/>}
         {!plan && !touring && <div className="cube-host" hidden={!ready}><ViewCube flat={false} orient={view=>viewer.current?.orient(view)}/></div>}
         {touring && <div className="walk-hint" role="status">{walkError||walkLoading||(walk==="mark"?"Elige un punto libre en el piso. Pulsa Intro para probar el centro.":<><span className="walk-keyboard">Arrastra para mirar · WASD o flechas para caminar</span><span className="walk-touch">Arrastra para mirar. Mantén pulsada una flecha para caminar.</span></>)}</div>}
         {walk==="active" && <div className="walk-pad" aria-label="Dirección del recorrido">{([["forward","Adelante","↑"],["left","Izquierda","←"],["back","Atrás","↓"],["right","Derecha","→"]]).map(([direction,label,icon])=><button key={direction} data-direction={direction} aria-label={label}

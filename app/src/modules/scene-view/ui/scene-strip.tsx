@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { BookmarkSimpleIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { BookmarkSimpleIcon, CaretLeftIcon, CaretRightIcon, PencilSimpleIcon, PlayIcon, PlusIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
 import type { CameraPose } from "@/viewer/domain/viewer.port";
 import { VIEW_LIMIT, VIEW_NAME_LIMIT, cleanViewName, nextViewName, type SceneView } from "../domain/scene-view";
 import { sceneViewHttpRepository } from "../infrastructure/scene-view-http-repository";
@@ -67,8 +67,63 @@ export function SceneStrip({ project, version, pose, apply }: {
       setMessage("«" + view.name + "» eliminada.");
     }, "No se pudo eliminar la vista.");
   }
+  // Presentation: the stage goes full screen and the saved views become slides.
+  const [slide, setSlide] = useState(-1);
+  const root = useRef<HTMLElement>(null);
+  const before = useRef<CameraPose | null>(null);
+  const presentButton = useRef<HTMLButtonElement>(null);
+  const presenting = slide >= 0 && !!views?.length;
+  const shown = presenting ? views![Math.min(slide, views!.length - 1)] : undefined;
+  function present() {
+    if (!views?.length) return;
+    before.current = pose();
+    const start = Math.max(0, views.findIndex(view => view.id === current));
+    setSlide(start); setMessage("");
+    root.current?.closest<HTMLElement>(".stage")?.requestFullscreen?.().catch(() => undefined);
+  }
+  useEffect(() => {
+    if (!shown) return;
+    const stage = root.current?.closest<HTMLElement>(".stage");
+    stage?.setAttribute("data-presenting", "");
+    let frame = 0;
+    // The canvas changes size when entering or leaving full screen: frame the view again once it has.
+    const frameView = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => apply(shown)); };
+    apply(shown); setCurrent(shown.id);
+    const stop = () => setSlide(-1);
+    const keys = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); stop(); }
+      else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        setSlide(index => (index + (event.key === "ArrowRight" ? 1 : -1) + views!.length) % views!.length);
+      }
+    };
+    const screen = () => { if (document.fullscreenElement) frameView(); else if (entered) stop(); };
+    let entered = !!document.fullscreenElement;
+    const mark = () => { if (document.fullscreenElement) entered = true; screen(); };
+    document.addEventListener("keydown", keys);
+    document.addEventListener("fullscreenchange", mark);
+    window.addEventListener("resize", frameView);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", keys);
+      document.removeEventListener("fullscreenchange", mark);
+      window.removeEventListener("resize", frameView);
+    };
+  }, [shown, apply, views]);
+  useEffect(() => {
+    if (presenting) return;
+    const stage = root.current?.closest<HTMLElement>(".stage");
+    if (!stage?.hasAttribute("data-presenting")) return;
+    stage.removeAttribute("data-presenting");
+    const previous = before.current;
+    const restore = () => { if (previous) apply(previous); };
+    restore(); setCurrent("");
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined).then(() => requestAnimationFrame(restore));
+    presentButton.current?.focus();
+  }, [presenting, apply]);
   const full = (views?.length ?? 0) >= VIEW_LIMIT;
-  return <section className="scene-strip" aria-label="Vistas guardadas">
+  const step = (delta: number) => setSlide(index => (index + delta + views!.length) % views!.length);
+  return <><section ref={root} className="scene-strip" aria-label="Vistas guardadas" hidden={presenting}>
     <header><h2><BookmarkSimpleIcon aria-hidden="true"/>Vistas</h2>
       <button className="scene-save" disabled={busy || !views || full} onClick={save}
         title={full ? "Esta versión ya tiene " + VIEW_LIMIT + " vistas." : undefined}>
@@ -90,6 +145,14 @@ export function SceneStrip({ project, version, pose, apply }: {
                 onClick={() => { setDraft(view.name); setEditing(view.id); }}><PencilSimpleIcon aria-hidden="true"/></button>
               <button className="scene-icon" aria-label={"Eliminar " + view.name} disabled={busy} onClick={() => remove(view)}><TrashIcon aria-hidden="true"/></button></>}
       </li>)}</ul>}
+    <button ref={presentButton} className="scene-present-open" disabled={!views?.length || busy} onClick={present}>
+      <PlayIcon weight="fill" aria-hidden="true"/>Presentar</button>
     <p className="scene-status" role="status">{message}</p>
-  </section>;
+  </section>
+  {shown && <div className="scene-present" role="group" aria-label="Presentación de vistas">
+    <button aria-label="Vista anterior" disabled={views!.length < 2} onClick={() => step(-1)}><CaretLeftIcon aria-hidden="true"/></button>
+    <p role="status"><b>{shown.name}</b><span>{views!.indexOf(shown) + 1} de {views!.length}</span></p>
+    <button aria-label="Vista siguiente" disabled={views!.length < 2} onClick={() => step(1)}><CaretRightIcon aria-hidden="true"/></button>
+    <button className="scene-present-close" onClick={() => setSlide(-1)}><XIcon aria-hidden="true"/>Salir</button>
+  </div>}</>;
 }
