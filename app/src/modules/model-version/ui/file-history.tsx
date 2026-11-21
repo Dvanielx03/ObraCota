@@ -22,5 +22,6 @@ export function FileHistory({ project, file }: {project: string; file: string}) 
           {new Date(v.uploadedAt).toLocaleString("es-CO")} · {v.uploaderEmail}</p>
           <details><summary>Huella SHA-256</summary><code>{v.sha256}</code></details>
           <Link className="panel-action" href={`/proyectos/${project}/visor/${v.id}`}>Abrir versión {v.revision} en el visor</Link>
+          {v.format.toUpperCase()==="IFC" && <p><Link href={`/proyectos/${project}/visor/${v.id}?panel=asistente`}>Abrir con Prisma</Link></p>}
         </article>)}</section>;
 }

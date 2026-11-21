@@ -80,9 +80,14 @@ export function extract(db, unknown,indexOnly=false) {
       minZ=Math.min(minZ,p.z);maxZ=Math.max(maxZ,p.z);
       if(!batch){
         const id=layer+"/"+kind;
-        if(!batches.has(id))batches.set(id,{id,layer,kind,color:properties?.color,count:0,positions:[]});
+        if(!batches.has(id))batches.set(id,{id,layer,kind,color:properties?.color,count:0,positions:[],
+          cad:{types:{},min:[Infinity,Infinity],max:[-Infinity,-Infinity]}});
         batch=batches.get(id);batch.count++;
+        batch.cad.types[e.type]=(batch.cad.types[e.type]??0)+1;
       }
+      const {min,max}=batch.cad;
+      min[0]=Math.min(min[0],p.x);min[1]=Math.min(min[1],p.y);
+      max[0]=Math.max(max[0],p.x);max[1]=Math.max(max[1],p.y);
       batch.positions.push(p.x-origin.x,p.z-origin.z,origin.y-p.y);
     }
     function segment(a,b){vertex(a.clone());vertex(b.clone());}

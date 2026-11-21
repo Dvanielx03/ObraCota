@@ -1,8 +1,9 @@
 import * as T from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import {PlanSheet} from "./plan-sheet";
-import { loadModel } from "./model-source";
-import type { ElementInfo, ViewerPort, ViewDirection } from "../domain/viewer.port";
+import { loadModel, type SceneModel } from "./model-source";
+import { walking, walkWorld, type WalkWorld } from "./walk";
+import type { ElementInfo, GroupCaptureView, ViewerPort, ViewDirection } from "../domain/viewer.port";
 
 function release(root:T.Object3D) {
   const geometry = new Set<T.BufferGeometry>(), materials = new Set<T.Material>();
@@ -37,6 +38,10 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   controls.listenToKeyEvents(canvas);
   let offsetX = 0, offsetY = 0;
   let root:T.Group|null = null, disposed = false, baseHeight = 1, baseWidth = 1;
+  let activeModel:SceneModel|undefined, originalFile:File|null=null;
+  let walk:ReturnType<typeof walking>|undefined, markFloor:((result:string|null)=>void)|undefined;
+  let selectedForWalk:string|null=null;
+  const walkModels=new Map<File,{model:SceneModel;world:WalkWorld}>();
   const originals = new Map<T.Mesh|T.LineSegments|T.Points,T.Material|T.Material[]>();
   const highlightedLines=new T.LineBasicMaterial({color:0xff6900});
   const highlightedPoints=new T.PointsMaterial({color:0xff6900,size:4,sizeAttenuation:false});
@@ -72,7 +77,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     camera.updateMatrixWorld();
   }
   function draw() {
-    if (disposed || fitting) return;
+    if (disposed || fitting || walk) return;
     constrainPlan();
     controls.rotateSpeed = T.MathUtils.clamp(1/Math.sqrt(camera.zoom),0.15,1.4);
     cubeRotation.makeRotationFromQuaternion(camera.quaternion).transpose().premultiply(cssAxes).multiply(cssAxes);
@@ -101,12 +106,12 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   }
   let plan=false;
   let initialPlanBounds:T.Box3|undefined;
-  function fit(reset=true,region?:T.Box3) {
+  function fit(reset=true,region?:T.Box3,from?:T.Vector3) {
     if(plan && !region)region=initialPlanBounds;
     if (!root) return;
     const center = (region??bounds).getCenter(new T.Vector3());
     const radius = Math.max(bounds.getSize(new T.Vector3()).length(),0.1);
-    const direction = plan ? new T.Vector3(0,1,0.000001).normalize() : reset ? new T.Vector3(1,0.65,1.45).normalize() : camera.getWorldDirection(new T.Vector3()).negate();
+    const direction = plan ? new T.Vector3(0,1,0.000001).normalize() : from ?? (reset ? new T.Vector3(1,0.65,1.45).normalize() : camera.getWorldDirection(new T.Vector3()).negate());
     offsetX=0;offsetY=0;
     controls.target.copy(center);
     camera.position.copy(center).addScaledVector(direction,radius*2);
@@ -174,8 +179,10 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   }
   motion.addEventListener("change",pulsePreference);
   document.addEventListener("visibilitychange",pulsePreference);
-  function select(id:string|null) {
+  const previewMaterial=new T.MeshStandardMaterial({side:T.DoubleSide});
+  function select(id:string|null, group?:Set<string>,color?:string) {
     endPulse();
+    selectedForWalk=id??(group?.size===1?group.values().next().value??null:null);
     hint.hidden=true;
     const note=id?annotations.get(id):undefined;
     anchor=note?.annotation?new T.Vector3(...note.annotation.anchor):null;
@@ -191,11 +198,12 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     originals.forEach((material,mesh)=>{mesh.material = material;});
     selectedOrder.forEach((order,node)=>{node.renderOrder=order;});selectedOrder.clear();
     originals.clear();
-    if (id) root?.traverse(mesh=>{
-      if ((mesh instanceof T.Mesh || mesh instanceof T.LineSegments || mesh instanceof T.Points) && mesh.userData.elementId === id) {
+    if(color)previewMaterial.color.set(color);
+    if (id || group?.size) root?.traverse(mesh=>{
+      if ((mesh instanceof T.Mesh || mesh instanceof T.LineSegments || mesh instanceof T.Points) && (group?group.has(mesh.userData.elementId):mesh.userData.elementId === id)) {
         originals.set(mesh,mesh.material);
         if(plan){selectedOrder.set(mesh,mesh.renderOrder);mesh.renderOrder=5;}
-        mesh.material = mesh instanceof T.Mesh ? highlight : mesh instanceof T.Points ? highlightedPoints : highlightedLines;
+        mesh.material = mesh instanceof T.Mesh ? (color?previewMaterial:highlight) : mesh instanceof T.Points ? highlightedPoints : highlightedLines;
       }
     });
     draw();
@@ -349,18 +357,27 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     exitWindow();
   }
   const cancel=()=>{if(windowMode)exitWindow();pointer=null;};
-  const key=(e:KeyboardEvent)=>{if(e.key==="Escape")cancel();if(e.key==="Home"){e.preventDefault();fit();}};
+  const key=(e:KeyboardEvent)=>{
+    if(e.key==="Escape")cancel();
+    if(e.key==="Home" && !walk){e.preventDefault();fit();}
+    if(e.key==="Enter" && markFloor){
+      e.preventDefault();
+      const rect=canvas.getBoundingClientRect();
+      walkAt(rect.left+rect.width/2,rect.top+rect.height/2);
+    }
+  };
   canvas.addEventListener("keydown",key);canvas.addEventListener("pointerdown",down,true);
   canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",finishWindow,true);
   canvas.addEventListener("pointercancel",cancel);
-  const start = (e:PointerEvent)=>{pointer = e.isPrimary && e.button === 0 ? new T.Vector2(e.clientX,e.clientY):null;};
+  const start = (e:PointerEvent)=>{pointer = !walk && e.isPrimary && e.button === 0 ? new T.Vector2(e.clientX,e.clientY):null;};
   const end = (e:PointerEvent)=>{
     if (!root || !pointer || pointer.distanceTo(new T.Vector2(e.clientX,e.clientY))>4) return;
     pointer = null;
+    if(markFloor){walkAt(e.clientX,e.clientY);return;}
     const hit = hitAt(e.clientX,e.clientY);
     const id=hit?.object.userData.elementId??null;
     onPick(id);
-    if(hit && id && originals.size){
+    if(hit && id && originals.size && !canvas.hasAttribute("data-group-preview")){
       if(plan){
         anchor=hit.point.clone();
         marker.dataset.label=id.split("/")[0];
@@ -369,19 +386,159 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       pulseActive=true;pulsePreference();
     }
   };
+  function walkAt(x:number,y:number){
+    const notify=markFloor;
+    if(!notify || !activeModel || !originalFile)return;
+    const hit=hitAt(x,y);
+    if(!hit){notify("Selecciona un punto visible en el piso.");return;}
+    try{
+      let entry=walkModels.get(originalFile);
+      if(!entry){entry={model:activeModel,world:walkWorld(activeModel)};walkModels.set(originalFile,entry);}
+      const heading=camera.getWorldDirection(new T.Vector3()).setY(0);
+      if(heading.lengthSq()<.001){
+        const target=selectedForWalk?groupBounds(new Set([selectedForWalk])):bounds;
+        target.getCenter(heading).sub(hit.point).setY(0);
+        if(heading.lengthSq()<.001)heading.set(0,0,-1);
+      }
+      walk=walking(canvas,entry.world,hit.point,heading.normalize(),view=>renderer.render(scene,view));
+    }catch(error){
+      notify(error instanceof Error?error.message:"No se pudo iniciar el recorrido.");
+      return;
+    }
+    marker.hidden=true;span.visible=false;
+    markFloor=undefined;canvas.style.cursor="grab";notify(null);
+  }
   const lose = (event:Event)=>{event.preventDefault();onLost();};
   const observer = new ResizeObserver(resize);
   observer.observe(container);
   controls.addEventListener("change",draw);
   canvas.addEventListener("pointerdown",start); canvas.addEventListener("pointerup",end);
   canvas.addEventListener("webglcontextlost",lose);
+  function snapshot(background:string) {
+      renderer.render(scene,camera);
+      const image=document.createElement("canvas");
+      const scale=Math.min(1,1280/Math.max(canvas.width,canvas.height));
+      image.width=Math.max(1,Math.round(canvas.width*scale));
+      image.height=Math.max(1,Math.round(canvas.height*scale));
+      const ctx=image.getContext("2d")!;
+      ctx.fillStyle=background;ctx.fillRect(0,0,image.width,image.height);
+      ctx.drawImage(canvas,0,0,image.width,image.height);
+      return image;
+  }
+  function groupBounds(selection:Set<string>){
+    const area=new T.Box3();
+    root?.traverse(node=>{if(node instanceof T.Mesh && selection.has(node.userData.elementId))area.expandByObject(node);});
+    return area;
+  }
+  function captureGroup(ids:string[],format:"png"|"jpeg"="jpeg",view:GroupCaptureView="current"){
+      const materials=new Map<T.Mesh,T.Material|T.Material[]>(),temporary:T.Material[]=[];
+      const hidden:T.Object3D[]=[];
+      function flat(value:number){
+        const m=new T.MeshBasicMaterial({color:value,side:T.DoubleSide,toneMapped:false});
+        temporary.push(m);return m;
+      }
+      const black=flat(0), colors=new Map(ids.map((id,i)=>[id,((i+1)*0x73a9ef)&0xffffff]));
+      const masks=new Map([...colors].map(([id,c])=>[id,flat(c)]));
+      function readMask(){
+        const mask=snapshot("#000000"),ctx=mask.getContext("2d")!;
+        const pixels=ctx.getImageData(0,0,mask.width,mask.height),seen=new Set<number>(),allowed=new Set(colors.values());
+        for(let i=0;i<pixels.data.length;i+=4){
+          const p=pixels.data,c=(p[i]<<16)|(p[i+1]<<8)|p[i+2];
+          const selected=allowed.has(c);
+          if(selected)seen.add(c);
+          p[i]=p[i+1]=p[i+2]=selected?255:0;
+        }
+        ctx.putImageData(pixels,0,0);
+        return {mask,missing:colors.size-seen.size};
+      }
+      try{
+        const area=view==="current"?null:groupBounds(new Set(ids));
+        if(area && !area.isEmpty())fit(false,area);
+        root?.traverse(node=>{
+          if(view==="isolated" && node.visible && (node instanceof T.LineSegments || node instanceof T.Points ||
+             (node instanceof T.Mesh && !masks.has(node.userData.elementId)))){
+            hidden.push(node);node.visible=false;
+          }
+          if(node instanceof T.Mesh){materials.set(node,node.material);node.material=masks.get(node.userData.elementId)??black;}
+        });
+        let coverage=readMask();
+        if(area && !area.isEmpty() && coverage.missing){
+          const direction=camera.getWorldDirection(new T.Vector3()).negate();
+          let best=direction;
+          const up=new T.Vector3(0,1,0);
+          const candidates=[Math.PI,Math.PI/2,-Math.PI/2].map(angle=>direction.clone().applyAxisAngle(up,angle));
+          candidates.push(new T.Vector3(0.15,1,0.18).normalize(),new T.Vector3(-0.8,0.58,-1).normalize());
+          for(const angle of candidates){
+            fit(false,area,angle);
+            const next=readMask();
+            if(next.missing<coverage.missing){coverage=next;best=angle;}
+            if(!coverage.missing)break;
+          }
+          fit(false,area,best);
+        }
+        materials.forEach((material,node)=>{node.material=originals.get(node)??material;});
+        const reference=snapshot("#f1ede4");
+        const {mask,missing}=coverage;
+        return {image:reference.toDataURL("image/"+format,0.9),mask:mask.toDataURL("image/"+format,0.95),missing,width:mask.width,height:mask.height};
+      }finally{
+        materials.forEach((material,node)=>{node.material=material;});
+        hidden.forEach(node=>{node.visible=true;});
+        temporary.forEach(material=>material.dispose());
+        draw();
+      }
+  }
+  function cancelWalk(){
+    if(!walk && !markFloor && !walkModels.size)return;
+    markFloor=undefined;walk?.dispose();walk=undefined;
+    if(activeModel && root!==activeModel.root){
+      if(root)scene.remove(root);
+      root=activeModel.root;scene.add(root);
+    }
+    for(const {model} of walkModels.values())if(model!==activeModel)release(model.root);
+    walkModels.clear();
+    controls.enabled=true;canvas.style.cursor="";draw();
+  }
   return {
+    capture(format="jpeg"){return snapshot("#f1ede4").toDataURL("image/"+format,0.9);},
+    previewGroup(ids,color){select(null,new Set(ids),color);canvas.toggleAttribute("data-group-preview",ids.length>0);},
+    frameGroup(ids){
+      const area=groupBounds(new Set(ids));
+      if(!area.isEmpty())fit(false,area);
+    },
+    captureGroup,
+    enterWalk(mark){
+      if(!activeModel?.coordination || !originalFile || plan){mark("Abre un IFC 3D con unidades verificables.");return;}
+      if(windowMode)exitWindow();
+      endPulse();
+      markFloor=mark;controls.enabled=false;canvas.style.cursor="crosshair";canvas.focus();
+    },
+    cancelWalk,
+    async switchWalk(file,signal,status){
+      const session=walk;
+      if(!session)throw new Error("Inicia el recorrido antes de comparar.");
+      let entry=walkModels.get(file);
+      if(!entry){
+        const model=await loadModel(file,signal,status);
+        try{
+          if(signal.aborted || session!==walk)throw new DOMException("Cancelado","AbortError");
+          entry={model,world:walkWorld(model)};
+        }catch(error){release(model.root);throw error;}
+        walkModels.set(file,entry);
+      }
+      if(signal.aborted || session!==walk)throw new DOMException("Cancelado","AbortError");
+      session.switch(entry.world);
+      if(root!==entry.model.root){
+        if(root)scene.remove(root);
+        root=entry.model.root;scene.add(root);
+      }
+    },
+    walkMove(key,held){walk?.move(key,held);},
     async open(file,signal,status) {
       const next = await loadModel(file,signal,status);
       if (disposed || signal.aborted) {release(next.root);throw new DOMException("Cancelado","AbortError");}
-      select(null);
+      cancelWalk();select(null);
       if (root) {scene.remove(root);release(root);}
-      root = next.root; scene.add(root);
+      root = next.root; scene.add(root);activeModel=next;originalFile=file;
       annotations=new Map(next.elements.filter(item=>item.annotation).map(item=>[item.id,item]));
       if(windowMode)exitWindow();
       bounds.setFromObject(root,true);
@@ -426,11 +583,12 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
         sheet=new PlanSheet(initialPlanBounds,root);
       }
       fit();
-      return {environment:plan?"plan":"model",name:next.name,schema:next.schema,sample:next.sample,elements:next.elements,drawing:next.drawing,versionId:next.versionId};
+      return {environment:plan?"plan":"model",name:next.name,schema:next.schema,sample:next.sample,elements:next.elements,drawing:next.drawing,versionId:next.versionId,walk:!!next.coordination && !plan};
     },
-      fit,select,locate,orient,extents:()=>fit(false),
+      fit,select(id){canvas.removeAttribute("data-group-preview");select(id);},locate,orient,extents:()=>fit(false),
     windowZoom(){if(windowMode)exitWindow();else{windowMode=true;canvas.style.cursor="crosshair";canvas.focus();}},
     clear() {
+      cancelWalk();activeModel=undefined;originalFile=null;
       if(windowMode)exitWindow();
       select(null);
       sheet=undefined;annotations.clear();
@@ -440,13 +598,14 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     zoom(factor) {camera.zoom = T.MathUtils.clamp(camera.zoom*factor,controls.minZoom,controls.maxZoom);camera.updateProjectionMatrix();draw();},
     pan(enabled) {if(plan)return;controls.mouseButtons.LEFT = enabled ? T.MOUSE.PAN : T.MOUSE.ROTATE; controls.touches.ONE = enabled ? T.TOUCH.PAN : T.TOUCH.ROTATE;},
     dispose() {
+      cancelWalk();
       endPulse();motion.removeEventListener("change",pulsePreference);
       document.removeEventListener("visibilitychange",pulsePreference);
       disposed = true; observer.disconnect(); controls.dispose();
       canvas.removeEventListener("pointerdown",start);canvas.removeEventListener("pointerup",end);
       canvas.removeEventListener("webglcontextlost",lose);
       originals.forEach((mat,m)=>{m.material=mat;}); if (root) release(root);
-      span.geometry.dispose();span.material.dispose();
+      span.geometry.dispose();span.material.dispose();previewMaterial.dispose();
       hint.remove();marker.remove();box.remove();highlightedLines.dispose();highlightedPoints.dispose();highlight.dispose();renderer.dispose();canvas.remove();
     }
   };
