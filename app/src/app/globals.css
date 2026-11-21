@@ -232,3 +232,14 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .request-preview[data-empty]{border-left-color:var(--line);background:transparent;color:var(--mute)}
 .run-cost{font-weight:600;opacity:.85}
 .budget-note{font-size:12px;color:var(--mute);margin:.35rem 0 0}
+
+/* Área marcada sobre la captura para acotar el cambio (F4-01). */
+.area-stage{position:relative;width:fit-content;max-width:100%;margin-inline:auto;line-height:0;cursor:crosshair;touch-action:none;user-select:none;border-radius:10px;overflow:hidden;border:1px solid #dcdfe4}
+.visual-options .area-stage img{display:block;width:auto;height:auto;max-width:100%;max-height:46dvh;pointer-events:none}
+.area-stage[data-marked]::after{content:"";position:absolute;inset:0;background:rgb(10 21 34/.28);pointer-events:none}
+.area-box{position:absolute;z-index:1;border:2px solid #f2b25c;background:rgb(242 178 92/.14);box-shadow:0 0 0 1px rgb(10 21 34/.5);cursor:move}
+.area-box:focus-visible{outline:3px solid #0a1522;outline-offset:2px}
+.area-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
+.area-controls p{font-size:12px;line-height:1.45;color:var(--mute);margin:0}
+.area-controls button{border:1px solid var(--line);border-radius:8px;padding:0 12px;min-height:36px;white-space:nowrap}
+.capture-details summary small{color:var(--mute);font-weight:600}

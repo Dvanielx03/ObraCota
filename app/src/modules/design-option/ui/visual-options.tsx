@@ -4,6 +4,8 @@ import {authenticated,authenticatedResponse} from "@/core/http/http-client";
 import type {ElementInfo,GroupCapture} from "@/viewer/domain/viewer.port";
 import {CompareSlider} from "./compare-slider";
 import {ChipChoice,ChipToggles} from "./option-chips";
+import {AreaMarker,areaMask} from "./area-marker";
+import type {Area} from "../domain/selection-area";
 import {DAYLIGHTS,DEFAULT_CHOICES,FINISHES,KEEPS,REQUEST_LIMIT,TONES,asksForChange,composeRequest,formatUsd,type OptionChoices} from "../domain/option-request";
 
 type Batch={id:string;request:string;state:"QUEUED"|"WORKING"|"READY"|"FAILED";selected:number|null;
@@ -41,6 +43,10 @@ export function VisualOptions({project,version,element,capture,groupCapture}:{pr
   const retryId=useRef<string|null>(null);
   const [compare,setCompare]=useState<{batch:string;slot:number}|null>(null);
   const [choices,setChoices]=useState<OptionChoices>(DEFAULT_CHOICES);
+  // Optional rectangle over the capture; it travels as the mask the image model already accepts.
+  const [area,setArea]=useState<Area|null>(null);
+  const captureSize=useRef({width:0,height:0});
+  function mark(next:Area|null){setArea(next);retryId.current=null;}
   // The chips only compose the text that was already being sent as the request.
   const composed=composeRequest(choices,request);
   function choose(next:Partial<OptionChoices>){setChoices(current=>({...current,...next}));retryId.current=null;}
@@ -60,7 +66,7 @@ export function VisualOptions({project,version,element,capture,groupCapture}:{pr
     void read();return ()=>{ctl.abort();clearTimeout(timer);};
   },[preview,base,key,refresh,!!groupCapture]);
   function open(){
-    setPreview(capture());notify("");setHistory(undefined);retryId.current=null;dialog.current?.showModal();
+    setPreview(capture());setArea(null);notify("");setHistory(undefined);retryId.current=null;dialog.current?.showModal();
   }
   async function submit(){
     setBusy(true);notify("");
@@ -68,8 +74,9 @@ export function VisualOptions({project,version,element,capture,groupCapture}:{pr
       const frame=groupCapture?.();
       if(frame?.missing){notify("Hay piezas ocultas o fuera del encuadre. Gira la cámara o encuadra la selección antes de enviar.");return;}
       retryId.current??=crypto.randomUUID();
-      await authenticated(base,{method:"POST",body:JSON.stringify({id:retryId.current,element:key,name:element.name.slice(0,512),request:composed,jpeg:(frame?.image??preview).split(",")[1],mask:frame?.mask.split(",")[1]})});
-      retryId.current=null;setRequest("");setChoices(DEFAULT_CHOICES);reload(n=>n+1);
+      await authenticated(base,{method:"POST",body:JSON.stringify({id:retryId.current,element:key,name:element.name.slice(0,512),request:composed,jpeg:(frame?.image??preview).split(",")[1],
+        mask:frame?frame.mask.split(",")[1]:area && captureSize.current.width?areaMask(area,captureSize.current.width,captureSize.current.height).split(",")[1]:undefined})});
+      retryId.current=null;setRequest("");setChoices(DEFAULT_CHOICES);setArea(null);reload(n=>n+1);
     }catch(e){notify(e instanceof Error?e.message:"No se pudo iniciar la generación.");}
     finally{setBusy(false);}
   }
@@ -80,7 +87,9 @@ export function VisualOptions({project,version,element,capture,groupCapture}:{pr
   }
   const working=busy || !!history?.batches.some(b=>b.state==="WORKING"||b.state==="QUEUED");
   const content=<>
-    <p>{element.name}</p>{preview && <details><summary>Captura que se enviará a Gemini</summary><img src={preview} alt="Encuadre original del visor"/></details>}
+    <p>{element.name}</p>{preview && <details className="capture-details"><summary>Captura que se enviará a Gemini{area && <small> · con un área marcada</small>}</summary>
+      {groupCapture?<img src={preview} alt="Encuadre original del visor"/>
+        :<AreaMarker src={preview} alt="Encuadre original del visor" area={area} onChange={mark} disabled={busy} onSize={(width,height)=>{captureSize.current={width,height};}}/>}</details>}
     {groupCapture && <small>Al enviar se comparte con Gemini el encuadre actual y la máscara de las piezas seleccionadas.</small>}
     <fieldset className="option-request" disabled={busy}><legend>Qué quieres probar</legend>
       <ChipChoice legend="Acabado o material" items={FINISHES} value={choices.finish} onChange={finish=>choose({finish})}/>
