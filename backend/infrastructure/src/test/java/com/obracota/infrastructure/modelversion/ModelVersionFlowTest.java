@@ -62,4 +62,27 @@ class ModelVersionFlowTest {
         mvc.perform(delete(base).header("Authorization",owner)).andExpect(status().isNoContent());
         assertFalse(Files.exists(volume.resolve(id)));
     }
+    @Test void keepsFbxAndObjOriginalsAsVersions() throws Exception {
+        String owner=token();
+        var p=mvc.perform(post("/api/projects").header("Authorization",owner).contentType("application/json")
+            .content("{\"name\":\"Mobiliario\"}")).andExpect(status().isCreated()).andReturn();
+        String base="/api/projects/"+json.readTree(p.getResponse().getContentAsString()).get("id").asText();
+        byte[] fbx=new byte[700];
+        System.arraycopy("Kaydara FBX Binary  \0".getBytes(StandardCharsets.US_ASCII),0,fbx,0,21);
+        for(int i=21;i<fbx.length;i++) fbx[i]=(byte)(i*7);
+        byte[] obj="# 3ds Max Wavefront OBJ Exporter\nmtllib PK60.mtl\no Solid2\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n".getBytes(StandardCharsets.UTF_8);
+        for(var upload:List.of(Map.entry("PK60.FBX",fbx),Map.entry("PK60.obj",obj))) {
+            var result=mvc.perform(post(base+"/uploads").queryParam("name",upload.getKey()).header("Authorization",owner)
+                .contentType("application/octet-stream").content(upload.getValue())).andExpect(status().isCreated()).andReturn();
+            var version=json.readTree(result.getResponse().getContentAsString());
+            assertEquals(upload.getKey().substring(upload.getKey().length()-3).toUpperCase(Locale.ROOT),version.get("format").asText());
+            mvc.perform(get(base+"/versions/"+version.get("id").asText()+"/original").header("Authorization",owner))
+                .andExpect(content().bytes(upload.getValue()));
+        }
+        // Same file name and extension as the OBJ, with FBX bytes: the header check refuses it.
+        mvc.perform(post(base+"/uploads").queryParam("name","PK60.obj").header("Authorization",owner)
+            .contentType("application/octet-stream").content(fbx)).andExpect(status().isBadRequest());
+        mvc.perform(post(base+"/uploads").queryParam("name","PK60.skp").header("Authorization",owner)
+            .contentType("application/octet-stream").content(obj)).andExpect(status().isBadRequest());
+    }
 }

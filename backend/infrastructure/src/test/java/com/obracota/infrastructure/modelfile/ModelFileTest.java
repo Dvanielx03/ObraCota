@@ -14,4 +14,11 @@ class ModelFileTest {
         assertThrows(IllegalArgumentException.class,()->ModelFile.formatOf("../Plano.dwg"));
         assertThrows(IllegalArgumentException.class,()->ModelFile.formatOf("Plano.rvt"));
     }
+    @Test void acceptsManufacturerMeshesAndKeepsOtherExchangeFormatsOut() {
+        assertEquals("FBX",ModelFile.formatOf("PK60.FBX"));
+        assertEquals("FBX",ModelFile.formatOf("Furniture_Fritz-Hansen_Basket.fbx"));
+        assertEquals("OBJ",ModelFile.formatOf("CM21 - Essay Table.obj"));
+        for(String name:new String[]{"PK60.skp","PK60.max","PK60.rfa","PK60.mtl","PK60.3ds","fbx","Silla.obj.zip"})
+            assertThrows(IllegalArgumentException.class,()->ModelFile.formatOf(name),name);
+    }
 }
