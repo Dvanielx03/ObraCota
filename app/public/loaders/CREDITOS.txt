@@ -17,3 +17,8 @@ Entrada al visor (22 de noviembre de 2026):
   de 0,5 s entre el final y el principio, VP9 CRF 33.
 - entrada-poster.webp: primer cuadro. entrada-quieto.webp: cuadro de 3,25 s, imagen para movimiento reducido.
 - Sustituye a maqueta-orbita.webm, que se conserva fuera de la aplicacion.
+
+Lectura y subida (22 de noviembre de 2026), mismo tratamiento que entrada.webm (Seedance 2.5, 480p, generacion ilimitada):
+- edificio-pisos.webm (job a699a069-c406-425d-96bd-742aba8a8a5b): el edificio se arma por pisos. Sustituye a edificio-arma.webm.
+- plano-volumen.webm (job 6859e288-d998-42ab-bdac-1498162b7217): el plano sube a volumen. Sustituye a plano-a-volumen.webm.
+- *-poster.webp: primer cuadro; *-quieto.webp: cuadro de 3,0 s. Los archivos anteriores se conservan fuera de la aplicacion.

@@ -18,14 +18,17 @@ interface Art {
 }
 
 /**
- * Animations generated with AI in Higgsfield on 21 Nov 2026 (credits in public/loaders/CREDITOS.txt).
- * The GIFs were converted to WebM (1.5× slower, 1.25× for the one-shot check) to weigh 10–38 KB.
+ * Animations generated with AI in Higgsfield on 21–22 Nov 2026 (credits in public/loaders/CREDITOS.txt).
+ * Seedance clips are mapped to the paper, ink and green tokens and looped with a short cross-fade;
+ * the older GIF ones were converted to WebM (1.5× slower, 1.25× for the one-shot check).
  */
 export const LOADER_ART: Record<LoaderArtName, Art> = {
   // The way in from the panel (download, reading and settling): slabs, floors and roof rise, the outline turns green.
   viewer: { video: "/loaders/entrada.webm", poster: "/loaders/entrada-poster.webp", still: "/loaders/entrada-quieto.webp", loop: true, tone: "paper" },
-  model: { video: "/loaders/edificio-arma.webm", poster: "/loaders/edificio-arma-poster.webp", still: "/loaders/edificio-arma-quieto.webp", loop: true, tone: "paper" },
-  upload: { video: "/loaders/plano-a-volumen.webm", poster: "/loaders/plano-a-volumen-poster.webp", still: "/loaders/plano-a-volumen-poster.webp", loop: true, tone: "paper" },
+  // Reading a file: the building rises floor by floor under a green slab line.
+  model: { video: "/loaders/edificio-pisos.webm", poster: "/loaders/edificio-pisos-poster.webp", still: "/loaders/edificio-pisos-quieto.webp", loop: true, tone: "paper" },
+  // Uploading: the plan rises into a volume and settles back.
+  upload: { video: "/loaders/plano-volumen.webm", poster: "/loaders/plano-volumen-poster.webp", still: "/loaders/plano-volumen-quieto.webp", loop: true, tone: "paper" },
   options: { video: "/loaders/fachada-revela.webm", poster: "/loaders/fachada-revela-poster.webp", still: "/loaders/fachada-revela-quieto.webp", loop: true, tone: "photo" },
   done: { video: "/loaders/listo.webm", poster: "/loaders/listo-inicio.webp", still: "/loaders/listo-poster.webp", loop: false, tone: "paper" },
 };
