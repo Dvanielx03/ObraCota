@@ -13,6 +13,8 @@ public class SceneViewRow {
     private String name;
     private double px, py, pz, tx, ty, tz, span;
     private Instant createdAt;
+    /** Read only: the preview itself is written and read through JDBC by the adapter. */
+    @Column(name="thumbnail_type",insertable=false,updatable=false) private String thumbnailType;
     protected SceneViewRow() {}
     public SceneViewRow(SceneView v) {
         id=v.id(); versionId=v.versionId(); name=v.name(); span=v.span(); createdAt=v.createdAt();
@@ -20,5 +22,7 @@ public class SceneViewRow {
         tx=v.target().get(0); ty=v.target().get(1); tz=v.target().get(2);
     }
     public void rename(String value) { name=value; }
-    public SceneView toDomain() { return new SceneView(id,versionId,name,List.of(px,py,pz),List.of(tx,ty,tz),span,createdAt); }
+    public SceneView toDomain() {
+        return new SceneView(id,versionId,name,List.of(px,py,pz),List.of(tx,ty,tz),span,createdAt,thumbnailType != null);
+    }
 }

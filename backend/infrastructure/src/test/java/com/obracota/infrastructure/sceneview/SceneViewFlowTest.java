@@ -77,4 +77,82 @@ class SceneViewFlowTest {
         mvc.perform(delete(one).header("Authorization",owner)).andExpect(status().isNotFound());
         mvc.perform(get(views).header("Authorization",owner)).andExpect(jsonPath("$.length()").value(23));
     }
+
+    /** A tiny byte sequence with the JPEG start marker; {@code mark} tells the images apart. */
+    static byte[] jpeg(int mark) {
+        return new byte[]{(byte)0xFF,(byte)0xD8,(byte)0xFF,(byte)0xE0,0,16,(byte)mark,(byte)0xFF,(byte)0xD9};
+    }
+    static String dataUrl(byte[] bytes) { return "data:image/jpeg;base64,"+Base64.getEncoder().encodeToString(bytes); }
+    byte[] view(String name, String thumbnail) throws Exception {
+        return json.writeValueAsBytes(Map.of("name",name,"position",List.of(4.5,3.0,-2.0),"target",List.of(0.0,1.0,0.0),"span",1.75,"thumbnail",thumbnail));
+    }
+    String upload(String base, String owner) throws Exception {
+        var upload=mvc.perform(post(base+"/uploads").queryParam("name","planta.ifc").header("Authorization",owner)
+            .contentType("application/octet-stream").content("ISO-10303-21;\nvistas "+UUID.randomUUID())).andExpect(status().isCreated()).andReturn();
+        return base+"/versions/"+json.readTree(upload.getResponse().getContentAsString()).get("id").asText()+"/views";
+    }
+    String id(org.springframework.test.web.servlet.MvcResult result) throws Exception {
+        return json.readTree(result.getResponse().getContentAsString()).get("id").asText();
+    }
+
+    @Test void storesThumbnailsAndPicksTheProjectCoverOnlyForTheOwner() throws Exception {
+        String owner=token(),other=token();
+        var p=mvc.perform(post("/api/projects").header("Authorization",owner).contentType("application/json")
+            .content("{\"name\":\"Obra con portada\"}")).andExpect(status().isCreated()).andReturn();
+        String base="/api/projects/"+id(p),cover=base+"/cover";
+        String first=upload(base,owner);
+
+        // Without any preview there is no cover yet.
+        mvc.perform(get(cover).header("Authorization",owner)).andExpect(status().isNotFound());
+
+        // A view without preview, then two with one: the list says which have it.
+        String plain=first+"/"+id(mvc.perform(post(first).header("Authorization",owner).contentType("application/json").content(view("Sin imagen")))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.hasThumbnail").value(false)).andReturn());
+        String north=first+"/"+id(mvc.perform(post(first).header("Authorization",owner).contentType("application/json").content(view("Norte",dataUrl(jpeg(1)))))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.hasThumbnail").value(true)).andReturn());
+        mvc.perform(post(first).header("Authorization",owner).contentType("application/json").content(view("Sur",dataUrl(jpeg(2)))))
+            .andExpect(status().isCreated());
+        mvc.perform(get(first).header("Authorization",owner)).andExpect(jsonPath("$.length()").value(3))
+            .andExpect(jsonPath("$[0].hasThumbnail").value(false)).andExpect(jsonPath("$[1].hasThumbnail").value(true))
+            .andExpect(jsonPath("$[2].hasThumbnail").value(true));
+
+        // The preview comes back as a JPEG; missing previews, unknown views and other accounts get 404.
+        mvc.perform(get(north+"/thumbnail").header("Authorization",owner)).andExpect(status().isOk())
+            .andExpect(content().contentType("image/jpeg")).andExpect(content().bytes(jpeg(1)));
+        mvc.perform(get(plain+"/thumbnail").header("Authorization",owner)).andExpect(status().isNotFound());
+        mvc.perform(get(first+"/"+UUID.randomUUID()+"/thumbnail").header("Authorization",owner)).andExpect(status().isNotFound());
+        mvc.perform(get(north+"/thumbnail").header("Authorization",other)).andExpect(status().isNotFound());
+
+        // Only JPEG data URLs of at most 80 KB are accepted.
+        byte[] large=Arrays.copyOf(jpeg(3),80*1024+1);
+        byte[] notJpeg={(byte)0x89,'P','N','G',13,10,26,10};
+        for (String bad:List.of("data:image/png;base64,"+Base64.getEncoder().encodeToString(jpeg(3)),
+                "data:image/jpeg;base64,%%%no-base64%%%", dataUrl(large), dataUrl(notJpeg), dataUrl(new byte[0]), Base64.getEncoder().encodeToString(jpeg(3))))
+            mvc.perform(post(first).header("Authorization",owner).contentType("application/json").content(view("Inválida",bad)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post(first).header("Authorization",owner).contentType("application/json").content(view("Al límite",dataUrl(Arrays.copyOf(jpeg(4),80*1024)))))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.hasThumbnail").value(true));
+
+        // Cover: first view with a preview (by date) of the newest version that has one.
+        mvc.perform(get(cover).header("Authorization",owner)).andExpect(status().isOk())
+            .andExpect(content().contentType("image/jpeg")).andExpect(content().bytes(jpeg(1)));
+        mvc.perform(get(cover).header("Authorization",other)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/projects/"+UUID.randomUUID()+"/cover").header("Authorization",owner)).andExpect(status().isNotFound());
+
+        // A newer revision without previews does not change it; one with a preview takes over.
+        String second=upload(base,owner);
+        mvc.perform(post(second).header("Authorization",owner).contentType("application/json").content(view("Sin imagen"))).andExpect(status().isCreated());
+        mvc.perform(get(cover).header("Authorization",owner)).andExpect(content().bytes(jpeg(1)));
+        String latest=second+"/"+id(mvc.perform(post(second).header("Authorization",owner).contentType("application/json").content(view("Acceso",dataUrl(jpeg(5)))))
+            .andExpect(status().isCreated()).andReturn());
+        mvc.perform(get(cover).header("Authorization",owner)).andExpect(status().isOk()).andExpect(content().bytes(jpeg(5)));
+
+        // Renaming keeps the preview; deleting it brings back the previous cover.
+        mvc.perform(put(latest).header("Authorization",owner).contentType("application/json").content("{\"name\":\"Acceso principal\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.hasThumbnail").value(true));
+        mvc.perform(delete(latest).header("Authorization",owner)).andExpect(status().isNoContent());
+        mvc.perform(get(cover).header("Authorization",owner)).andExpect(content().bytes(jpeg(1)));
+        mvc.perform(delete(north).header("Authorization",owner)).andExpect(status().isNoContent());
+        mvc.perform(get(cover).header("Authorization",owner)).andExpect(content().bytes(jpeg(2)));
+    }
 }
