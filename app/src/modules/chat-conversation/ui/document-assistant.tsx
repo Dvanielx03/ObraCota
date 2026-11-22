@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import {PanelView} from "@/shared/ui/panel-view";
+import {BusyButton,LoadingStatus} from "@/shared/ui/loading";
 import {authenticated,authenticatedResponse} from "@/core/http/http-client";
 import styles from "./document-assistant.module.css";
 import {fileCatalog} from "@/modules/model-file/infrastructure/file-catalog";
@@ -30,14 +31,16 @@ function Consultation({project,source}:{project:string;source:Source}){
       .catch(()=>{if(active)setError("No se pudo abrir el PDF original.");});
     return ()=>{active=false;if(url)URL.revokeObjectURL(url);};
   },[project,source]);
+  // The question on its way (the history loading also sets `busy`).
+  const [asking,setAsking]=useState(false);
   async function ask(){
-    setBusy(true);setError("");
+    setBusy(true);setAsking(true);setError("");
     const text=question.trim();
     try{
       const result=await authenticated<Answer>(base,{method:"POST",body:JSON.stringify({document:source.id,question:text})});
       setEntries(prior=>[{question:text,result},...prior].slice(0,10));setQuestion("");
     }catch(e){setError(e instanceof Error?e.message:"No se pudo consultar la fuente.");}
-    finally{setBusy(false);}
+    finally{setBusy(false);setAsking(false);}
   }
   return <><p>{source.model} · Versión {source.revision} · Elemento {source.element}</p>
     {pdf && <a href={pdf} target="_blank" rel="noreferrer">Abrir ficha original</a>}
@@ -45,8 +48,8 @@ function Consultation({project,source}:{project:string;source:Source}){
     <form className="account-form" data-working={busy} onSubmit={e=>{e.preventDefault();void ask();}}>
       <label>Pregunta sobre la ficha<textarea required maxLength={600} value={question} onChange={e=>setQuestion(e.target.value)}/></label>
       <small>Al consultar, se envían a Gemini la pregunta y fragmentos del PDF seleccionado.</small>
-      <button className="panel-action" disabled={busy||!question.trim()}>Consultar con Gemini</button>
-    </form>{busy && <p role="status">Consultando…</p>}{error && <p role="alert">{error}</p>}
+      <BusyButton className="panel-action" busy={asking} busyLabel="Consultando…" spinnerSize={14} disabled={busy||!question.trim()}>Consultar con Gemini</BusyButton>
+    </form>{busy && <LoadingStatus>{asking?"Consultando la ficha…":"Cargando el historial…"}</LoadingStatus>}{error && <p role="alert">{error}</p>}
     {entries.map((entry,index)=><article key={index}><h3>{entry.question}</h3><p>{entry.result.answer}</p>
       {entry.result.evidence.map(c=><blockquote key={c.page}>{c.quote} {pdf && <a href={pdf+"#page="+c.page} target="_blank" rel="noreferrer">{source.filename} · pág. {c.page}</a>}</blockquote>)}</article>)}</>;
 }
@@ -61,7 +64,7 @@ export function SelectedDocuments({project,version,keys}:{project:string;version
     return ()=>control.abort();
   },[project,version,JSON.stringify(keys)]);
   if(failed)return <p role="alert">No se pudieron consultar las fichas.</p>;
-  if(!rows)return <p role="status">Buscando fichas…</p>;
+  if(!rows)return <LoadingStatus>Buscando fichas…</LoadingStatus>;
   if(!rows.length)return <p>Esta selección no tiene fichas vinculadas en esta versión.</p>;
   const source=rows.find(s=>s.id===id)!;
   return <><label>Ficha vinculada<select value={id} onChange={e=>setId(e.target.value)}>{rows.map(s=><option key={s.id} value={s.id}>{s.filename} · {s.element}</option>)}</select></label>
@@ -86,12 +89,12 @@ export function DocumentAssistant({project}:{project:string}){
   },[project]);
   const source=sources?.find(s=>s.id===selected);
   return <PanelView title="Asistente" project={false}>
-    <section className={styles.workspace}><h2>Prisma · Asistente de diseño</h2>
+    <section className={styles.workspace}><h2>Editar · Asistente de diseño</h2>
       {current?<><label>Versión del modelo<select value={current} onChange={e=>choose(e.target.value)}>{models.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}</select></label>
-      <Link className="panel-action" href={"/proyectos/"+project+"/visor/"+current+"?panel=asistente"}>Abrir Prisma en el modelo</Link></>:
-      <p><Link href={"/proyectos/"+project+"/archivos"}>Subir un IFC</Link> o <Link href="/proyectos/restage/visor?panel=asistente">probar Prisma en ReStage</Link></p>}</section>
+      <Link className="panel-action" href={"/proyectos/"+project+"/visor/"+current+"?panel=asistente"}>Abrir Editar en el modelo</Link></>:
+      <p><Link href={"/proyectos/"+project+"/archivos"}>Subir un IFC</Link> o <Link href="/proyectos/restage/visor?panel=asistente">probar Editar en ReStage</Link></p>}</section>
     {error && <p role="alert">{error}</p>}
-    {!sources && !error && <p role="status">Buscando fichas del proyecto…</p>}
+    {!sources && !error && <LoadingStatus>Buscando fichas del proyecto…</LoadingStatus>}
     {sources?.length===0 && <section><h2>Vincula la primera ficha</h2><p>Abre una versión en el visor y adjunta un PDF desde las propiedades de una puerta IFC o una selección del plano DWG.</p><Link href={"/proyectos/"+project+"/archivos"}>Archivos y versiones</Link></section>}
     {!!sources?.length && <section className={styles.workspace}><label>Ficha del proyecto <select value={selected} onChange={e=>select(e.target.value)}>{sources.map(s=><option key={s.id} value={s.id}>{s.filename} · {s.model} · v{s.revision} · {s.element}</option>)}</select></label>
       {source && <Consultation key={source.id} project={project} source={source}/>}</section>}

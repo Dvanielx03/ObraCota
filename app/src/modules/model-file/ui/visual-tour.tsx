@@ -9,16 +9,22 @@ function target(phase:Phase,hasSelection:boolean):Stop|null{
     const node=document.querySelector<HTMLElement>(selector);
     return node && node.getClientRects().length?{node,title,action}:null;
   };
+  // REVISAR opens a panel over the bar; the report it prepares opens in a modal dialog.
   if(dialog){
     if(phase!=="review")return find(".delivery-review .review-heading button","Vuelve a la referencia","Cierra la revisión para continuar la práctica en el modelo.");
     const download=find(".delivery-review [data-tour=download]","Conserva el resultado","Comprueba las observaciones y descarga el informe con sus referencias.");
     if(download)return download;
-    const input=dialog.querySelector("textarea");
+  }
+  const panel=document.querySelector<HTMLElement>(".review-popover:not([hidden])");
+  if(panel){
+    if(phase!=="review")return find(".review-popover .tool-popover-close","Vuelve a la referencia","Cierra la revisión para continuar la práctica en el modelo.");
+    const input=panel.querySelector("textarea");
     if(input && !input.value.trim())return {node:input,title:"Define qué revisar",action:"Escribe un concepto presente en el plano, uno por línea."};
-    return find(".delivery-review [data-tour=prepare]","Prepara la revisión","Pulsa aquí para reunir la evidencia y tus observaciones.");
+    return find(".review-popover [data-tour=prepare]","Prepara la revisión","Pulsa aquí para reunir la evidencia y tus observaciones.");
   }
   if(phase==="review")return find(".review-trigger","Reúne la evidencia","Abre la revisión de entrega para preparar el informe del archivo actual.");
-  if(document.getElementById("explorer")?.hidden)return find(".stagebar > button","Abre el explorador","Despliega el panel para trabajar con los elementos del archivo.");
+  if(document.getElementById("explorer")?.hidden)return find(".scene-explorer","Abre el explorador","Despliega el panel para trabajar con los elementos del archivo.")
+    ??find(".stagebar > .explorer-toggle","Abre el explorador","Despliega el panel para trabajar con los elementos del archivo.");
   if(phase==="select" || !hasSelection){
     if(document.getElementById("pane-reading")?.hidden)return find("#tab-reading","Abre Lectura","Vuelve al árbol para localizar la referencia.");
     const search=document.querySelector<HTMLInputElement>(".search input");
@@ -82,11 +88,17 @@ export function GuidedPointer({resolve,id,label,paused,pause,back,restart,exit,c
     const mutations=new MutationObserver(records=>{
       if(records.some(record=>!(record.target as Element).closest?.("[data-visual-tour]")))schedule();
     });
-    mutations.observe(document.querySelector("main")!,{subtree:true,childList:true,attributes:true,attributeFilter:["open","disabled","aria-expanded","hidden","aria-pressed"]});
+    mutations.observe(document.querySelector("main")!,{subtree:true,childList:true,attributes:true,attributeFilter:["open","disabled","aria-disabled","aria-expanded","hidden","aria-pressed"]});
     document.addEventListener("input",schedule,true);document.addEventListener("scroll",schedule,true);
+    // Popovers enter with a short scale animation: measure again once it settles, or the light keeps the in-between box.
+    // The tour's own light and pointer animate too; those never change what is being pointed at.
+    const settled=(event:Event)=>{if(!(event.target as Element).closest?.("[data-visual-tour]"))schedule();};
+    document.addEventListener("animationend",settled,true);document.addEventListener("transitionend",settled,true);
     window.visualViewport?.addEventListener("resize",schedule);window.visualViewport?.addEventListener("scroll",schedule);
     measure();schedule();
-    return ()=>{cancelAnimationFrame(raf);observer.disconnect();mutations.disconnect();document.removeEventListener("input",schedule,true);document.removeEventListener("scroll",schedule,true);window.visualViewport?.removeEventListener("scroll",schedule);window.visualViewport?.removeEventListener("resize",schedule);};
+    return ()=>{cancelAnimationFrame(raf);observer.disconnect();mutations.disconnect();document.removeEventListener("input",schedule,true);document.removeEventListener("scroll",schedule,true);
+      document.removeEventListener("animationend",settled,true);document.removeEventListener("transitionend",settled,true);
+      window.visualViewport?.removeEventListener("scroll",schedule);window.visualViewport?.removeEventListener("resize",schedule);};
   },[resolve,paused]);
   const active=frame?.stop.node;
   useLayoutEffect(()=>{

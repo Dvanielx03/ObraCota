@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { ViewerWorkspace } from "@/modules/model-file/ui/viewer-workspace";
+
+export const metadata: Metadata = { title: "ReStage · Visor · ObraCota" };
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ desde?: string }> }) {
   const { desde } = await searchParams;

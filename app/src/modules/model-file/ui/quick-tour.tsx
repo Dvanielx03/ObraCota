@@ -13,7 +13,8 @@ function point(selector: string, title: string, action: string): Stop | null {
 function target(step: QuickStep): Stop | null {
   if (step === "select") {
     if (document.getElementById("explorer")?.hidden)
-      return point(".stagebar > button", "Abre el explorador", "Despliega el panel para ver las piezas del modelo.");
+      return point(".scene-explorer", "Abre el explorador", "Despliega el panel para ver las piezas del modelo.")
+        ?? point(".stagebar > .explorer-toggle", "Abre el explorador", "Despliega el panel para ver las piezas del modelo.");
     if (document.getElementById("pane-reading")?.hidden)
       return point("#tab-reading", "Vuelve a Lectura", "Ahí está la lista de piezas del modelo.");
     return (
@@ -24,18 +25,18 @@ function target(step: QuickStep): Stop | null {
   if (step === "options")
     return point(
       '[data-prisma-tour="open"]',
-      "2 de 3 · Pide opciones",
-      "Prisma prueba acabados sobre la pieza elegida y prepara una edición con IA. Púlsalo para abrirlo.",
+      "2 de 3 · Edita la pieza",
+      "Con Editar marcas piezas o zonas del modelo y describes el cambio; antes de enviarlo ves su costo. Púlsalo para abrirlo.",
     );
   if (step === "walk")
-    return point(".walk-trigger:enabled", "3 de 3 · Recórrelo por dentro", "Camina por el modelo en primera persona para anticipar problemas antes de la obra.");
+    return point(".walk-trigger:not([aria-disabled=true])", "3 de 3 · Recórrelo por dentro", "Camina por el modelo en primera persona para anticipar problemas antes de la obra.");
   // The sample cannot be walked: say where that control appears instead of skipping it silently.
-  const walkable = !!document.querySelector(".walk-trigger:enabled");
+  const walkable = !!document.querySelector(".walk-trigger:not([aria-disabled=true])");
   return point(
     ".help-icon",
     "Listo: ya conoces lo esencial",
     (walkable ? "" : "El recorrido en primera persona aparece al abrir un IFC guardado en uno de tus proyectos. ") +
-      "Desde este botón puedes repetir esta guía o practicar una revisión de entrega y una edición con Prisma.",
+      "Desde este botón puedes repetir esta guía o practicar una revisión de entrega y la edición de piezas con Editar.",
   );
 }
 

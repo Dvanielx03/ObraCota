@@ -2,7 +2,8 @@ import { authenticated, authenticatedResponse } from "@/core/http/http-client";
 import type { ModelVersion, VersionNotes, VersionRepository } from "../domain/model-version";
 
 export const versionRepository: VersionRepository = {
-  list: (project,file) => authenticated<ModelVersion[]>(`projects/${project}/files/${file}/versions`),
+  list: (project,file,signal) => authenticated<ModelVersion[]>(`projects/${project}/files/${file}/versions`,{ signal }),
+  get: (project,version,signal) => authenticated<ModelVersion>(`projects/${project}/versions/${version}`,{ signal }),
   upload(project, file, fileId) {
     const query = new URLSearchParams({ name: file.name });
     if (fileId) query.set("file", fileId);

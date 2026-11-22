@@ -14,15 +14,14 @@
   min-width: 0;
   max-width: 100%;
   padding: .65rem .75rem;
-  border: 1px solid currentColor;
-  border-radius: .3rem;
-  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--field);
   color: inherit;
   font: inherit;
 }
 .workspace textarea { min-height: 5rem; resize: vertical; }
 .workspace p, .workspace h3 { margin: 0; }
-.workspace article { display: grid; gap: .65rem; border-top: 1px solid #a9b4bf; padding-top: 1rem; }
-.workspace blockquote { margin: 0; border-inline-start: 2px solid #a9b4bf; padding-inline-start: 1rem; }
+.workspace article { display: grid; gap: .65rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+.workspace blockquote { margin: 0; border-inline-start: 2px solid var(--border); padding-inline-start: 1rem; }
 .workspace blockquote a { display: block; margin-top: .4rem; }
-

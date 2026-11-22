@@ -2,6 +2,7 @@
 import Link from "next/link";
 import {useEffect,useState} from "react";
 import {PanelView} from "@/shared/ui/panel-view";
+import {BusyButton,LoadingStatus,Skeleton} from "@/shared/ui/loading";
 import {authenticated,authenticatedResponse} from "@/core/http/http-client";
 import {DoorEstimate,DoorReview,endpoints,type Change} from "./door-review";
 
@@ -15,7 +16,9 @@ function Picture({path}:{path:string}){
     }).catch(()=>{if(!control.signal.aborted)setError(true);});
     return ()=>{control.abort();if(objectUrl)URL.revokeObjectURL(objectUrl);};
   },[path]);
-  return url?<img src={url} width={320} style={{maxWidth:"100%",height:"auto"}} alt="Propuesta visual elegida"/>:<p>{error?"No se pudo abrir la propuesta.":"Cargando propuesta…"}</p>;
+  return url?<img src={url} width={320} style={{maxWidth:"100%",height:"auto"}} alt="Propuesta visual elegida"/>
+    :error?<p>No se pudo abrir la propuesta.</p>
+    :<><Skeleton shape="thumb" width={320} style={{maxWidth:"100%"}}/><LoadingStatus hidden>Cargando propuesta…</LoadingStatus></>;
 }
 export function ProjectChanges({project,budget=false}:{project:string;budget?:boolean}){
   const [rows,setRows]=useState<Change[]>(),[working,setWorking]=useState<string>(),[error,setError]=useState("");
@@ -35,7 +38,7 @@ export function ProjectChanges({project,budget=false}:{project:string;budget?:bo
   }
   return <PanelView title={budget?"Presupuesto":"Cambios de diseño"} project={false}>
     {error && <p role="alert">{error}</p>}
-    {!rows && !error && <p role="status">Cargando revisiones…</p>}
+    {!rows && !error && <LoadingStatus>Cargando revisiones…</LoadingStatus>}
     {rows?.length===0 && <p>Selecciona una puerta de una <Link href={prefix+"/archivos"}>versión IFC guardada</Link> para registrar una propuesta.</p>}
     <div className="estimate-sheet">{rows?.map(change=><article id={change.id} key={change.id}>
       <h2>{change.description}</h2><p>{change.review.door.name}</p>
@@ -43,10 +46,10 @@ export function ProjectChanges({project,budget=false}:{project:string;budget?:bo
         {change.picture && <figure><Picture path={base+"/"+change.id+"/picture"}/><figcaption>Referencia visual</figcaption></figure>}
         <DoorReview review={change.review} project={project} version={change.version}/>
         {change.applied ? <p role="status">Cambio aplicado. <Link href={prefix+"/visor/"+change.applied+"?element="+encodeURIComponent(change.review.door.element)+"&anterior="+change.version}>Abrir nueva versión</Link></p>:
-          <button className="panel-action" disabled={!!working || !change.review.proposal.compatible} onClick={()=>void decide(change,"apply")}>Aprobar y aplicar cambio</button>}
-        {change.applied && !change.restored && <button className="panel-action restore-action" disabled={!!working} onClick={()=>void decide(change,"restore")}>Crear revisión de restauración</button>}
+          <BusyButton className="panel-action" busy={working===change.id} busyLabel="Aplicando…" spinnerSize={14} disabled={!!working || !change.review.proposal.compatible} onClick={()=>void decide(change,"apply")}>Aprobar y aplicar cambio</BusyButton>}
+        {change.applied && !change.restored && <BusyButton className="panel-action restore-action" busy={working===change.id} busyLabel="Restaurando…" spinnerSize={14} disabled={!!working} onClick={()=>void decide(change,"restore")}>Crear revisión de restauración</BusyButton>}
         {change.restored && <p><Link href={prefix+"/visor/"+change.restored}>Abrir revisión restaurada</Link></p>}
-        {working===change.id && <p role="status">Comprobando y guardando la revisión IFC…</p>}
+        {working===change.id && <LoadingStatus>Comprobando y guardando la revisión IFC…</LoadingStatus>}
       </>}
     </article>)}</div>
   </PanelView>;

@@ -1,38 +1,103 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { QuestionIcon, SelectionIcon, HouseIcon, ArrowsOutCardinalIcon, CornersOutIcon, CubeIcon, DiamondIcon, FolderOpenIcon, HandIcon, MinusIcon, PersonSimpleWalkIcon, PlusIcon, SidebarSimpleIcon, XIcon } from "@phosphor-icons/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CubeIcon, SidebarSimpleIcon, XIcon } from "@phosphor-icons/react";
+import { Footprints, Hand, House, ListChecks, Maximize, Minus, Plus, Rotate3d, SquareDashed, X } from "lucide-react";
 import type {CameraPose,ModelInfo,ViewerPort} from "@/viewer/domain/viewer.port";
 import { ViewCube } from "./view-cube";
 import {SidebarWidth} from "./sidebar-width";
 import { Explorer,type SidebarTab } from "./explorer";
-import {DeliveryReview} from "./delivery-review";
+import {DeliveryReview,type DeliveryReviewHandle} from "./delivery-review";
 import {VisualTour} from "./visual-tour";
 import {QuickTour,type QuickStep} from "./quick-tour";
 
-import { VisualOptions } from "@/modules/design-option/ui/visual-options";
-import { SceneStrip } from "@/modules/scene-view/ui/scene-strip";
+import { SceneStrip, type SceneStripHandle } from "@/modules/scene-view/ui/scene-strip";
+import { ExportMenu } from "@/modules/scene-view/ui/export-menu";
+import { EXPORT_MAX_SIDE } from "@/modules/scene-view/domain/view-export";
 import { SelectionAssistant } from "@/modules/design-option/ui/selection-assistant";
 import { PrismaTour,type MaskStep,type PrismaStep } from "@/modules/design-option/ui/prisma-tour";
 import { NotesContext } from "./notes-source";
+import { ViewerHeader } from "./viewer-header";
 import type { VersionNotes } from "@/modules/model-version/domain/model-version";
+import { VersionRail, type VersionRailHandle } from "@/modules/model-version/ui/version-rail";
+import { WorkspaceTools, type WorkspaceToolsHandle } from "./workspace-tools";
+import { IconTool, ModeButton, RovingToolbar, ToolSeparator } from "./tool-bar";
+import { ShortcutSheet } from "./shortcut-sheet";
+import { TOOL_KEYS, shortcutFor, toolNotice, type ShortcutAction } from "../domain/shortcuts";
+import { EmptyArt, ModelPreparing, Spinner } from "@/shared/ui/loading";
+import { ENTRY_SETTLING_PHASE, remainingHold } from "../domain/entry-hold";
 
-export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", initialFile, storedNotes, storedVersion, loadPrevious }: {
+/** "Duplex.ifc · 2,3 MB": the file being opened, under the phase of the wait. */
+function fileLine(file: File | null): string {
+  if (!file) return "ReStage · modelo de ejemplo";
+  const megabytes = file.size / 1048576;
+  const size = megabytes >= 1 ? megabytes.toLocaleString("es-CO", { maximumFractionDigits: 1 }) + " MB"
+    : Math.max(1, Math.round(file.size / 1024)).toLocaleString("es-CO") + " KB";
+  return file.name + " · " + size;
+}
+
+/** Whether the person left the explorer dock open ("open") or folded ("closed"). */
+const PANEL_KEY="obracota.explorer.v1";
+
+/** Fields where letters, digits and arrows are typing, not shortcuts. */
+const TYPING = "input,textarea,select,[contenteditable]:not([contenteditable=false]),[role=textbox],[role=combobox],[role=searchbox],[role=spinbutton]";
+/** Widgets that use the arrow keys themselves. */
+const ARROW_WIDGETS = "[role=slider],[role=radiogroup],[role=radio],[role=menu],[role=listbox],[role=tree],[role=tablist],[role=grid],[aria-haspopup=menu],[aria-haspopup=true],[aria-haspopup=listbox],.annotate-layer,#explorer,.tool-popover";
+
+/** Whether the focus lets a shortcut through (DU-12): never while typing or inside a modal dialog. */
+function shortcutAllowed(target: EventTarget | null, action: ShortcutAction): boolean {
+  if (document.querySelector("dialog[open]")) return false;
+  const element = target instanceof Element ? target : null;
+  if (element?.closest(TYPING)) return false;
+  if ((action.kind === "view" || action.kind === "home") && element?.closest(ARROW_WIDGETS)) return false;
+  // Inicio moves inside a toolbar; on the canvas the viewer already answers it.
+  if (action.kind === "home" && (element?.closest("[role=toolbar]") || element instanceof HTMLCanvasElement)) return false;
+  if (element?.closest("[role=menu]")) return false;
+  return true;
+}
+
+export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", initialFile, storedNotes, storedVersion, loadPrevious, projectName, revision }: {
   returnHref: string; returnLabel?: string; initialFile?: File; storedNotes?: VersionNotes; storedVersion?: {project:string;version:string};
-  loadPrevious?: (signal:AbortSignal)=>Promise<File>;
+  loadPrevious?: (signal:AbortSignal)=>Promise<File>; projectName?: string;
+  /** Revision label ("v2") and upload date of a stored version: cover of the presentation and export index. */
+  revision?: {label:string;date:string};
 }) {
   const container = useRef<HTMLDivElement>(null), viewer = useRef<ViewerPort|null>(null), input = useRef<HTMLInputElement>(null);
   const request = useRef<AbortController|null>(null), last = useRef<File|null>(initialFile ?? null);
   const [model,setModel] = useState<ModelInfo|null>(null), [selected,setSelected] = useState<string|null>(null);
-  const [status,setStatus] = useState("Abriendo ReStage…"), [error,setError] = useState(""), [pan,setPan] = useState(false);
-  const [panel,setPanel] = useState(true), [session,setSession] = useState(0);
+  const [status,setStatus] = useState("Iniciando visor…"), [error,setError] = useState(""), [pan,setPan] = useState(false);
+  // Minimum time on the preparing screen when arriving from the panel (see domain/entry-hold).
+  const [holding,setHolding] = useState(true);
+  useEffect(()=>{
+    const startedAt=performance.now();
+    const timer=setTimeout(()=>setHolding(false),remainingHold(startedAt,performance.now()));
+    return ()=>clearTimeout(timer);
+  },[]);
+  // The wait over the canvas: the editor starting (no viewer yet) or a file being read, and which file.
+  const [engine,setEngine] = useState(false), [opening,setOpening] = useState(()=>fileLine(initialFile ?? null));
+  // The dock starts folded, as the reference has no side panel; the person's own choice is remembered.
+  const [panel,setPanel] = useState(false), [session,setSession] = useState(0);
+  useEffect(()=>{try{if(localStorage.getItem(PANEL_KEY)==="open")setPanel(true);}catch{/* Folded by default. */}},[]);
+  function showExplorer(next:boolean){
+    setPanel(next);
+    try{localStorage.setItem(PANEL_KEY,next?"open":"closed");}catch{/* Remembered for this visit only. */}
+  }
   const [walk,setWalk]=useState<"idle"|"mark"|"active">("idle");
   const [walkError,setWalkError]=useState(""),[walkLoading,setWalkLoading]=useState(""),[walkOlder,setWalkOlder]=useState(false);
   const walkRequest=useRef<AbortController|null>(null),previousFile=useRef<File|undefined>(undefined),beforeWalk=useRef(true);
+  const walkEnded=useRef(false);
   const stopWalk=useCallback(()=>{
     walkRequest.current?.abort();
     viewer.current?.cancelWalk();
+    walkEnded.current=true;
     setPanel(beforeWalk.current);setWalk("idle");setWalkError("");setWalkLoading("");setWalkOlder(false);
   },[]);
+  // Leaving the walk gives the focus back to RECORRIDO once the bottom bar is back.
+  useEffect(()=>{
+    if(walk!=="idle" || !walkEnded.current)return;
+    walkEnded.current=false;
+    const frame=requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>(".walk-trigger")?.focus({preventScroll:true}));
+    return ()=>cancelAnimationFrame(frame);
+  },[walk]);
   useEffect(()=>{
     if(walk==="idle")return;
     function escape(event:KeyboardEvent){if(event.key==="Escape")stopWalk();}
@@ -43,28 +108,35 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   const [assistant,setAssistant]=useState(false),[ids,setIds]=useState<string[]>([]),[grouping,setGrouping]=useState(false),[color,setColor]=useState<string|null>(null);
   const [prismaStep,setPrismaStep]=useState<PrismaStep|null>(null);
   const [prismaPaused,setPrismaPaused]=useState(false);
+  // True while a batch of options is being generated: the Editar mark in the dock keeps moving meanwhile.
+  const [optionsWorking,setOptionsWorking]=useState(false);
   const mode=useRef({assistant:false,grouping:false});
   mode.current={assistant,grouping};
   function selectForDesign(id:string){
     setColor(null);
     setIds(current=>mode.current.grouping ? current.includes(id)?current.filter(i=>i!==id):[...current,id] : [id]);
   }
-  function toggleAssistant(){
-    if(!assistant){setIds(selected?[selected]:[]);setColor(null);setGrouping(false);}
-    if(assistant){setTab("reading");setPrismaStep(null);}
-    setAssistant(!assistant);setPanel(true);
+  // Editar (DU-16, DU-17): the canvas and the sub-bar, as in the reference. The dock keeps its state
+  // (folded by default) and, when open, shows the selection of pieces («Selección»); the marks of the
+  // sub-bar add their pieces to it and the green dot of Seleccionar tells they are there. Escape while
+  // "Agrupar" is on only ends the grouping: the tools handle that key, so Escape has one owner.
+  function enterEdit(){
+    if(guide!=="off")stopTour();
+    setIds(selected?[selected]:[]);setColor(null);setGrouping(false);
+    setAssistant(true);
   }
+  function exitEdit(){
+    setTab("reading");setPrismaStep(null);setGrouping(false);
+    setAssistant(false);
+  }
+  // In Editar the model shows the piece of the open mark (DU-17), or the whole selection while a colour is previewed.
+  const [editFocus,setEditFocus]=useState<string|null>(null);
   const previouslyDesign=useRef(false);
   useEffect(()=>{
-    if(assistant)viewer.current?.previewGroup(ids,color??undefined);
+    if(assistant)viewer.current?.previewGroup(color?ids:editFocus?[editFocus]:[],color??undefined);
     else if(previouslyDesign.current)viewer.current?.select(selected);
     previouslyDesign.current=assistant;
-  },[assistant,ids,color,selected]);
-  useEffect(()=>{
-    if(!assistant||!grouping)return;
-    const escape=(e:KeyboardEvent)=>{if(e.key==="Escape")setGrouping(false);};
-    window.addEventListener("keydown",escape);return ()=>window.removeEventListener("keydown",escape);
-  },[assistant,grouping]);
+  },[assistant,ids,color,selected,editFocus]);
   const [tab,setTab]=useState<SidebarTab>("reading");
   const [windowMode,setWindowMode] = useState(false);
   const [guide,setGuide]=useState<"off"|"welcome"|"select"|"note"|"review"|"done">("off");
@@ -74,13 +146,15 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   quickRef.current=quickPaused?null:quick;
   const pauseRef=useRef(false);
   const helpDialog=useRef<HTMLDialogElement>(null),helpButton=useRef<HTMLButtonElement>(null);
+  const review=useRef<DeliveryReviewHandle>(null);
+  const [reviewOpen,setReviewOpen]=useState(false);
   function pauseTour(value:boolean){pauseRef.current=value;setPaused(value);}
   function startTour(){
-    document.querySelector<HTMLDialogElement>(".delivery-review[open]")?.close();
+    review.current?.close();
     setQuick(null);setPrismaStep(null);setAssistant(false);pauseTour(false);setPanel(true);setTab("reading");setGuide("select");
   }
   function startQuickTour(){
-    document.querySelector<HTMLDialogElement>(".delivery-review[open]")?.close();
+    review.current?.close();
     rememberGuide();pauseTour(false);setGuide("off");
     setPrismaStep(null);setAssistant(false);setPanel(true);setTab("reading");setQuickPaused(false);setQuick("select");
   }
@@ -117,8 +191,12 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   },[]);
   function rememberGuide(){try{localStorage.setItem("obracota.guide.v1","seen");}catch{/* Available again next visit. */}}
   const chosen = model?.elements.find(item=>item.id===selected) || null;
+  // While presenting, a click on the model only orbits: the selection stays as it was.
+  const presentingRef=useRef(false);
   const pick = useCallback((id:string|null)=>{
-    if(mode.current.assistant){if(id)selectForDesign(id);return;}
+    if(presentingRef.current)return;
+    // In Editar a click on the model belongs to Seleccionar (it places a mark), never to the dock.
+    if(mode.current.assistant)return;
     if(id)setTab("properties");
     setSelected(id);viewer.current?.select(id);
     if(id && !pauseRef.current)setGuide(step=>step==="select"?"note":step);
@@ -129,7 +207,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     request.current?.abort();
     const job = new AbortController();
     request.current = job;
-    setError("");setStatus(file?"Leyendo archivo…":"Abriendo ReStage…");
+    setError("");setStatus(file?"Leyendo archivo…":"Abriendo ReStage…");setOpening(fileLine(file));
     try {
       const next = await viewer.current.open(file,job.signal,setStatus);
       if (!job.signal.aborted) {
@@ -156,15 +234,15 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     import("@/viewer/infrastructure/three-viewer").then(({createViewer})=>{
       if (!active || !container.current) return;
       viewer.current = createViewer(container.current,pick,()=>{
-        request.current?.abort();walkRequest.current?.abort();viewer.current?.dispose();viewer.current=null;setWalk("idle");
+        request.current?.abort();walkRequest.current?.abort();viewer.current?.dispose();viewer.current=null;setWalk("idle");setEngine(false);
         setStatus("");setError("Se perdió la conexión con el visor gráfico.");
       },()=>setWindowMode(false));
-      setPan(false);setWindowMode(false);
+      setPan(false);setWindowMode(false);setEngine(true);
       void open(last.current);
     }).catch(()=>{
       if (active) {setStatus("");setError("El navegador no pudo iniciar WebGL 2. Comprueba la aceleración gráfica.");}
     });
-    return ()=>{active=false;request.current?.abort();viewer.current?.dispose();viewer.current=null;};
+    return ()=>{active=false;request.current?.abort();viewer.current?.dispose();viewer.current=null;setEngine(false);};
   },[open,pick,session]);
   function closeModel() {
     setPrismaStep(null);setQuick(null);
@@ -174,12 +252,13 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   }
   function togglePan() {viewer.current?.pan(!pan);setPan(!pan);}
   const plan=model?.environment==="plan";
-  const ready = !!model && !status && !error;
+  const settling = holding && !status && !error && !!model;
+  const ready = !!model && !status && !error && !holding;
   const prismaAvailable=ready && !plan && !model?.drawing;
   // The quick tour follows what the person does and skips a stop whose control this file lacks.
   useEffect(()=>{
     if(!ready || !quick || quickPaused)return;
-    if(quick==="options" && (!prismaAvailable || (assistant && panel)))setQuick("walk");
+    if(quick==="options" && (!prismaAvailable || assistant))setQuick("walk");
     else if(quick==="walk" && !model?.walk)setQuick("done");
   },[ready,quick,quickPaused,prismaAvailable,assistant,panel,model]);
   useEffect(()=>{
@@ -195,7 +274,35 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   },[ready,guide]);
   const serverNotes = initialFile && last.current === initialFile ? storedNotes : undefined;
   const readPose=useCallback(()=>viewer.current?.pose()??null,[]);
-  const applyPose=useCallback((next:CameraPose)=>viewer.current?.applyPose(next),[]);
+  const applyPose=useCallback((next:CameraPose,duration?:number)=>viewer.current?.applyPose(next,duration),[]);
+  const capturePicture=useCallback(()=>viewer.current?.capture("jpeg")??null,[]);
+  // The header's "Presentar" drives the presentation that lives in the saved-view strip.
+  const strip=useRef<SceneStripHandle>(null),presentButton=useRef<HTMLButtonElement>(null);
+  const tools=useRef<WorkspaceToolsHandle>(null),rail=useRef<VersionRailHandle>(null);
+  const [viewCount,setViewCount]=useState(0);
+  // During the presentation the header and the dock are inert; the focus goes back to "Presentar" after it.
+  const [presenting,setPresenting]=useState(false);
+  presentingRef.current=presenting;
+  const refocusPresent=useRef(false);
+  const presentStarted=useCallback(()=>{setPresenting(true);},[]);
+  const presentEnded=useCallback(()=>{refocusPresent.current=true;setPresenting(false);},[]);
+  useEffect(()=>{
+    if(presenting || !refocusPresent.current)return;
+    refocusPresent.current=false;
+    // The button lives outside the full-screen stage: it can only take the focus once full screen is over.
+    const focus=()=>presentButton.current?.focus();
+    if(document.fullscreenElement)document.addEventListener("fullscreenchange",()=>requestAnimationFrame(focus),{once:true});
+    else focus();
+  },[presenting]);
+  // Short messages over the canvas: export results and shortcuts that cannot run (also for screen readers).
+  const [notice,setNotice]=useState<{text:string;tone:"info"|"error";at:number}|null>(null);
+  const say=useCallback((text:string,tone:"info"|"error"="info")=>setNotice({text,tone,at:Date.now()}),[]);
+  useEffect(()=>{
+    if(!notice)return;
+    const timer=setTimeout(()=>setNotice(null),notice.tone==="error"?6000:3200);
+    return ()=>clearTimeout(timer);
+  },[notice]);
+  const [shortcutsOpen,setShortcutsOpen]=useState(false);
   function startWalk(){
     stopTour();setPrismaStep(null);setQuick(null);
     beforeWalk.current=panel;setPanel(false);setWalk("mark");setWalkError("");
@@ -213,85 +320,144 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
       if(!operation.signal.aborted)setWalkError(error instanceof Error?error.message:"No se pudo comparar la versión.");
     }finally{if(!operation.signal.aborted)setWalkLoading("");}
   }
+  const readViewer=useCallback(()=>viewer.current,[]);
+  // Renderizar, Comparar and Descargar act on the Editar selection, or on the piece chosen in the dock.
+  const findElement=useCallback((id:string)=>model?.elements.find(item=>item.id===id),[model]);
+  const optionPieces=useMemo(()=>{
+    if(!model)return [];
+    if(assistant)return ids.map(id=>model.elements.find(item=>item.id===id)).filter((item):item is NonNullable<typeof item>=>!!item);
+    return chosen?[chosen]:[];
+  },[model,assistant,ids,chosen]);
   const touring=walk!=="idle";
-  return <NotesContext.Provider value={serverNotes}><main className="workspace" data-walk={touring?"on":undefined} data-guide={ready?guide:"off"} data-quick={ready && quick?quick:undefined}>
-    <header><a href={returnHref} className="brand viewer-back" aria-label={returnLabel} title={returnLabel}><svg width="25" height="23" viewBox="0 0 25 23" fill="currentColor" aria-hidden="true"><path d="M1 2h23l-5 5H6l-5 5zm0 13 5-5v7h13l5 5H1z"/></svg>ObraCota</a>
-      <span className="separator">/</span><span className="project">{model?.name || "Visor de modelos"}</span>
-      {model && !touring && <span className="stage-meta">{plan?"Plano 2D":"Vista 3D"}<small>{model.schema}</small></span>}
-      <input hidden ref={input} type="file" accept=".ifc,.dwg" onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(file)void open(file);}}/>
-      <button className="open" onClick={()=>input.current?.click()} disabled={touring || (!viewer.current && !!error)}><FolderOpenIcon/>Abrir archivo</button>
-      <button ref={helpButton} className="help-icon" aria-label="Guía de uso" title="Guía de uso" aria-haspopup="dialog" disabled={!ready || touring} onClick={()=>setGuide("welcome")}><QuestionIcon aria-hidden="true"/></button>
-      {model && !touring && <button className="header-close" aria-label="Cerrar modelo" title="Cerrar modelo" onClick={closeModel}><XIcon aria-hidden="true"/></button>}
-    </header>
+  const stripShown=ready && !plan && !touring && !!serverNotes && !!storedVersion;
+  const presentReason=!stripShown?(touring?"No disponible durante el recorrido":"Disponible en una versión guardada de un modelo 3D")
+    :viewCount?"Presentar las vistas guardadas a pantalla completa":"Guarda una vista para presentarla";
+  const exportReason=touring?"No disponible durante el recorrido":!ready?"Abre un modelo para exportar sus vistas"
+    :plan?"Las vistas se exportan desde un modelo 3D":!stripShown?"Disponible en una versión guardada de un modelo 3D":undefined;
+  function present(){
+    // Guides point at controls the presentation hides: they end here.
+    if(guide!=="off")stopTour();
+    setQuick(null);setPrismaStep(null);
+    if(tools.current)tools.current.release(()=>strip.current?.present());else strip.current?.present();
+  }
+  // Keyboard shortcuts of the workspace (DU-12). The presentation, the walk and modal dialogs keep their own keys.
+  useEffect(()=>{
+    if(!ready || touring || presenting)return;
+    function onKey(event:KeyboardEvent){
+      if(event.defaultPrevented)return;
+      const action=shortcutFor({key:event.key,ctrl:event.ctrlKey,meta:event.metaKey,alt:event.altKey,shift:event.shiftKey,repeat:event.repeat});
+      if(!action || !shortcutAllowed(event.target,action))return;
+      // Without saved views the arrows keep their usual job (panning the canvas, scrolling).
+      if(action.kind==="view" && !strip.current)return;
+      let note:string|undefined;
+      if(action.kind==="help")setShortcutsOpen(true);
+      else if(action.kind==="tool"){
+        const reason=tools.current?tools.current.run(action.tool):"Las herramientas aparecen con el modelo abierto";
+        note=reason?toolNotice(action.tool,reason):undefined;
+      }
+      else if(action.kind==="version")note=rail.current?rail.current.open(action.position):"Las versiones están en los archivos guardados de un proyecto";
+      else if(action.kind==="home")viewer.current?.fit();
+      else note=strip.current?.step(action.step);
+      event.preventDefault();event.stopPropagation();
+      if(note)say(note);
+    }
+    window.addEventListener("keydown",onKey,true);
+    return ()=>window.removeEventListener("keydown",onKey,true);
+  },[ready,touring,presenting,say]);
+  return <NotesContext.Provider value={serverNotes}><main className="workspace" data-walk={touring?"on":undefined} data-guide={ready?guide:"off"} data-quick={ready && quick?quick:undefined} data-plan={plan || undefined} data-stored={serverNotes && storedVersion?"":undefined}>
+    <ViewerHeader returnHref={returnHref} returnLabel={returnLabel} projectName={storedVersion?projectName:undefined}
+      fileName={model?.name || "Visor de modelos"} pending={!model} meta={model?(plan?"Plano 2D":"Vista 3D")+" · "+model.schema:undefined}
+      onFile={file=>void open(file)} input={input} openDisabled={touring || (!viewer.current && !!error)} inert={presenting}
+      exportMenu={<ExportMenu disabledReason={exportReason} viewCount={viewCount} onNotice={say}
+        context={()=>{const list=strip.current?.snapshot();return list && model?{views:list.views,project:projectName,file:model.name,version:revision?.label}:null;}}
+        camera={{pose:readPose,apply:next=>applyPose(next),capture:()=>viewer.current?.capture("png",EXPORT_MAX_SIDE)??null}}
+        stage={()=>container.current?.closest<HTMLElement>(".stage")??null}/>}
+      present={{ref:presentButton,disabled:!stripShown || !viewCount,title:presentReason,onClick:present}}
+      help={{ref:helpButton,disabled:!ready || touring,onClick:()=>setGuide("welcome")}}
+      onClose={model && !touring?closeModel:undefined}/>
     <div className={"workarea " + (panel?"":"collapsed")}>
-      <aside id="explorer" hidden={!panel} inert={!!status} aria-busy={!!status}>{assistant && ready && viewer.current && model?
-       <SelectionAssistant viewer={viewer.current} scope={serverNotes?storedVersion:undefined} elements={model.elements} ids={ids} grouping={grouping} onGroup={()=>setGrouping(!grouping)} onPick={selectForDesign} onRemove={id=>{setIds(ids.filter(i=>i!==id));setColor(null);}} color={color} onColor={setColor} fold={()=>setPanel(false)}
+      <aside id="explorer" hidden={!panel} inert={!!status || presenting} aria-busy={!!status}>{assistant && ready && viewer.current && model?
+       <SelectionAssistant working={optionsWorking} viewer={viewer.current} scope={serverNotes?storedVersion:undefined} elements={model.elements} ids={ids} grouping={grouping} onGroup={()=>setGrouping(!grouping)} onPick={selectForDesign} onRemove={id=>{setIds(ids.filter(i=>i!==id));setColor(null);}} color={color} onColor={setColor} fold={()=>showExplorer(false)}
         onGuide={startPrismaTour} onFrame={()=>advancePrisma("frame","preview")} onExport={()=>advancePrisma("export","edit-package")} onMaskGuide={startMaskGuide}
         onMaskPrepared={()=>setPrismaStep(step=>step==="edit-package"||step==="edit-save"?"edit-import":step)}
         onMaskImported={()=>setPrismaStep(step=>step==="edit-import"||step==="edit-package"?"edit-save":step)}
         onMaskSaved={()=>setPrismaStep(step=>step==="edit-save"?"done":step)}/>:
-       <Explorer scope={serverNotes ? storedVersion : undefined} options={ready && !plan && serverNotes && storedVersion && chosen && <VisualOptions key={chosen.id} {...storedVersion} element={chosen} capture={()=>viewer.current!.capture()}/>} tab={tab} changeTab={setTab} onNoteSaved={()=>{if(!paused)setGuide(step=>step==="note"?"review":step);}} key={(serverNotes?"server:":"local:")+(model?.versionId??model?.name)} version={model?.versionId ?? (serverNotes ? "server" : undefined)} elements={model?.elements || []} selected={chosen} drawing={model?.drawing} locate={(id,preview)=>{pick(id);if(preview && guide!=="select")setTab("reading");viewer.current?.locate(id);}}/>}<SidebarWidth/></aside>
-      <section className="stage" aria-label={plan?"Mesa de planos":"Modelo 3D"}>
-        {touring?<div className="stagebar walk-bar" aria-label="Controles del recorrido">
-          <span>Recorrido</span>
-          {serverNotes && loadPrevious && walk==="active" && <div className="walk-versions" aria-label="Comparar versiones">
-            <button disabled={!!walkLoading} aria-pressed={walkOlder} onClick={()=>void compareWalk(true)}>Anterior</button>
-            <button disabled={!!walkLoading} aria-pressed={!walkOlder} onClick={()=>void compareWalk(false)}>Nueva</button>
-          </div>}
-          <button className="close" onClick={stopWalk}>Salir</button>
-        </div>:<div className="stagebar"><button aria-label={panel?"Ocultar explorador":"Mostrar explorador"} aria-expanded={panel} onClick={()=>setPanel(!panel)}><SidebarSimpleIcon/></button><span>{plan?"Plano 2D":"Vista 3D"}</span>
-          <div className="stage-actions" role="toolbar" aria-label="Acciones del modelo">
-          {prismaAvailable && <button className="assistant-trigger" data-prisma-tour="open" aria-controls="explorer" aria-pressed={assistant && panel}
-            aria-label={assistant && panel?"Volver a lectura":"Abrir Prisma"} onClick={()=>{
-              if(guide!=="off")stopTour();
-              if(assistant && !panel)setPanel(true);else toggleAssistant();
-            }}><DiamondIcon aria-hidden="true"/><span>Prisma</span><span className="assistant-trigger-caption">{assistant && panel?"Volver a lectura":"Asistente de diseño"}</span></button>}
-          {ready && model && <DeliveryReview guided={guide==="review"&&!paused} onDownloaded={()=>{if(guide==="review"&&!paused){setGuide("done");rememberGuide();}}} key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} model={model} locate={id=>{setPanel(true);pick(id);viewer.current?.locate(id);}}/>}
-          {prismaAvailable && <button className="walk-trigger" disabled={!model?.walk} onClick={startWalk}
-            title={model?.walk?undefined:"Disponible al abrir un IFC guardado en uno de tus proyectos"}><PersonSimpleWalkIcon aria-hidden="true"/>Recorrer</button>}
-          </div>
+       <Explorer scope={serverNotes ? storedVersion : undefined} tab={tab} changeTab={setTab} onNoteSaved={()=>{if(!paused)setGuide(step=>step==="note"?"review":step);}} key={(serverNotes?"server:":"local:")+(model?.versionId??model?.name)} version={model?.versionId ?? (serverNotes ? "server" : undefined)} elements={model?.elements || []} loading={!!status && !model} selected={chosen} drawing={model?.drawing} locate={(id,preview)=>{pick(id);if(preview && guide!=="select")setTab("reading");viewer.current?.locate(id);}}/>}<SidebarWidth/></aside>
+      <section className="stage" data-plan={plan || undefined} aria-label={plan?"Mesa de planos":"Modelo 3D"}>
+        {!touring && <div className="stagebar"><button className="explorer-toggle" aria-label={panel?"Ocultar explorador":"Mostrar explorador"} aria-expanded={panel} aria-controls="explorer" onClick={()=>showExplorer(!panel)}><SidebarSimpleIcon/></button><span>{plan?"Plano 2D":"Vista 3D"}</span>
           {model && <><small>{model.schema}</small><button className="close" aria-label="Cerrar modelo" onClick={closeModel}><XIcon/></button></>}
         </div>}
-        <div className="view" style={{visibility:ready?"visible":"hidden"}} ref={container}/>
-        {!ready && <div className="feedback" role="status"><CubeIcon size={32}/><h2>{error?"No se pudo abrir":status || "Abrir un modelo"}</h2>
-          {error && <p>{error}</p>}
-          {!status && <div>{viewer.current ? <><button onClick={()=>input.current?.click()}>Elegir archivo</button>
+        <div className="view" style={{visibility:ready?"visible":"hidden"}} data-ready={ready || undefined} ref={container}/>
+        {status || settling ? <ModelPreparing phase={status || ENTRY_SETTLING_PHASE} stage={engine?"model":"viewer"} detail={opening}>
+            {engine && status && <button type="button" onClick={()=>{request.current?.abort();setStatus("");setHolding(false);}}>Cancelar</button>}
+          </ModelPreparing>
+          : !ready && <div className="feedback" role="status" data-kind={error?"error":"empty"}>
+          {error ? <CubeIcon size={32}/> : <EmptyArt width={220}/>}<h2>{error?"No se pudo abrir":"Abrir un modelo"}</h2>
+          {error ? <p>{error}</p> : <p>Sube un IFC o un DWG de tu equipo, o recorre el edificio de ejemplo.</p>}
+          <div>{viewer.current ? <><button onClick={()=>input.current?.click()}>Elegir archivo</button>
             <button onClick={()=>model?setError(""):open(null)}>{model?"Volver al modelo":"Explorar ReStage"}</button></> :
-            <button onClick={()=>{setError("");setStatus("Iniciando visor…");setSession(s=>s+1);}}>Reintentar</button>}</div>}
-          {status && viewer.current && <button onClick={()=>{request.current?.abort();setStatus("");}}>Cancelar</button>}
+            <button onClick={()=>{setError("");setStatus("Iniciando visor…");setSession(s=>s+1);}}>Reintentar</button>}</div>
         </div>}
-        {ready && !plan && !touring && serverNotes && storedVersion && <SceneStrip key={storedVersion.version} {...storedVersion}
-          pose={readPose} apply={applyPose}/>}
+        {stripShown && storedVersion && <SceneStrip key={storedVersion.version} {...storedVersion}
+          pose={readPose} apply={applyPose} capture={capturePicture} control={strip} onCount={setViewCount}
+          deck={{title:projectName,file:model?.name??"",version:revision?.label,date:revision?.date}} explorer={{open:panel,toggle:()=>showExplorer(!panel)}}
+          onPresentStart={presentStarted} onPresentEnd={presentEnded}/>}
+        {ready && !touring && serverNotes && storedVersion && <VersionRail project={storedVersion.project} version={storedVersion.version} control={rail}/>}
+        <p className="visually-hidden" role="status">{notice?.tone==="info"?notice.text:""}</p>
+        {notice && <p key={notice.at} className="workspace-toast" data-tone={notice.tone} role={notice.tone==="error"?"alert":undefined}
+          aria-hidden={notice.tone==="error"?undefined:true}>{notice.text}</p>}
         {!plan && !touring && <div className="cube-host" hidden={!ready}><ViewCube flat={false} orient={view=>viewer.current?.orient(view)}/></div>}
-        {touring && <div className="walk-hint" role="status">{walkError||walkLoading||(walk==="mark"?"Elige un punto libre en el piso. Pulsa Intro para probar el centro.":<><span className="walk-keyboard">Arrastra para mirar · WASD o flechas para caminar</span><span className="walk-touch">Arrastra para mirar. Mantén pulsada una flecha para caminar.</span></>)}</div>}
+        {touring && <p className="walk-hint" role="status" data-tone={walkError?"error":undefined}>{walkError||(walkLoading?<><Spinner size={12}/>{walkLoading}</>:null)||(walk==="mark"?"Elige un punto libre en el piso. Pulsa Intro para probar el centro.":<><span className="walk-keyboard">Arrastra para mirar · WASD o flechas para caminar</span><span className="walk-touch">Arrastra para mirar. Mantén pulsada una flecha para caminar.</span></>)}</p>}
+        {/* The walk keeps the bottom bar (reference §1): RECORRIDO active, the version switch and a ghost «Salir». */}
+        {touring && <div className="workspace-bars walk-bars">
+          <span aria-hidden="true"/>
+          <RovingToolbar label="Controles del recorrido" className="tool-bar walk-bar">
+            <ModeButton icon={Footprints} label="Recorrido" aria-pressed={true} title="Salir del recorrido · Esc" onClick={stopWalk}/>
+            {serverNotes && loadPrevious && walk==="active" && <><ToolSeparator/>
+              <button type="button" data-tool="" className="tool-mode" aria-disabled={walkLoading?true:undefined} aria-pressed={walkOlder} title="Ver la versión anterior desde el mismo punto" onClick={()=>{if(!walkLoading)void compareWalk(true);}}>Anterior</button>
+              <button type="button" data-tool="" className="tool-mode" aria-disabled={walkLoading?true:undefined} aria-pressed={!walkOlder} title="Volver a esta versión" onClick={()=>{if(!walkLoading)void compareWalk(false);}}>Nueva</button>
+            </>}
+            <ToolSeparator/>
+            <button type="button" data-tool="" className="walk-exit" title="Salir del recorrido · Esc" onClick={stopWalk}><X size={16} strokeWidth={2} aria-hidden="true"/>Salir</button>
+          </RovingToolbar>
+        </div>}
         {walk==="active" && <div className="walk-pad" aria-label="Dirección del recorrido">{([["forward","Adelante","↑"],["left","Izquierda","←"],["back","Atrás","↓"],["right","Derecha","→"]]).map(([direction,label,icon])=><button key={direction} data-direction={direction} aria-label={label}
           onPointerDown={event=>{event.currentTarget.setPointerCapture(event.pointerId);viewer.current?.walkMove(direction,true);}}
           onPointerUp={()=>viewer.current?.walkMove(direction,false)}
           onLostPointerCapture={()=>viewer.current?.walkMove(direction,false)}>{icon}</button>)}</div>}
-        {ready && !touring && <div className="tools" aria-label="Controles del modelo">
-          {!plan && <><button aria-label="Orbitar" title="Orbitar" aria-pressed={!pan} onClick={()=>{if(pan)togglePan();}}><ArrowsOutCardinalIcon/></button>
-          <button aria-label="Desplazar" title="Desplazar" aria-pressed={pan} onClick={()=>{if(!pan)togglePan();}}><HandIcon/></button></>}
-          {!plan && <i/>}<button aria-label="Acercar" title="Acercar" onClick={()=>viewer.current?.zoom(1.25)}><PlusIcon/></button>
-          <button aria-label="Alejar" title="Alejar" onClick={()=>viewer.current?.zoom(0.8)}><MinusIcon/></button>
-          <button aria-label="Zoom ventana" title="Zoom ventana · arrastra un rectángulo, Esc para cancelar" aria-pressed={windowMode} onClick={()=>{setWindowMode(!windowMode);viewer.current?.windowZoom();}}><SelectionIcon/></button>
-          <button aria-label={plan?"Encuadrar plano":"Encuadrar modelo"} title="Extensión completa · doble clic central" onClick={()=>viewer.current?.extents()}><CornersOutIcon/></button>
-          <button aria-label="Restablecer cámara" title={plan?"Volver a la vista inicial del plano · Inicio":"Restablecer isométrica · Inicio"} onClick={()=>viewer.current?.fit()}><HouseIcon/></button>
-        </div>}
+        {ready && !touring && model && <WorkspaceTools key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} control={tools} viewer={readViewer} plan={plan}
+          scope={!plan && serverNotes && storedVersion ? storedVersion : undefined} pieces={optionPieces} onWorking={setOptionsWorking}
+          edit={{on:assistant,grouping,reason:prismaAvailable?undefined:"Editar trabaja con modelos IFC y GLB",
+            selection:ids,onSelection:next=>{setIds(next);setColor(null);},piece:findElement,onFocusPiece:setEditFocus,
+            onEnter:enterEdit,onExit:exitEdit,onUngroup:()=>setGrouping(false)}}
+          reviewOpen={reviewOpen} onCloseReview={()=>review.current?.close()}
+          review={<DeliveryReview control={review} onOpenChange={setReviewOpen} guided={guide==="review"&&!paused} onDownloaded={()=>{if(guide==="review"&&!paused){setGuide("done");rememberGuide();}}} key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} model={model} locate={id=>{setPanel(true);pick(id);viewer.current?.locate(id);}}
+            trigger={(toggle,anchor,open)=><ModeButton ref={anchor} icon={ListChecks} label="Revisar" aria-label="Revisar entrega" aria-haspopup="dialog" aria-expanded={open} aria-controls="tool-review" className="review-trigger" shortcut={TOOL_KEYS.review} onClick={toggle}/>}/>}
+          walk={{reason:model.walk && prismaAvailable?undefined:"Disponible al abrir un IFC guardado en uno de tus proyectos",onStart:startWalk}}
+          camera={<RovingToolbar label="Controles de la cámara" className="tools">
+            {!plan && <><IconTool icon={Rotate3d} aria-label="Orbitar" aria-pressed={!pan} onClick={()=>{if(pan)togglePan();}}/>
+            <IconTool icon={Hand} aria-label="Desplazar" aria-pressed={pan} onClick={()=>{if(!pan)togglePan();}}/><ToolSeparator/></>}
+            <IconTool icon={Plus} aria-label="Acercar" onClick={()=>viewer.current?.zoom(1.25)}/>
+            <IconTool icon={Minus} aria-label="Alejar" onClick={()=>viewer.current?.zoom(0.8)}/>
+            <IconTool icon={SquareDashed} aria-label="Zoom ventana" title="Zoom ventana · arrastra un rectángulo, Esc para cancelar" aria-pressed={windowMode} onClick={()=>{setWindowMode(!windowMode);viewer.current?.windowZoom();}}/>
+            <IconTool icon={Maximize} aria-label={plan?"Encuadrar plano":"Encuadrar modelo"} title="Extensión completa · doble clic central" onClick={()=>viewer.current?.extents()}/>
+            <IconTool icon={House} aria-label="Restablecer cámara" title={plan?"Volver a la vista inicial del plano · Inicio":"Restablecer isométrica · Inicio"} onClick={()=>viewer.current?.fit()}/>
+          </RovingToolbar>}/>}
       </section>
     </div>
     <dialog className="help-sheet" ref={helpDialog} aria-labelledby="help-title" onCancel={stopTour}>
       <h2 id="help-title">{guide==="done"?"Guía completada":"Empieza por aquí"}</h2>
-      <p>{guide==="done"?"Abre el archivo .txt en tus descargas para leer tu observación junto a la referencia del modelo.":"El recorrido rápido te muestra lo esencial en tres pasos: elegir una pieza, pedir opciones y recorrer el modelo. Las otras guías practican una revisión de entrega y una edición con Prisma."}</p>
-      {guide==="done"?<button onClick={stopTour}>Finalizar</button>:<><button className="help-primary" onClick={startQuickTour} disabled={!ready}>Recorrido rápido</button><button onClick={startTour} disabled={!ready}>Iniciar guía</button>{prismaAvailable && <button onClick={startPrismaTour}>Guía de Prisma</button>}<button onClick={stopTour}>Ahora no</button></>}
+      <p>{guide==="done"?"Abre el archivo .txt en tus descargas para leer tu observación junto a la referencia del modelo.":"El recorrido rápido te muestra lo esencial en tres pasos: elegir una pieza, editarla y recorrer el modelo. Las otras guías practican una revisión de entrega y la edición de piezas con Editar."}</p>
+      {guide==="done"?<button onClick={stopTour}>Finalizar</button>:<><button className="help-primary" onClick={startQuickTour} disabled={!ready}>Recorrido rápido</button><button onClick={startTour} disabled={!ready}>Iniciar guía</button>{prismaAvailable && <button onClick={startPrismaTour}>Guía de Editar</button>}<button onClick={()=>{stopTour();setShortcutsOpen(true);}} aria-keyshortcuts="?" title="Atajos de teclado · ?">Atajos de teclado</button><button onClick={stopTour}>Ahora no</button></>}
       {model?.sample && <p><a href="/models/creditos.txt" target="_blank" rel="noreferrer">Créditos del modelo ReStage ↗</a></p>}
     </dialog>
+    <ShortcutSheet open={shortcutsOpen} onClose={()=>setShortcutsOpen(false)} fallback={helpButton}/>
     {guide==="note" && !model?.versionId && <button className="guide-skip-note" onClick={()=>setGuide("review")}>Continuar sin nota local</button>}
     {ready && quick && guide==="off" && !prismaStep && <QuickTour step={quick} paused={quickPaused} onPause={()=>setQuickPaused(!quickPaused)}
       onBack={quick==="options"?()=>{setAssistant(false);setTab("reading");setQuick("select");}:undefined} onRestart={startQuickTour} onExit={()=>setQuick(null)}/>}
     {prismaAvailable && prismaStep && guide==="off" && <PrismaTour step={prismaStep} paused={prismaPaused} onPause={()=>setPrismaPaused(!prismaPaused)} onRestart={startPrismaTour} onExit={()=>setPrismaStep(null)}/>}
     {ready && (guide==="select"||guide==="note"||guide==="review") && <VisualTour phase={guide} selected={!!chosen} paused={paused} pause={()=>pauseTour(!paused)} restart={startTour} exit={stopTour} back={()=>{
-      const dialog=document.querySelector<HTMLDialogElement>(".delivery-review[open]");
-      if(dialog){dialog.close();return;}
+      if(document.querySelector(".delivery-review[open],.review-popover:not([hidden])")){review.current?.close();return;}
       setPanel(true);setTab(guide==="review"?"properties":"reading");setGuide(guide==="review"?"note":"select");
     }}/>}
   </main></NotesContext.Provider>;

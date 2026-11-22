@@ -2,6 +2,7 @@ import {useState,type FormEvent} from "react";
 import Link from "next/link";
 import {authenticated} from "@/core/http/http-client";
 import {DoorReview,endpoints,type Change,type Door,type Price,type Review} from "./door-review";
+import {LoadingStatus} from "@/shared/ui/loading";
 
 function uploadImage(file:File):Promise<string>{
   return new Promise((resolve,reject)=>{
@@ -82,7 +83,7 @@ export function DoorProposal({project,version,element,capture}:{project:string;v
         <button disabled={busy||!description.trim()} onClick={()=>void perform(register)}>Registrar propuesta IFC</button></>}
     </>}
     {created && <p role="status">Propuesta registrada. <Link href={"/proyectos/"+project+"/cambios#"+created.id}>Revisar y decidir si aplicar</Link></p>}
-    {busy && <p role="status">Consultando el cambio…</p>}
+    {busy && <LoadingStatus>Consultando el cambio…</LoadingStatus>}
     {error && <p role="alert">{error}</p>}
   </section>;
 }

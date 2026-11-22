@@ -16,6 +16,18 @@ function release(root:T.Object3D) {
   materials.forEach(m=>m.dispose());
 }
 
+/** cubic-bezier(.22, 1, .36, 1): the curve of the presentation slides (--ease-slide in theme.css). */
+function slideEase(t:number){
+  const cx=.66,bx=3*(.36-.22)-cx,ax=1-cx-bx,cy=3,by=-3,ay=1;
+  let s=t;
+  for(let i=0;i<8;i++){
+    const error=((ax*s+bx)*s+cx)*s-t,slope=(3*ax*s+2*bx)*s+cx;
+    if(Math.abs(error)<1e-6 || Math.abs(slope)<1e-6)break;
+    s=Math.min(1,Math.max(0,s-error/slope));
+  }
+  return ((ay*s+by)*s+cy)*s;
+}
+
 export function createViewer(container: HTMLElement, onPick:(id:string|null)=>void, onLost:()=>void, onWindowEnd:()=>void): ViewerPort {
   const renderer = new T.WebGLRenderer({antialias:true,alpha:true});
   renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
@@ -61,6 +73,10 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   container.appendChild(marker);
   let sheet:PlanSheet|undefined;
   let fitting=false;
+  // Overlays anchored to the model (Editar marks) follow every frame drawn.
+  const frameListeners=new Set<()=>void>();
+  // Editar › Seleccionar: the left button draws marks instead of orbiting or picking.
+  let marking=false,panning=false;
   const hint=document.createElement("div");
   hint.className="plan-location-hint";hint.setAttribute("role","status");hint.hidden=true;
   container.appendChild(hint);
@@ -94,6 +110,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       marker.hidden=Math.abs(point.x)>1 || Math.abs(point.y)>1 || Math.abs(point.z)>1;
       marker.style.left=(point.x+1)*50+"%";marker.style.top=(1-point.y)*50+"%";
     }
+    frameListeners.forEach(listener=>listener());
   }
   function resize() {
     const width = Math.max(container.clientWidth,1), height = Math.max(container.clientHeight,1);
@@ -106,9 +123,10 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   }
   let plan=false;
   let initialPlanBounds:T.Box3|undefined;
-  function fit(reset=true,region?:T.Box3,from?:T.Vector3) {
+  function fit(reset=true,region?:T.Box3,from?:T.Vector3,useRoom=true) {
     if(plan && !region)region=initialPlanBounds;
     if (!root) return;
+    stopTween();
     const center = (region??bounds).getCenter(new T.Vector3());
     const radius = Math.max(bounds.getSize(new T.Vector3()).length(),0.1);
     const direction = plan ? new T.Vector3(0,1,0.000001).normalize() : from ?? (reset ? new T.Vector3(1,0.65,1.45).normalize() : camera.getWorldDirection(new T.Vector3()).negate());
@@ -129,9 +147,31 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     const projected = planeBounds.getSize(new T.Vector3());
     const offset = planeBounds.getCenter(new T.Vector3());offset.z=0;
     offset.applyQuaternion(camera.quaternion);camera.position.add(offset);controls.target.add(offset);
-    baseWidth = Math.max(projected.x,0.01)*1.08;
-    baseHeight = Math.max(projected.y,0.01)*1.08;
+    // A 3D model is framed inside the room the floating panels leave free; a 2D sheet and the
+    // reference pictures taken for Editar's piece selection use the whole canvas.
+    const width=Math.max(container.clientWidth,1),height=Math.max(container.clientHeight,1);
+    const room=plan || !useRoom?{top:0,right:0,bottom:0,left:0}:frameInsets(width,height);
+    const innerWidth=width-room.left-room.right,innerHeight=height-room.top-room.bottom;
+    baseWidth = Math.max(projected.x,0.01)*1.08*width/innerWidth;
+    baseHeight = Math.max(projected.y,0.01)*1.08*height/innerHeight;
+    // Shift the frustum so the model sits in the middle of that room (offsets are in world units).
+    const unit=Math.max(baseHeight,baseWidth/(width/height))/height;
+    offsetX=(room.right-room.left)/2*unit;
+    offsetY=(room.top-room.bottom)/2*unit;
     fitting=true;controls.update();fitting=false;resize();
+  }
+  /**
+   * Space kept free around a framed model, read from the --fit-top/right/bottom/left custom properties
+   * (plain px values) that the workspace sets. Each axis keeps at least half of the canvas.
+   */
+  function frameInsets(width:number,height:number){
+    const style=getComputedStyle(container);
+    const read=(name:string)=>Math.max(0,parseFloat(style.getPropertyValue(name))||0);
+    const room={top:read("--fit-top"),right:read("--fit-right"),bottom:read("--fit-bottom"),left:read("--fit-left")};
+    const across=room.left+room.right,down=room.top+room.bottom;
+    if(across>width/2){const k=width/2/across;room.left*=k;room.right*=k;}
+    if(down>height/2){const k=height/2/down;room.top*=k;room.bottom*=k;}
+    return room;
   }
   const motion=window.matchMedia("(prefers-reduced-motion: reduce)");
   const orange=new T.Color(0xff6900),annotationInk=new T.Color(0x35404a);
@@ -316,16 +356,47 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     const position=camera.position.clone().add(shift),target=controls.target.clone().add(shift);
     return {position:[position.x,position.y,position.z],target:[target.x,target.y,target.z],span:viewSpan()/camera.zoom};
   }
-  function applyPose(next:CameraPose) {
-    if(plan || walk || !root || !(next.span>0))return;
+  function setPose(position:T.Vector3,target:T.Vector3,height:number) {
     offsetX=0;offsetY=0;
-    camera.position.fromArray(next.position);controls.target.fromArray(next.target);
+    camera.position.copy(position);controls.target.copy(target);
     camera.lookAt(controls.target);
-    camera.zoom=T.MathUtils.clamp(viewSpan()/next.span,controls.minZoom,controls.maxZoom);
+    camera.zoom=T.MathUtils.clamp(viewSpan()/height,controls.minZoom,controls.maxZoom);
     fitting=true;controls.update();fitting=false;resize();
+  }
+  // Camera moves between saved views (presentation, ↑/↓): one at a time, cancelled by any other camera action.
+  let tween:number|undefined;
+  function stopTween(){if(tween!==undefined){cancelAnimationFrame(tween);tween=undefined;}}
+  controls.addEventListener("start",stopTween);
+  function applyPose(next:CameraPose,duration=0) {
+    if(plan || walk || !root || !(next.span>0))return;
+    stopTween();
+    const endPosition=new T.Vector3().fromArray(next.position),endTarget=new T.Vector3().fromArray(next.target);
+    const from=pose();
+    if(!(duration>0) || motion.matches || !from || !(from.span>0)){setPose(endPosition,endTarget,next.span);return;}
+    // The target travels in a straight line; the eye turns around it (no cut through the model)
+    // and the visible height changes on a log scale, so zooming in and out feel alike.
+    const startTarget=new T.Vector3().fromArray(from.target);
+    const startOffset=new T.Vector3().fromArray(from.position).sub(startTarget),endOffset=endPosition.clone().sub(endTarget);
+    const startLength=startOffset.length(),endLength=endOffset.length();
+    if(!(startLength>0) || !(endLength>0)){setPose(endPosition,endTarget,next.span);return;}
+    const startDirection=startOffset.clone().divideScalar(startLength);
+    const turn=new T.Quaternion().setFromUnitVectors(startDirection,endOffset.clone().divideScalar(endLength));
+    const still=new T.Quaternion(),step=new T.Quaternion(),target=new T.Vector3(),eye=new T.Vector3();
+    const fromSpan=Math.log(from.span),toSpan=Math.log(next.span),begin=performance.now();
+    const frame=(now:number)=>{
+      const t=Math.min(1,(now-begin)/duration),k=slideEase(t);
+      if(t>=1){tween=undefined;setPose(endPosition,endTarget,next.span);return;}
+      step.copy(still).slerp(turn,k);
+      target.copy(startTarget).lerp(endTarget,k);
+      eye.copy(startDirection).applyQuaternion(step).multiplyScalar(T.MathUtils.lerp(startLength,endLength,k)).add(target);
+      setPose(eye,target,Math.exp(T.MathUtils.lerp(fromSpan,toSpan,k)));
+      tween=requestAnimationFrame(frame);
+    };
+    tween=requestAnimationFrame(frame);
   }
   function orient(view:ViewDirection) {
     if(plan)return;
+    stopTween();
     const distance = camera.position.distanceTo(controls.target);
     camera.position.copy(controls.target).addScaledVector(new T.Vector3().fromArray(directions[view]).normalize(),distance);
     controls.update();draw();
@@ -350,7 +421,8 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       }
       lastMiddle={time:performance.now(),x:e.clientX,y:e.clientY};
     }
-    if (!plan && ((e.button===1 && e.shiftKey) || (e.button===0 && !e.shiftKey && controls.mouseButtons.LEFT===T.MOUSE.ROTATE))) {
+    const orbitButton=(e.button===0 && controls.mouseButtons.LEFT===T.MOUSE.ROTATE) || (e.button===2 && controls.mouseButtons.RIGHT===T.MOUSE.ROTATE);
+    if (!plan && ((e.button===1 && e.shiftKey) || (orbitButton && !e.shiftKey))) {
       const hit=hitAt(e.clientX,e.clientY);if(hit)pivotAt(hit.point);
     }
   }
@@ -388,7 +460,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   canvas.addEventListener("keydown",key);canvas.addEventListener("pointerdown",down,true);
   canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",finishWindow,true);
   canvas.addEventListener("pointercancel",cancel);
-  const start = (e:PointerEvent)=>{pointer = !walk && e.isPrimary && e.button === 0 ? new T.Vector2(e.clientX,e.clientY):null;};
+  const start = (e:PointerEvent)=>{pointer = !walk && !marking && e.isPrimary && e.button === 0 ? new T.Vector2(e.clientX,e.clientY):null;};
   const end = (e:PointerEvent)=>{
     if (!root || !pointer || pointer.distanceTo(new T.Vector2(e.clientX,e.clientY))>4) return;
     pointer = null;
@@ -433,16 +505,28 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   controls.addEventListener("change",draw);
   canvas.addEventListener("pointerdown",start); canvas.addEventListener("pointerup",end);
   canvas.addEventListener("webglcontextlost",lose);
-  function snapshot(background:string) {
-      renderer.render(scene,camera);
-      const image=document.createElement("canvas");
-      const scale=Math.min(1,1280/Math.max(canvas.width,canvas.height));
-      image.width=Math.max(1,Math.round(canvas.width*scale));
-      image.height=Math.max(1,Math.round(canvas.height*scale));
-      const ctx=image.getContext("2d")!;
-      ctx.fillStyle=background;ctx.fillRect(0,0,image.width,image.height);
-      ctx.drawImage(canvas,0,0,image.width,image.height);
-      return image;
+  // Captures keep a light background in both colour modes; the value comes from the --capture-bg token.
+  function captureBackground(){return getComputedStyle(container).getPropertyValue("--capture-bg").trim()||"#F3F2F1";}
+  function snapshot(background:string,maxSide=1280) {
+      // A picture larger than the canvas (exports) is rendered once at a higher pixel ratio, then the
+      // canvas goes back to its own ratio within the same task, so nothing different is ever painted.
+      const width=Math.max(container.clientWidth,1),height=Math.max(container.clientHeight,1);
+      const ratio=renderer.getPixelRatio(),sharper=Math.min(3,maxSide/Math.max(width,height));
+      const boost=sharper>ratio*1.05;
+      if(boost){renderer.setPixelRatio(sharper);renderer.setSize(width,height,false);}
+      try{
+        renderer.render(scene,camera);
+        const image=document.createElement("canvas");
+        const scale=Math.min(1,maxSide/Math.max(canvas.width,canvas.height));
+        image.width=Math.max(1,Math.round(canvas.width*scale));
+        image.height=Math.max(1,Math.round(canvas.height*scale));
+        const ctx=image.getContext("2d")!;
+        ctx.fillStyle=background;ctx.fillRect(0,0,image.width,image.height);
+        ctx.drawImage(canvas,0,0,image.width,image.height);
+        return image;
+      }finally{
+        if(boost){renderer.setPixelRatio(ratio);renderer.setSize(width,height,false);renderer.render(scene,camera);}
+      }
   }
   function groupBounds(selection:Set<string>){
     const area=new T.Box3();
@@ -472,7 +556,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       }
       try{
         const area=view==="current"?null:groupBounds(new Set(ids));
-        if(area && !area.isEmpty())fit(false,area);
+        if(area && !area.isEmpty())fit(false,area,undefined,false);
         root?.traverse(node=>{
           if(view==="isolated" && node.visible && (node instanceof T.LineSegments || node instanceof T.Points ||
              (node instanceof T.Mesh && !masks.has(node.userData.elementId)))){
@@ -488,15 +572,15 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
           const candidates=[Math.PI,Math.PI/2,-Math.PI/2].map(angle=>direction.clone().applyAxisAngle(up,angle));
           candidates.push(new T.Vector3(0.15,1,0.18).normalize(),new T.Vector3(-0.8,0.58,-1).normalize());
           for(const angle of candidates){
-            fit(false,area,angle);
+            fit(false,area,angle,false);
             const next=readMask();
             if(next.missing<coverage.missing){coverage=next;best=angle;}
             if(!coverage.missing)break;
           }
-          fit(false,area,best);
+          fit(false,area,best,false);
         }
         materials.forEach((material,node)=>{node.material=originals.get(node)??material;});
-        const reference=snapshot("#f1ede4");
+        const reference=snapshot(captureBackground());
         const {mask,missing}=coverage;
         return {image:reference.toDataURL("image/"+format,0.9),mask:mask.toDataURL("image/"+format,0.95),missing,width:mask.width,height:mask.height};
       }finally{
@@ -505,6 +589,32 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
         temporary.forEach(material=>material.dispose());
         draw();
       }
+  }
+  function applyButtons(){
+    if(plan)return;
+    controls.mouseButtons.LEFT=marking?(-1 as T.MOUSE):panning?T.MOUSE.PAN:T.MOUSE.ROTATE;
+    controls.mouseButtons.RIGHT=marking?T.MOUSE.ROTATE:T.MOUSE.PAN;
+    controls.touches.ONE=panning?T.TOUCH.PAN:T.TOUCH.ROTATE;
+  }
+  const projected=new T.Vector3(),toPoint=new T.Vector3(),viewDirection=new T.Vector3();
+  function project(points:readonly (readonly [number,number,number])[],owners?:readonly (string|undefined)[]){
+    if(!root || walk)return points.map(()=>null);
+    const rect=canvas.getBoundingClientRect();
+    if(!rect.width || !rect.height)return points.map(()=>null);
+    camera.getWorldDirection(viewDirection);
+    // Depth slack: a point on the surface it was taken from must not hide behind that same surface.
+    const slack=bounds.isEmpty()?1e-3:bounds.getSize(new T.Vector3()).length()*2e-3;
+    return points.map((point,index)=>{
+      projected.set(point[0],point[1],point[2]).project(camera);
+      if(Math.abs(projected.x)>1 || Math.abs(projected.y)>1 || projected.z<-1 || projected.z>1)return null;
+      const x=(projected.x+1)/2*rect.width,y=(1-projected.y)/2*rect.height;
+      const hit=hitAt(rect.left+x,rect.top+y);
+      if(hit && hit.object.userData.elementId!==owners?.[index]){
+        const depth=toPoint.set(point[0],point[1],point[2]).sub(hit.point).dot(viewDirection);
+        if(depth>slack)return null;
+      }
+      return {x,y};
+    });
   }
   function cancelWalk(){
     if(!walk && !markFloor && !walkModels.size)return;
@@ -518,7 +628,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     controls.enabled=true;canvas.style.cursor="";draw();
   }
   return {
-    capture(format="jpeg"){return snapshot("#f1ede4").toDataURL("image/"+format,0.9);},
+    capture(format="jpeg",maxSide){return snapshot(captureBackground(),maxSide).toDataURL("image/"+format,0.9);},
     previewGroup(ids,color){select(null,new Set(ids),color);canvas.toggleAttribute("data-group-preview",ids.length>0);},
     frameGroup(ids){
       const area=groupBounds(new Set(ids));
@@ -528,7 +638,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     enterWalk(mark){
       if(!activeModel?.coordination || !originalFile || plan){mark("Abre un IFC 3D con unidades verificables.");return;}
       if(windowMode)exitWindow();
-      endPulse();
+      endPulse();stopTween();
       markFloor=mark;controls.enabled=false;canvas.style.cursor="crosshair";canvas.focus();
     },
     cancelWalk,
@@ -568,8 +678,9 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       initialPlanBounds=undefined;sheet=undefined;
       controls.minZoom=plan?1:.0001;controls.maxZoom=plan?128:1e7;
       controls.enableRotate=!plan;
-      controls.mouseButtons.LEFT=plan?T.MOUSE.PAN:T.MOUSE.ROTATE;
-      controls.touches.ONE=plan?T.TOUCH.PAN:T.TOUCH.ROTATE;
+      panning=false;
+      if(plan){controls.mouseButtons.LEFT=T.MOUSE.PAN;controls.mouseButtons.RIGHT=T.MOUSE.PAN;controls.touches.ONE=T.TOUCH.PAN;}
+      else applyButtons();
       canvas.setAttribute("aria-label",plan?"Plano 2D. Arrastra para desplazar y usa la rueda para acercar.":"Vista tridimensional del modelo. Usa el explorador para seleccionar con teclado.");
       if(plan){
         // Survey drawings may contain distant reference marks. Sample proportionally
@@ -605,19 +716,30 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       return {environment:plan?"plan":"model",name:next.name,schema:next.schema,sample:next.sample,elements:next.elements,drawing:next.drawing,versionId:next.versionId,walk:!!next.coordination && !plan};
     },
       fit,select(id){canvas.removeAttribute("data-group-preview");select(id);},locate,orient,pose,applyPose,extents:()=>fit(false),
-    windowZoom(){if(windowMode)exitWindow();else{windowMode=true;canvas.style.cursor="crosshair";canvas.focus();}},
+    windowZoom(){stopTween();if(windowMode)exitWindow();else{windowMode=true;canvas.style.cursor="crosshair";canvas.focus();}},
     clear() {
-      cancelWalk();activeModel=undefined;originalFile=null;
+      stopTween();cancelWalk();activeModel=undefined;originalFile=null;
       if(windowMode)exitWindow();
       select(null);
       sheet=undefined;annotations.clear();
       if (root) {scene.remove(root);release(root);root=null;}
       draw();
     },
-    zoom(factor) {camera.zoom = T.MathUtils.clamp(camera.zoom*factor,controls.minZoom,controls.maxZoom);camera.updateProjectionMatrix();draw();},
-    pan(enabled) {if(plan)return;controls.mouseButtons.LEFT = enabled ? T.MOUSE.PAN : T.MOUSE.ROTATE; controls.touches.ONE = enabled ? T.TOUCH.PAN : T.TOUCH.ROTATE;},
+    zoom(factor) {stopTween();camera.zoom =T.MathUtils.clamp(camera.zoom*factor,controls.minZoom,controls.maxZoom);camera.updateProjectionMatrix();draw();},
+    pan(enabled) {if(plan)return;panning=enabled;applyButtons();},
+    probe(x,y){
+      if(plan || walk)return null;
+      const hit=hitAt(x,y),id=hit?.object.userData.elementId;
+      return hit && typeof id==="string"?{id,point:[hit.point.x,hit.point.y,hit.point.z]}:null;
+    },
+    project,
+    onFrame(listener){frameListeners.add(listener);return ()=>{frameListeners.delete(listener);};},
+    setMarking(on){
+      marking=on;applyButtons();
+      if(on){pointer=null;canvas.setAttribute("data-marking","");}else canvas.removeAttribute("data-marking");
+    },
     dispose() {
-      cancelWalk();
+      stopTween();cancelWalk();
       endPulse();motion.removeEventListener("change",pulsePreference);
       document.removeEventListener("visibilitychange",pulsePreference);
       disposed = true; observer.disconnect(); controls.dispose();

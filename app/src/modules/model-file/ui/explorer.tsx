@@ -4,9 +4,14 @@ import type {ElementInfo,ModelInfo} from "@/viewer/domain/viewer.port";
 import {DoorEvidence} from "@/modules/knowledge/ui/door-evidence";
 import {DrawingEvidence} from "./drawing-evidence";
 import {ReviewNotes} from "./review-notes";
+import {Skeleton} from "@/shared/ui/loading";
 
 export type SidebarTab="reading"|"properties";
-export function Explorer({tab,changeTab,elements,selected,drawing,locate,version,onNoteSaved,options,scope}:{scope?:{project:string;version:string};options?:import("react").ReactNode;tab:SidebarTab;changeTab:(tab:SidebarTab)=>void;onNoteSaved:()=>void;version?:string;locate:(id:string,preview?:boolean)=>void;drawing?:ModelInfo["drawing"];elements:ElementInfo[];selected:ElementInfo|null}) {
+/** Widths of the placeholder rows while the first model opens: levels and their pieces. */
+const TREE_SKELETON=[["62%",0],["78%",22],["70%",22],["84%",22],["56%",0],["74%",22],["66%",22]] as const;
+export function Explorer({tab,changeTab,elements,selected,drawing,locate,version,onNoteSaved,options,scope,loading}:{scope?:{project:string;version:string};options?:import("react").ReactNode;tab:SidebarTab;changeTab:(tab:SidebarTab)=>void;onNoteSaved:()=>void;version?:string;locate:(id:string,preview?:boolean)=>void;drawing?:ModelInfo["drawing"];elements:ElementInfo[];selected:ElementInfo|null;
+  /** A model is opening and there is no tree yet: placeholder rows instead of the empty hint. */
+  loading?:boolean}) {
   const [query,setQuery] = useState("");
   const activeRow = useRef<HTMLButtonElement>(null);
   const inspector = useRef<HTMLElement>(null);
@@ -71,7 +76,9 @@ export function Explorer({tab,changeTab,elements,selected,drawing,locate,version
             {items.length>limit && <button onClick={()=>setLimits(old=>({...old,[level]:limit+60}))}>Ver más elementos</button>}</div>}
         </div>;
       })}
-      {!groups.size && <p>{query?"Ningún elemento coincide.":"Abre un modelo para explorar sus niveles."}</p>}
+      {!groups.size && (loading && !query ? <div className="tree-skeleton" aria-hidden="true">
+          {TREE_SKELETON.map(([width,indent],index)=><Skeleton key={index} shape="line" width={width} style={{marginLeft:indent}}/>)}</div>
+        : <p>{query?"Ningún elemento coincide.":"Abre un modelo para explorar sus niveles."}</p>)}
     </div>
     </section>
     <section ref={inspector} role="tabpanel" id="pane-properties" aria-labelledby="tab-properties" className="inspector" hidden={tab!=="properties"}>

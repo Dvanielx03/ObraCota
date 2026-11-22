@@ -1,0 +1,48 @@
+"use client";
+import type { ReactNode, RefObject } from "react";
+import { ChevronRight, CircleHelp, FolderOpen, Presentation, Share2, X } from "lucide-react";
+import { ThemeToggle } from "@/shared/theme/theme-toggle";
+
+interface HeaderAction { ref: RefObject<HTMLButtonElement | null>; disabled: boolean; onClick: () => void; title?: string }
+
+/**
+ * 52 px bar that floats over the canvas: brand link › project · file and share on the left;
+ * theme, export, present, open, help and close on the right. The bar itself lets pointer
+ * events through so the model can still be orbited between its controls. `inert` while the
+ * presentation covers the page.
+ */
+export function ViewerHeader({ returnHref, returnLabel, projectName, fileName, pending, meta, input, onFile, openDisabled, exportMenu, present, help, onClose, inert }: {
+  returnHref: string; returnLabel: string; projectName?: string; fileName: string; pending?: boolean; meta?: string;
+  input: RefObject<HTMLInputElement | null>; onFile: (file: File) => void; openDisabled: boolean;
+  /** The "Exportar" pill and its menu. */
+  exportMenu: ReactNode;
+  present: HeaderAction; help: HeaderAction; onClose?: () => void; inert?: boolean;
+}) {
+  return <header className="viewer-header" inert={inert}>
+    <div className="viewer-crumbs">
+      <a href={returnHref} className="brand viewer-back" aria-label={returnLabel} title={returnLabel}>
+        <svg width="26" height="26" viewBox="0 -1 25 25" fill="currentColor" aria-hidden="true"><path d="M1 2h23l-5 5H6l-5 5zm0 13 5-5v7h13l5 5H1z"/></svg>
+      </a>
+      <ChevronRight className="crumb-chevron" size={24} strokeWidth={2} aria-hidden="true"/>
+      {projectName && <><span className="project-name" title={projectName}>{projectName}</span>{!pending && <span className="crumb-dot" aria-hidden="true">·</span>}</>}
+      {/* While a stored version opens, the project name stands alone; the placeholder stays for screen readers. */}
+      <span className={"project" + (projectName && pending ? " visually-hidden" : "")} data-secondary={projectName ? "" : undefined}
+        title={meta ? fileName + " · " + meta : fileName}>{fileName}</span>
+      <button type="button" className="header-icon header-share" aria-label="Compartir" aria-disabled="true" title="Pendiente: compartir por enlace">
+        <Share2 size={16} strokeWidth={2} aria-hidden="true"/></button>
+    </div>
+    <input hidden ref={input} type="file" accept=".ifc,.dwg" onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (file) onFile(file); }}/>
+    <div className="viewer-actions">
+      <ThemeToggle/>
+      {exportMenu}
+      <button ref={present.ref} type="button" className="header-pill header-present" disabled={present.disabled} title={present.title} onClick={present.onClick}>
+        <Presentation size={12} strokeWidth={2} aria-hidden="true"/>Presentar</button>
+      <button type="button" className="open header-icon" aria-label="Abrir archivo" title="Abrir un IFC o DWG de tu equipo" disabled={openDisabled}
+        onClick={() => input.current?.click()}><FolderOpen size={16} strokeWidth={2} aria-hidden="true"/><span className="open-label">Abrir archivo</span></button>
+      <button ref={help.ref} type="button" className="help-icon header-icon" aria-label="Guía de uso" title={"Guía de uso\nAtajos de teclado: ?"} aria-haspopup="dialog"
+        disabled={help.disabled} onClick={help.onClick}><CircleHelp size={16} strokeWidth={2} aria-hidden="true"/></button>
+      {onClose && <button type="button" className="header-close header-icon" aria-label="Cerrar modelo" title="Cerrar modelo" onClick={onClose}>
+        <X size={16} strokeWidth={2} aria-hidden="true"/></button>}
+    </div>
+  </header>;
+}
