@@ -51,3 +51,26 @@ ENGINE_PREVIEW_DEADLINE_S = _positive_int("ENGINE_PREVIEW_DEADLINE_S", 150)
 
 # How long a request waits for the geometry semaphore before answering 503 ENGINE_BUSY.
 ENGINE_BUSY_WAIT_S = _positive_int("ENGINE_BUSY_WAIT_S", 20)
+
+# --- Solids of 3D DWG (ACIS), /dwg/solids (ACIS-LECTOR.md §5) ---------------------------------------------
+# Node and the @mlightcad/libredwg-web package that obracota_engine/dwg/extract.mjs runs (Dockerfile).
+ENGINE_NODE = os.environ.get("ENGINE_NODE") or "node"
+ENGINE_LIBREDWG_WEB = _path("ENGINE_LIBREDWG_WEB", "/opt/libredwg-web")
+# JavaScript heap of the Node process that reads the DWG. Rug Dots (8.8 MB, 1,257 solids) peaks at about 306 MB
+# of resident memory in total. This bounds only the JavaScript heap: LibreDWG's WebAssembly memory grows
+# outside it (up to 4 GB by the wasm32 address space), and an address-space limit (RLIMIT_AS) cannot be used
+# because V8 reserves its WebAssembly guard regions as virtual memory. The real bound of the reader is the
+# container's memory limit (ACIS-LECTOR §5, risks).
+ENGINE_DWG_NODE_HEAP_MB = _positive_int("ENGINE_DWG_NODE_HEAP_MB", 512)
+
+# DWG originals above this size get 422 MODEL_TOO_LARGE before anything is read (same bound as /preview).
+ENGINE_SOLIDS_MAX_BYTES = _positive_int("ENGINE_SOLIDS_MAX_BYTES", 33_554_432)
+# Reading plus meshing is aborted after this many seconds (503 DEADLINE_EXCEEDED). A request's whole budget
+# is ENGINE_BUSY_WAIT_S + this (170 s by default), below the backend's dwg.solids.timeout (180 s).
+ENGINE_SOLIDS_DEADLINE_S = _positive_int("ENGINE_SOLIDS_DEADLINE_S", 150)
+# Above this many triangles the answer is 422 MESH_TOO_LARGE (about 24 bytes a triangle before gzip).
+ENGINE_SOLIDS_MAX_TRIANGLES = _positive_int("ENGINE_SOLIDS_MAX_TRIANGLES", 4_000_000)
+
+# Meshes on disk by SHA-256 of the original and tessellator version; the oldest go above this many bytes.
+ENGINE_SOLIDS_CACHE = _path("ENGINE_SOLIDS_CACHE", "/tmp/obracota-solids")
+ENGINE_SOLIDS_CACHE_MAX_BYTES = _positive_int("ENGINE_SOLIDS_CACHE_MAX_BYTES", 512 * 1024 * 1024)

@@ -227,6 +227,11 @@ class Originals:
         model.write(str(path))
         return VersionRef(project, version, store.sha_of(path), path)
 
+    def write(self, data: bytes) -> VersionRef:
+        project, version, path = self._slot()
+        path.write_bytes(data)
+        return VersionRef(project, version, store.sha_of(path), path)
+
     def link(self, source: Path) -> VersionRef:
         project, version, path = self._slot()
         path.symlink_to(source)

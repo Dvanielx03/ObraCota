@@ -15,6 +15,10 @@ nothing. Without it, /preview builds and verifies the revision (``build``) and k
 artifact for /build. /build sends that artifact once, or rebuilds it with the full verification. /diff
 compares two stored versions. The size limit comes before anything is opened, in all three.
 
+/dwg/solids answers the ACIS solids of a stored DWG as one gzip mesh (``obracota_engine.dwg``, format in
+``dwg/meshfile.py``), cached on disk by the SHA-256 of the original and the tessellator version. An
+``If-None-Match`` that names the current mesh is answered 304 without meshing.
+
 Every request that writes uses its own ``TemporaryDirectory`` and removes it in every branch; only a
 verified artifact survives, moved to ``ENGINE_ARTIFACTS`` first (§5.6). The engine empties
 ``ENGINE_ARTIFACTS`` when it starts (§5.9).
@@ -27,11 +31,12 @@ from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException
 from starlette.background import BackgroundTask
-from starlette.responses import FileResponse
+from starlette.responses import FileResponse, Response
 
 from obracota_engine import artifacts, auth, build, errors, operations, reading, recipe, scope, store
+from obracota_engine.dwg import meshfile, solids as dwg_solids
 from obracota_engine.errors import EngineError
 # load and inspect stay importable from here: the step 0 capture of tests/fixtures/inspect-duplex.json
 # calls engine.inspect(*engine.load(...)) and can be repeated against any image.
@@ -74,6 +79,29 @@ def model_elements(project: Optional[str] = None, version: Optional[str] = None,
 def model_element(project: Optional[str] = None, version: Optional[str] = None, sha256: Optional[str] = None,
                   guid: Optional[str] = None):
     return reading.element(reading.version_ref(project, version, sha256), guid)
+
+
+@app.get("/dwg/solids")
+def dwg_solids_mesh(project: Optional[str] = None, version: Optional[str] = None, sha256: Optional[str] = None,
+                    if_none_match: Optional[str] = Header(None)):
+    ref = reading.version_ref(project, version, sha256)
+    if dwg_solids.not_modified(ref, if_none_match):
+        # The caller holds the current mesh: no meshing and no cache read, even if it was evicted.
+        return Response(status_code=304, headers={
+            "ETag": dwg_solids.etag(ref.sha256), "X-ObraCota-Format": meshfile.FORMAT,
+            "X-ObraCota-Source-Sha256": ref.sha256, "X-ObraCota-Tessellator": dwg_solids.tessellate.TESSELLATOR})
+    result = dwg_solids.solids(ref)
+    try:
+        payload = result.path.read_bytes()
+    except FileNotFoundError:
+        # Evicted between the lookup and the read: compute it again.
+        result = dwg_solids.solids(ref)
+        payload = result.path.read_bytes()
+    headers = {"ETag": result.etag, "X-ObraCota-Format": meshfile.FORMAT,
+               "X-ObraCota-Source-Sha256": result.sha256,
+               "X-ObraCota-Tessellator": dwg_solids.tessellate.TESSELLATOR,
+               "X-ObraCota-Cache": "hit" if result.hit else "miss"}
+    return Response(payload, media_type=meshfile.MEDIA_TYPE, headers=headers)
 
 
 def _fits(ref) -> None:

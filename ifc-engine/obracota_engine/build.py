@@ -73,9 +73,10 @@ def _clock() -> float:
 
 
 @contextmanager
-def geometry_slot():
-    """The global slot of the work that generates geometry, or 503 ``ENGINE_BUSY``."""
-    if not _slot.acquire(timeout=settings.ENGINE_BUSY_WAIT_S):
+def geometry_slot(wait_s=None):
+    """The global slot of the work that generates geometry, or 503 ``ENGINE_BUSY`` after ``wait_s`` seconds
+    (``ENGINE_BUSY_WAIT_S`` by default)."""
+    if not _slot.acquire(timeout=settings.ENGINE_BUSY_WAIT_S if wait_s is None else wait_s):
         raise EngineError(503, "ENGINE_BUSY", ENGINE_BUSY)
     try:
         yield
