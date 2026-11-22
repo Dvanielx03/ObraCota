@@ -39,6 +39,7 @@ public class CloudflareImages implements ImageGenerationPort {
     private final URI base;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
 
+    @org.springframework.beans.factory.annotation.Autowired
     public CloudflareImages(ObjectMapper json, @Value("${CLOUDFLARE_ACCOUNT_ID:}") String account,
                             @Value("${CLOUDFLARE_API_TOKEN:}") String token) {
         this(json, account, token, URI.create("https://api.cloudflare.com/client/v4/"));
