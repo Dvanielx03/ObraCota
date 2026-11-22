@@ -48,6 +48,10 @@
   border: 1px solid var(--border-soft); border-radius: var(--radius-2xl); background: var(--loader-paper); box-shadow: var(--shadow-card); }
 .loader-art :is(video, img) { display: block; width: 100%; height: 100%; object-fit: cover; user-select: none; pointer-events: none; }
 .loader-art.loader-art-small { border-radius: var(--radius-lg); box-shadow: none; }
+/* When the picture stands in for the video (reduced motion, or a browser that will not play it), it
+   breathes with opacity only: a wait never looks frozen and nothing moves across the screen. */
+.loader-art[data-still="breathe"] img { animation: loader-breathe 2.4s var(--ease-standard) infinite alternate; }
+@keyframes loader-breathe { from { opacity: 1; } to { opacity: .55; } }
 /* Dark mode: the line drawings are inverted (light lines, green kept as a green) and their black
    paper gives way to the surface; shaded images only dim a little. */
 :root[data-theme="dark"] .loader-art[data-tone="paper"] { background: var(--surface); }

@@ -35,7 +35,14 @@ export const LOADER_ART: Record<LoaderArtName, Art> = {
  * after that time and rests on the still picture (WCAG 2.2.2 for waits shown beside other content);
  * without it the loop goes on, for preload screens where nothing else can be used yet.
  */
-export function LoaderArt({ name, size = 160, maxLoopMs, className, style }: {
+export function LoaderArt(props: {
+  name: LoaderArtName; size?: number; maxLoopMs?: number; className?: string; style?: CSSProperties;
+}) {
+  // Each step gets its own player: swapping the source of a playing video interrupts it.
+  return <LoaderArtPlayer key={props.name} {...props} />;
+}
+
+function LoaderArtPlayer({ name, size = 160, maxLoopMs, className, style }: {
   name: LoaderArtName; size?: number; maxLoopMs?: number; className?: string; style?: CSSProperties;
 }) {
   const art = LOADER_ART[name];
@@ -53,10 +60,19 @@ export function LoaderArt({ name, size = 160, maxLoopMs, className, style }: {
     if (!node) return;
     // Autoplay needs the muted property itself, not only the attribute.
     node.muted = true;
-    node.play().catch(() => setPhase("still"));
+    node.play().catch((error: unknown) => {
+      // An interrupted play (new load, the player leaving the page) is not a failure: playback goes on or
+      // the player is gone. Only a refused or unsupported video falls back to the picture.
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setPhase("still");
+    });
   }, [reduced]);
   const still = reduced || phase === "still";
+  // A capped loop rests on its picture; any other picture is a fallback and keeps breathing (opacity only),
+  // so a wait never looks frozen, with or without reduced motion.
+  const resting = phase === "still" && !!maxLoopMs;
   return <span className={"loader-art" + (className ? " " + className : "")} data-tone={art.tone} data-art={name}
+    data-still={still ? (resting ? "rest" : "breathe") : undefined}
     style={{ "--art-size": size + "px", ...style } as CSSProperties} aria-hidden="true">
     {still ? <img src={art.still} alt="" width={size} height={size} decoding="async" draggable={false} />
       : <video ref={video} src={art.video} poster={art.poster} width={size} height={size} muted autoPlay playsInline preload="auto"
