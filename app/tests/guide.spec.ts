@@ -4,6 +4,12 @@ import path from "node:path";
 
 test.use({storageState:{cookies:[],origins:[]}});
 
+// La revisión de entrega vive en REVISAR (tecla V) de la barra inferior: un panel «Revisión de entrega»
+// anclado sobre el botón, con los conceptos y «Preparar informe», y un diálogo modal «Informe de revisión»
+// con «Descargar informe» (delivery-review.tsx). El panel conserva su contenido al cerrarse (keepMounted),
+// así que su aviso «Paso 3 de 4» sigue en el DOM, pero dentro de un panel [hidden]: no se ve ni se anuncia.
+// Por eso el paso 4 se busca en el informe y se comprueba que el paso 3 ya no es perceptible.
+
 test("Primera revisión guiada sobre el plano de la piscina",async({page},info)=>{
   const drawing=process.env.TEST_DWG;
   test.skip(!drawing || path.basename(drawing).toLowerCase()!=="dwg_piscina_030824.dwg");
@@ -21,18 +27,26 @@ test("Primera revisión guiada sobre el plano de la piscina",async({page},info)=
   await page.getByLabel("Observación sobre la selección").fill("Contrastar la referencia de rebose.");
   await page.getByRole("button",{name:"Guardar observación"}).click();
   await expect(page.locator("main")).toHaveAttribute("data-guide","review");
-  await page.getByRole("button",{name:"Revisar entrega"}).click();
-  await page.getByLabel("Conceptos que pide la entrega").fill("rebose");await page.getByRole("button",{name:"Preparar informe"}).click();
-  await expect(page.locator(".guide-tip")).toContainText("4 de 4");
-  const download=page.waitForEvent("download");await page.getByRole("button",{name:"Descargar informe"}).click();
+  await page.getByRole("toolbar",{name:"Acciones del modelo"}).getByRole("button",{name:"Revisar entrega"}).click();
+  const panel=page.getByRole("dialog",{name:"Revisión de entrega"});
+  await expect(panel.locator(".guide-tip")).toContainText("Paso 3 de 4");
+  await panel.getByLabel("Conceptos que pide la entrega").fill("rebose");await panel.getByRole("button",{name:"Preparar informe"}).click();
+  const report=page.getByRole("dialog",{name:"Informe de revisión"});
+  await expect(report).toBeVisible();await expect(panel).toBeHidden();
+  await expect(report.locator(".guide-tip")).toContainText("Paso 4 de 4");
+  // Un solo aviso de la guía perceptible a la vez: el del paso 3 queda en el panel oculto.
+  await expect(page.getByRole("status").filter({hasText:/Paso \d de 4/})).toHaveCount(1);
+  await expect(page.getByRole("status").filter({hasText:"Paso 3 de 4"})).toHaveCount(0);
+  const download=page.waitForEvent("download");await report.getByRole("button",{name:"Descargar informe"}).click();
   const contents=await readFile((await (await download).path())!,"utf8");
   expect(contents).toContain("Texto encontrado (6)");expect(contents).toContain("Contrastar la referencia de rebose.");
-  await expect(page.getByRole("dialog",{name:"Revisión de entrega"})).toHaveCount(0);await expect(page.getByRole("dialog",{name:"Guía completada"})).toBeVisible();
+  await expect(report).toHaveCount(0);await expect(panel).toHaveCount(0);await expect(page.getByRole("dialog",{name:"Guía completada"})).toBeVisible();
   await page.getByRole("button",{name:"Finalizar"}).click();
   await page.reload();await expect(page.getByRole("dialog")).toHaveCount(0);await page.getByRole("button",{name:"Guía de uso"}).click();await page.getByRole("button",{name:"Iniciar guía"}).click();await expect(page.locator("main")).toHaveAttribute("data-guide","select");
 });
-test("Omitir y retomar en móvil",async({page})=>{
-  await page.setViewportSize({width:390,height:844});await page.goto("/proyectos/restage/visor");
+for(const [width,height] of [[1366,768],[390,844]])test("Omitir y retomar · "+width,async({page})=>{
+  test.skip(width<1000,"Solo escritorio (D-12)");
+  await page.setViewportSize({width,height});await page.goto("/proyectos/restage/visor");
   await page.getByRole("button",{name:"Ahora no"}).click();await page.reload();
   await expect(page.getByRole("dialog")).toHaveCount(0);await page.getByRole("button",{name:"Guía de uso"}).click();await page.getByRole("button",{name:"Iniciar guía"}).click();await page.getByRole("button",{name:"Omitir"}).click();
   await expect(page.getByRole("button",{name:"Guía de uso"})).toBeVisible();

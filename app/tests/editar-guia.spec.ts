@@ -1,31 +1,52 @@
 import {expect,test} from "@playwright/test";
 import {readFile} from "node:fs/promises";
 import {unzipSync} from "three/addons/libs/fflate.module.js";
+import {editBar,editButton,editTour,selectionPanel} from "./support/editar-prisma";
 
-for(const width of [1366,390])test("Guía de Prisma · práctica sin Gemini · "+width,async({page},info)=>{
-  await page.setViewportSize({width,height:width===390?844:768});
-  if(width===390)await page.emulateMedia({reducedMotion:"reduce"});
+// Antes «Guía de Prisma»: desde DU-16 es la «Guía de Editar» y practica la selección, el acabado local
+// y la edición con máscara sobre los controles reales de EDITAR, sin llamar a Gemini.
+// El movimiento reducido no depende del ancho: antes solo se emulaba en la variante de 390 px (D-12 la omite),
+// así que ahora tiene su propia variante de escritorio. Lo implementan globals.css (.tour-pointer sin transición)
+// y selection-assistant.module.css (edit-arrival solo con prefers-reduced-motion:no-preference).
+
+const variants=[
+  {name:"1366",width:1366,reducedMotion:false},
+  {name:"1366 · movimiento reducido",width:1366,reducedMotion:true},
+  {name:"390",width:390,reducedMotion:true},
+];
+
+for(const {name,width,reducedMotion} of variants)test("Guía de Editar · práctica sin Gemini · "+name,async({page},info)=>{
+  test.skip(width<1000,"Solo escritorio (D-12)");
+  await page.setViewportSize({width,height:768});
+  if(reducedMotion)await page.emulateMedia({reducedMotion:"reduce"});
   const requests:string[]=[];
   page.on("request",request=>{if(request.method()==="POST")requests.push(request.url());});
   await page.goto("/proyectos/restage/visor");
-  const launch=page.getByRole("button",{name:"Abrir Prisma"});
+  const launch=editButton(page);
   await expect(launch).toBeVisible();
-  await expect(launch).toHaveText(/Prisma/);
+  await expect(launch).toHaveText(/Editar/);
+  await expect(launch).toHaveAttribute("aria-pressed","false");
   await page.getByRole("button",{name:"Guía de uso"}).click();
-  await page.getByRole("dialog").getByRole("button",{name:"Guía de Prisma"}).click();
-  const tour=page.getByRole("region",{name:"Guía visual de Prisma"});
-  await expect(tour).toContainText("Abre Prisma");
+  await page.getByRole("dialog").getByRole("button",{name:"Guía de Editar"}).click();
+  const tour=editTour(page);
+  await expect(tour).toContainText("Abre Editar");
   await expect(launch).toHaveAttribute("aria-describedby",/prisma-instruction/);
   await page.screenshot({path:info.outputPath("entrada-"+width+".png")});
   await launch.click();
-  const panel=page.getByRole("region",{name:"Asistente de diseño"});
+  await expect(launch).toHaveAttribute("aria-pressed","true");
+  await expect(editBar(page)).toBeVisible();
+  const panel=selectionPanel(page);
   await expect(panel).toBeVisible();
   const mascot=panel.locator("svg").first();
   const mascotEntry=mascot.locator("..");
-  if(width===390){
+  const pointer=page.locator(".tour-pointer");
+  if(reducedMotion){
     await expect(mascotEntry).toHaveCSS("animation-name","none");
-    await expect(page.locator(".tour-pointer")).toHaveCSS("transition-property","none");
-  }else await expect(mascotEntry).toHaveCSS("animation-name",/prism-arrival/);
+    await expect(pointer).toHaveCSS("transition-property","none");
+  }else{
+    await expect(mascotEntry).toHaveCSS("animation-name",/edit-arrival/);
+    await expect(pointer).toHaveCSS("transition-property","transform");
+  }
   const group=panel.getByRole("button",{name:"Agrupar"});
   const search=panel.getByRole("textbox",{name:"Buscar pieza para la propuesta"});
   if(await panel.getByRole("listitem").count()===0){
@@ -35,7 +56,7 @@ for(const width of [1366,390])test("Guía de Prisma · práctica sin Gemini · "
   }
   await expect(tour).toContainText("Activa Agrupar");
   await tour.getByRole("button",{name:"Pausar"}).click();
-  await expect(page.locator(".tour-pointer")).toHaveCount(0);
+  await expect(pointer).toHaveCount(0);
   await tour.getByRole("button",{name:"Reanudar"}).click();
   await group.click();
   await expect(tour).toContainText("Busca otra pieza");
@@ -43,18 +64,19 @@ for(const width of [1366,390])test("Guía de Prisma · práctica sin Gemini · "
   await expect(tour).toContainText("Añade esta pieza");
   await panel.locator('[data-prisma-tour="result"]').first().click();
   await expect(panel.getByRole("listitem")).toHaveCount(2);
-  await panel.getByRole("button",{name:"Plegar asistente"}).click();
-  await expect(tour).toContainText("Abre Prisma");
-  await launch.click();
+  // Plegar el panel no sale de Editar: la guía señala el botón del explorador, que lo despliega con la misma selección.
+  await panel.getByRole("button",{name:"Plegar selección"}).click();
+  await expect(tour).toContainText("Muestra la selección");
+  const showExplorer=page.getByRole("button",{name:"Mostrar explorador"});
+  await expect(showExplorer).toHaveAttribute("aria-describedby",/prisma-instruction/);
+  await expect(launch).toHaveAttribute("aria-pressed","true");
+  await showExplorer.click();
+  await expect(panel.getByRole("listitem")).toHaveCount(2);
   await expect(tour).toContainText("Encuadra la selección");
   await panel.getByRole("button",{name:"Encuadrar selección"}).click();
   await expect(tour).toContainText("Prueba un acabado");
   await panel.getByRole("button",{name:"Probar color"}).click();
   await expect(tour).toContainText("Exporta la propuesta");
-  if(width===390){
-    const pointer=await page.locator(".tour-pointer").boundingBox();
-    expect(pointer!.y+pointer!.height).toBeLessThanOrEqual(844);
-  }
   await page.screenshot({path:info.outputPath("exportar-"+width+".png")});
   const download=page.waitForEvent("download");
   await panel.getByRole("button",{name:"Exportar PNG"}).click();
@@ -67,22 +89,24 @@ for(const width of [1366,390])test("Guía de Prisma · práctica sin Gemini · "
   await panel.getByLabel("Cambio para Gemini").fill("Aplica zinc oscuro a las piezas seleccionadas.");
   const prepare=panel.getByRole("button",{name:"Preparar paquete para Gemini"});
   await expect(prepare).toHaveAttribute("aria-describedby",/prisma-instruction/);
-  if(width===1366){
-    await page.getByRole("button",{name:"Desplazar",exact:true}).click();
-    const canvas=(await page.locator(".view canvas").boundingBox())!;
-    for(let drag=0;drag<5;drag++){
-      const y=canvas.y+canvas.height*.44;
-      await page.mouse.move(canvas.x+canvas.width*.85,y);
-      await page.mouse.down();
-      await page.mouse.move(canvas.x+canvas.width*.16,y,{steps:4});
-      await page.mouse.up();
-    }
-    await prepare.click();
-    await expect(panel.getByRole("alert")).toContainText("Hay piezas fuera de vista");
-    const recover=panel.getByRole("button",{name:"Reencuadrar y preparar de nuevo"});
-    await expect(recover).toHaveAttribute("aria-describedby",/prisma-instruction/);
-    await recover.click();
-  }else await prepare.click();
+  // Con Seleccionar activo, arrastrar sobre el lienzo dibuja una zona (DU-17): se apaga para desplazar la cámara.
+  const select=editBar(page).getByRole("button",{name:"Seleccionar"});
+  await select.click();
+  await expect(select).toHaveAttribute("aria-pressed","false");
+  await page.getByRole("button",{name:"Desplazar",exact:true}).click();
+  const canvas=(await page.locator(".view canvas").boundingBox())!;
+  for(let drag=0;drag<5;drag++){
+    const y=canvas.y+canvas.height*.44;
+    await page.mouse.move(canvas.x+canvas.width*.85,y);
+    await page.mouse.down();
+    await page.mouse.move(canvas.x+canvas.width*.16,y,{steps:4});
+    await page.mouse.up();
+  }
+  await prepare.click();
+  await expect(panel.getByRole("alert")).toContainText("Hay piezas fuera de vista");
+  const recover=panel.getByRole("button",{name:"Reencuadrar y preparar de nuevo"});
+  await expect(recover).toHaveAttribute("aria-describedby",/prisma-instruction/);
+  await recover.click();
   const packageButton=panel.getByRole("link",{name:"Descargar paquete para Gemini"});
   await expect(packageButton).toHaveAttribute("aria-describedby",/prisma-instruction/);
   const mask=panel.getByRole("img",{name:"Área editable de la selección"});
@@ -116,11 +140,11 @@ for(const width of [1366,390])test("Guía de Prisma · práctica sin Gemini · "
   const downloadProtected=page.waitForEvent("download");
   await saveProtected.click();
   expect((await downloadProtected).suggestedFilename()).toBe("ObraCota-edicion-protegida.png");
-  await expect(tour).toContainText("Guía de Prisma completada");
+  await expect(tour).toContainText("Guía de Editar completada");
   await tour.getByRole("button",{name:"Finalizar"}).click();
   await expect(tour).toHaveCount(0);
   expect(requests).toEqual([]);
-  await panel.getByRole("button",{name:"Guía de Prisma"}).click();
+  await panel.getByRole("button",{name:"Guía de Editar",exact:true}).click();
   await expect(tour).toBeVisible();
   await tour.getByRole("button",{name:"Omitir"}).click();
   await expect(tour).toHaveCount(0);

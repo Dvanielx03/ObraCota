@@ -36,6 +36,8 @@ test("Una vista guardada devuelve la cámara a su encuadre y se renombra y elimi
     await page.getByRole("button", { name: "Guardar versión" }).click();
     await page.getByRole("link", { name: "Abrir versión 1 en el visor" }).click();
     await expect(page.locator(".project")).toContainText("Duplex", { timeout: 120_000 });
+    // Coming from the panel, the preparing screen stays at least 5 s (entry-hold): the strip shows once the canvas is ready.
+    await expect(page.locator(".view[data-ready]")).toBeVisible({ timeout: 120_000 });
 
     const strip = page.getByRole("region", { name: "Vistas guardadas" });
     await expect(strip.getByText("Encuadra el modelo y guarda la vista para volver a ella.")).toBeVisible();
@@ -95,14 +97,40 @@ test("Una vista guardada devuelve la cámara a su encuadre y se renombra y elimi
     // Las vistas pertenecen a la versión: siguen ahí al volver a abrirla y aplican el mismo encuadre.
     await page.reload();
     await expect(page.locator(".project")).toContainText("Duplex", { timeout: 120_000 });
+    await expect(page.locator(".view[data-ready]")).toBeVisible({ timeout: 120_000 });
     await expect(renamed).toBeVisible();
     await expect(strip.getByRole("listitem")).toHaveCount(2);
     await renamed.click();
     await expect.poll(async () => difference(page, saved, await look())).toBeLessThan(0.5);
 
-    await strip.getByRole("button", { name: "Eliminar Vista 2" }).click();
+    // Deleting asks first in a modal dialog that names the view: cancelling keeps it and gives the focus back.
+    const removeSecond = strip.getByRole("button", { name: "Eliminar Vista 2" });
+    await removeSecond.click();
+    const confirmSecond = page.getByRole("dialog", { name: "¿Eliminar «Vista 2»?" });
+    await expect(confirmSecond).toBeVisible();
+    await confirmSecond.getByRole("button", { name: "Cancelar" }).click();
+    await expect(confirmSecond).toHaveCount(0);
+    await expect(strip.getByRole("button", { name: "Vista 2", exact: true })).toBeVisible();
+    await expect(removeSecond).toBeFocused();
+
+    await removeSecond.click();
+    await confirmSecond.getByRole("button", { name: "Eliminar", exact: true }).click();
     await expect(strip.getByRole("status")).toHaveText("«Vista 2» eliminada.");
+    await expect(strip.getByRole("listitem")).toHaveCount(1);
+    await expect(strip.getByRole("button", { name: "Vista 2", exact: true })).toHaveCount(0);
+    // The thumbnail is gone: the keyboard goes to «+» (promise of scene-strip.tsx:128-129).
+    // Known app race: the focus runs in a requestAnimationFrame that can fire before React commits
+    // setBusy(false) (line 73), while «+» is still disabled (line 197); the focus then stays on body.
+    await expect(strip.getByRole("button", { name: "Guardar vista" })).toBeFocused();
+
     await strip.getByRole("button", { name: "Eliminar Fachada de acceso" }).click();
+    await page.getByRole("dialog", { name: "¿Eliminar «Fachada de acceso»?" }).getByRole("button", { name: "Eliminar", exact: true }).click();
+    await expect(strip.getByRole("status")).toHaveText("«Fachada de acceso» eliminada.");
+    await expect(strip.getByText("Encuadra el modelo y guarda la vista para volver a ella.")).toBeVisible();
+
+    // Both deletions reached the server: a fresh visit shows the empty strip.
+    await page.reload();
+    await expect(page.locator(".view[data-ready]")).toBeVisible({ timeout: 120_000 });
     await expect(strip.getByText("Encuadra el modelo y guarda la vista para volver a ella.")).toBeVisible();
   } finally {
     await page.request.delete("/api/projects/" + id, { headers }).catch(() => undefined);
@@ -125,10 +153,13 @@ test("Las vistas se presentan a pantalla completa y se recorren con el teclado",
     await page.getByRole("button", { name: "Guardar versión" }).click();
     await page.getByRole("link", { name: "Abrir versión 1 en el visor" }).click();
     await expect(page.locator(".project")).toContainText("Duplex", { timeout: 120_000 });
+    await expect(page.locator(".view[data-ready]")).toBeVisible({ timeout: 120_000 });
 
     const strip = page.getByRole("region", { name: "Vistas guardadas" });
-    const present = strip.getByRole("button", { name: "Presentar" });
+    // «Presentar» lives in the viewer header (viewer-header.tsx) and drives the presentation of the strip.
+    const present = page.locator(".viewer-header").getByRole("button", { name: "Presentar", exact: true });
     await expect(present).toBeDisabled();
+    await expect(present).toHaveAttribute("title", "Guarda una vista para presentarla");
 
     const stage = (await page.locator("section.stage").boundingBox())!;
     const centre = { x: stage.x + stage.width * 0.6, y: stage.y + stage.height * 0.5 };
@@ -151,42 +182,76 @@ test("Las vistas se presentan a pantalla completa y se recorren con el teclado",
     const clip = { x: Math.round(stage.x + stage.width * 0.42), y: Math.round(stage.y + stage.height * 0.3), width: Math.round(stage.width * 0.36), height: Math.round(stage.height * 0.42) };
     const before = await page.screenshot({ clip, animations: "disabled" });
 
+    await expect(present).toBeEnabled();
+    await expect(present).toHaveAttribute("title", "Presentar las vistas guardadas a pantalla completa");
     await present.click();
-    const bar = page.getByRole("group", { name: "Presentación de vistas" });
-    await expect(bar.getByRole("status")).toContainText("de 2");
+    // The deck is a cover plus one slide per view, and it starts on the view applied last (Vista 2).
+    const deck = page.getByRole("dialog", { name: "Presentación de Prueba de presentación" });
+    const label = deck.getByRole("status");
+    await expect(label).toHaveText("Diapositiva 3 de 3: Vista 2");
+    await expect(deck.getByRole("heading", { name: "Vista 2" })).toBeVisible();
     await expect(page.locator("section.stage")).toHaveAttribute("data-presenting", "");
     await expect(strip).toBeHidden();
     await expect(page.getByRole("toolbar", { name: "Acciones del modelo" })).toBeHidden();
 
     // La pantalla completa cambia el tamaño del lienzo: se compara todo el escenario entre vistas.
-    const whole = () => page.locator("section.stage canvas").first().screenshot({ animations: "disabled" });
+    // Only the 3D canvas is compared (the caption, dots and counter over it change and fade on their own),
+    // once the 450 ms camera move between slides is over.
+    const whole = () => page.locator("section.stage .view canvas").first().screenshot({ animations: "disabled", style: ".presentation{visibility:hidden!important}" });
+    const still = async () => {
+      let previous = await whole();
+      for (let i = 0; i < 30; i++) {
+        await page.waitForTimeout(150);
+        const next = await whole();
+        if (await difference(page, previous, next) < 0.05) return next;
+        previous = next;
+      }
+      return previous;
+    };
+    await page.keyboard.press("ArrowLeft");
+    await expect(label).toHaveText("Diapositiva 2 de 3: Vista 1");
+    await expect(deck.locator(".presentation-counter")).toHaveText("02 / 03");
+    const one = await still();
     await page.keyboard.press("ArrowRight");
-    const label = bar.getByRole("status");
-    const firstLabel = (await label.textContent())!;
-    const one = await whole();
-    await page.keyboard.press("ArrowRight");
-    await expect(label).not.toHaveText(firstLabel);
+    await expect(label).toHaveText("Diapositiva 3 de 3: Vista 2");
     await expect.poll(async () => difference(page, one, await whole())).toBeGreaterThan(1);
     await page.screenshot({ animations: "disabled", path: process.env.EVIDENCE_DIR ? process.env.EVIDENCE_DIR + "/presentacion-1366.png" : info.outputPath("presentacion.png") });
+    // The deck stops at the last view (no wrap to the cover): going back from there lands on Vista 1.
+    await page.keyboard.press("ArrowRight");
+    await expect(label).toHaveText("Diapositiva 3 de 3: Vista 2");
     await page.keyboard.press("ArrowLeft");
-    await expect(label).toHaveText(firstLabel);
+    await expect(label).toHaveText("Diapositiva 2 de 3: Vista 1");
     await expect.poll(async () => difference(page, one, await whole())).toBeLessThan(0.5);
-    await bar.getByRole("button", { name: "Vista siguiente" }).click();
-    await expect(label).not.toHaveText(firstLabel);
+
+    // With the pointer: Inicio shows the cover, a click on it advances and the dots jump to a slide.
+    await page.keyboard.press("Home");
+    await expect(label).toHaveText("Portada: Prueba de presentación");
+    await expect(deck.getByRole("heading", { name: "Prueba de presentación" })).toBeVisible();
+    await deck.locator(".presentation-cover").click();
+    await expect(label).toHaveText("Diapositiva 2 de 3: Vista 1");
+    const dots = deck.getByRole("navigation", { name: "Diapositivas" });
+    const lastDot = dots.getByRole("button", { name: "Vista 02: Vista 2" });
+    await lastDot.click();
+    await expect(label).toHaveText("Diapositiva 3 de 3: Vista 2");
+    await expect(lastDot).toHaveAttribute("aria-current", "step");
+    await expect(dots.getByRole("button", { name: "Vista 01: Vista 1" })).not.toHaveAttribute("aria-current", "step");
 
     // Escape sale, devuelve los controles, el foco y el encuadre que había.
     await page.keyboard.press("Escape");
-    await expect(bar).toHaveCount(0);
+    await expect(deck).toHaveCount(0);
     await expect(page.locator("section.stage")).not.toHaveAttribute("data-presenting", "");
     await expect(strip).toBeVisible();
+    await expect(page.getByRole("toolbar", { name: "Acciones del modelo" })).toBeVisible();
     await expect(present).toBeFocused();
     await expect.poll(async () => difference(page, before, await page.screenshot({ clip, animations: "disabled" }))).toBeLessThan(0.5);
 
     // También se sale con el botón.
     await present.click();
-    await bar.getByRole("button", { name: "Salir" }).click();
-    await expect(bar).toHaveCount(0);
+    await expect(label).toHaveText("Diapositiva 3 de 3: Vista 2");
+    await deck.getByRole("button", { name: "Salir de la presentación (Esc)" }).click();
+    await expect(deck).toHaveCount(0);
     await expect(strip).toBeVisible();
+    await expect(present).toBeFocused();
   } finally {
     await page.request.delete("/api/projects/" + id, { headers }).catch(() => undefined);
   }

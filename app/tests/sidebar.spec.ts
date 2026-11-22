@@ -1,6 +1,8 @@
 import {expect,test} from "@playwright/test";
+import {MODEL_ONLY,modelShown} from "./support/visor";
 for(const [width,height] of [[1480,667],[390,844],[844,390]]){
   test("Panel contextual "+width,async({page},info)=>{
+    test.skip(width<1000,"Solo escritorio (D-12)");
     await page.emulateMedia({reducedMotion:"reduce"});
     await page.setViewportSize({width,height});await page.goto("/proyectos/restage/visor");
     await expect(page.locator(".project")).toHaveText("ReStage");
@@ -13,8 +15,10 @@ for(const [width,height] of [[1480,667],[390,844],[844,390]]){
     await expect(tab("Lectura")).toHaveAttribute("aria-selected","true");
     await tab("Propiedades").click();
     await page.locator(".review-notes summary").click();const draft=page.getByLabel("Observación sobre la selección");await draft.fill("Pendiente de coordinación");
+    await modelShown(page);
     await page.getByRole("button",{name:"Acercar",exact:true}).click();
-    const modelImage=()=>canvas.screenshot({style:".tools,.stagebar{visibility:hidden!important}"});
+    // Only the model render: the floating header (theme icon included), bars and cube stay out of the capture.
+    const modelImage=()=>canvas.screenshot({style:MODEL_ONLY});
     const initial=await area(),framing=await modelImage();
     await tab("Propiedades").press("ArrowLeft");await expect(search).toHaveValue("STL1");
     expect(await area()).toEqual(initial);

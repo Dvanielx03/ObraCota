@@ -1,6 +1,10 @@
 import {expect,test} from "@playwright/test";
 import {readFile} from "node:fs/promises";
 import {strFromU8,unzipSync} from "three/addons/libs/fflate.module.js";
+import {editButton,editTour,selectionPanel} from "./support/editar-prisma";
+
+// Antes «Prisma»: la edición externa con máscara («Editar en Gemini con máscara») vive en el panel
+// «Selección» de EDITAR (DU-16). Nada de esto llama a Gemini: se prepara un ZIP y se protege la imagen devuelta.
 
 function visibilityFixture(){
   let step=`ISO-10303-21;
@@ -39,10 +43,12 @@ DATA;
 
 for(const piece of ["Pieza posterior","Pieza interior"])test("Guía y captura de IFC · "+piece,async({page},info)=>{
   await page.goto("/proyectos/restage/visor?panel=asistente");
-  const panel=page.getByRole("region",{name:"Asistente de diseño"});
+  const panel=selectionPanel(page);
   await expect(panel).toBeVisible();
   await page.locator("header input[type=file]").setInputFiles({name:"visibilidad.ifc",mimeType:"application/octet-stream",buffer:visibilityFixture()});
   await expect(page.locator(".project")).toHaveText("visibilidad.ifc");
+  // Abrir otro IFC con ?panel=asistente vuelve a entrar en Editar.
+  await expect(editButton(page)).toHaveAttribute("aria-pressed","true");
   const search=panel.getByLabel("Buscar pieza para la propuesta");
   await search.fill(piece);
   await panel.getByRole("button",{name:new RegExp(piece+" · ")}).click();
@@ -51,7 +57,7 @@ for(const piece of ["Pieza posterior","Pieza interior"])test("Guía y captura de
   await panel.getByRole("button",{name:"Guía de edición con máscara"}).click();
   await panel.getByLabel("Cambio para Gemini").fill("Cambia el acabado de "+piece);
   await panel.getByRole("button",{name:"Preparar paquete para Gemini"}).click();
-  const tour=page.getByRole("region",{name:"Guía visual de Prisma"});
+  const tour=editTour(page);
   const reframe=panel.getByRole("button",{name:"Reencuadrar y preparar de nuevo"});
   await expect(reframe).toHaveAttribute("aria-describedby",/prisma-instruction/);
   const orientation=await page.locator(".stage").evaluate(el=>el.style.getPropertyValue("--cube-pose"));
@@ -83,10 +89,10 @@ test("Exporta el encuadre con instrucciones y protege la imagen que devuelve Gem
   const posts:string[]=[];
   page.on("request",r=>{if(r.method()==="POST")posts.push(r.url());});
   await page.goto("/proyectos/restage/visor?panel=asistente");
-  const panel=page.getByRole("region",{name:"Asistente de diseño"});
+  const panel=selectionPanel(page);
   await panel.getByRole("textbox",{name:"Buscar pieza para la propuesta"}).fill("fachada");
   await panel.getByRole("button",{name:/fachada.* · /i}).first().click();
-  await panel.getByText("Editar en Gemini con máscara").click();
+  await panel.getByText("Editar en Gemini con máscara",{exact:true}).click();
   await panel.getByLabel("Cambio para Gemini").fill("Aplica zinc oscuro solo a la pieza seleccionada.");
   await panel.getByRole("button",{name:"Preparar paquete para Gemini"}).click();
   const downloading=page.waitForEvent("download");
@@ -112,14 +118,14 @@ test("Exporta el encuadre con instrucciones y protege la imagen que devuelve Gem
     return canvas.toDataURL("image/png");
   },originalURL);
   await page.reload();
-  await panel.getByText("Editar en Gemini con máscara").click();
+  await panel.getByText("Editar en Gemini con máscara",{exact:true}).click();
   await panel.getByLabel("Buscar pieza para la propuesta").fill("fachada");
   await panel.getByRole("button",{name:/fachada.* · /i}).first().click();
   await panel.getByRole("listitem").getByRole("button",{name:/Quitar/}).click();
   await panel.getByRole("button",{name:"Guía de edición con máscara"}).click();
-  const tour=page.getByRole("region",{name:"Guía visual de Prisma"});
+  const tour=editTour(page);
   await expect(tour).toContainText("Recupera tu paquete");
-  const openZip=panel.getByRole("button",{name:"Abrir ZIP de Prisma"});
+  const openZip=panel.getByRole("button",{name:"Abrir ZIP de edición"});
   await expect(openZip).toHaveAttribute("aria-describedby",/prisma-instruction/);
   const choosingZip=page.waitForEvent("filechooser");
   await openZip.click();
@@ -134,7 +140,7 @@ test("Exporta el encuadre con instrucciones y protege la imagen que devuelve Gem
   const imageChooser=await choosingImage;
   expect(await imageChooser.element().getAttribute("accept")).toBe("image/png,image/jpeg,image/webp");
   await imageChooser.setFiles(savedZip);
-  await expect(panel.getByRole("alert")).toContainText("Para recuperar un ZIP, pulsa Abrir ZIP de Prisma");
+  await expect(panel.getByRole("alert")).toContainText("Para recuperar un ZIP, pulsa Abrir ZIP de edición");
   const file=panel.getByLabel("Imagen editada de Gemini");
   await file.setInputFiles({name:"gemini.png",mimeType:"image/png",buffer:Buffer.from(replacement.split(",")[1],"base64")});
   const preview=panel.getByRole("img",{name:"Vista final con cambios limitados a la selección"});

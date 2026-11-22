@@ -3,15 +3,21 @@ import {readFile,writeFile} from "node:fs/promises";
 import path from "node:path";
 import {reviewDelivery} from "../src/modules/model-file/application/review-delivery";
 
+// La revisión de entrega es REVISAR (tecla V) en la barra inferior del visor: un panel «Revisión de entrega»
+// anclado sobre el botón, con los conceptos del DWG y «Preparar informe», y el informe en un diálogo modal
+// «Informe de revisión» con «Descargar informe» (model-file/ui/delivery-review.tsx).
+const reportDialog=(page:Page)=>page.getByRole("dialog",{name:"Informe de revisión"});
+
 async function load(page:Page,file:string){
   await page.goto("/proyectos/restage/visor");await expect(page.locator(".inspector")).toContainText("GlobalId");
   await page.locator("input[type=file]").setInputFiles(path.resolve(file));
   await expect(page.locator(".project")).toHaveText(path.basename(file),{timeout:90000});
-  await page.getByRole("button",{name:"Revisar entrega"}).click();
+  await page.getByRole("toolbar",{name:"Acciones del modelo"}).getByRole("button",{name:"Revisar entrega"}).click();
+  await expect(page.getByRole("dialog",{name:"Revisión de entrega"})).toBeVisible();
 }
 async function exported(page:Page){
   const result=page.waitForEvent("download");
-  await page.getByRole("button",{name:"Descargar informe"}).click();
+  await reportDialog(page).getByRole("button",{name:"Descargar informe"}).click();
   return readFile((await (await result).path())!,"utf8");
 }
 test("Reglas IFC distinguen relación directa, material y GUID",()=>{
@@ -33,7 +39,7 @@ test("Entrega DWG · extracción, variantes, omisiones y archivo descargado",asy
   expect(report).toContain("xqzwv391 — Sin evidencia en textos leídos (0)");
   expect(report).toContain("HATCH");expect(report).toMatch(/Versión: [0-9a-f]{64}/);
   expect(report.match(/— Texto encontrado/g)).toHaveLength(1);
-  const exact=page.locator("dialog details").first();
+  const exact=reportDialog(page).locator("details").first();
   await exact.locator("summary").click();await exact.getByRole("button").first().click();
   await expect(page.locator(".note-marker")).toBeVisible();
   await page.getByText("Texto de origen",{exact:true}).click();
@@ -44,8 +50,19 @@ test("Entrega DWG · extracción, variantes, omisiones y archivo descargado",asy
   const final=await exported(page);expect(final).toContain("Validar con hidráulica —");
   await writeFile(info.outputPath("informe-piscina.txt"),final,"utf8");
   await page.screenshot({path:info.outputPath("revision-piscina.png")});
-  await terms.fill("otro");await expect(page.getByRole("button",{name:"Descargar informe"})).toHaveCount(0);
-  await page.getByRole("button",{name:"Cerrar revisión"}).click();
+  // Los conceptos viven en el panel de REVISAR y el informe en su diálogo modal: se cierra el informe,
+  // el foco vuelve a REVISAR y la tecla V reabre el panel con lo escrito (delivery-review.tsx, keepMounted).
+  const stale=page.locator(".delivery-review").getByRole("button",{name:"Descargar informe",includeHidden:true});
+  const reviewButton=page.getByRole("toolbar",{name:"Acciones del modelo"}).getByRole("button",{name:"Revisar entrega"});
+  await reportDialog(page).getByRole("button",{name:"Cerrar revisión"}).click();
+  await expect(reportDialog(page)).toBeHidden();await expect(reviewButton).toBeFocused();await expect(stale).toHaveCount(1);
+  await page.keyboard.press("v");
+  const panel=page.getByRole("dialog",{name:"Revisión de entrega"});await expect(panel).toBeVisible();
+  await expect(terms).toHaveValue("rebose\nRÉBOSE\nrebosse\nxqzwv391");
+  // Cambiar los conceptos descarta el informe anterior: no queda un resultado viejo que descargar.
+  await terms.fill("otro");await expect(stale).toHaveCount(0);await expect(page.getByRole("button",{name:"Descargar informe"})).toHaveCount(0);
+  await panel.getByRole("button",{name:"Cerrar revisión"}).click();
+  await expect(panel).toBeHidden();await expect(reviewButton).toBeFocused();
 });
 test("Entrega IFC · validar evidencia del informe contra el STEP original",async({page})=>{
   const file=process.env.TEST_IFC;test.skip(!file);await load(page,file!);
@@ -63,8 +80,9 @@ test("Entrega IFC · validar evidencia del informe contra el STEP original",asyn
   await more.click();expect(await branch.locator(".entry").count()).toBeGreaterThan(initial);
   console.log(report.split(/\r?\n/).filter(l=>l.includes(" — ")||l.startsWith("Registros revisados")).slice(0,4));
 });
-test("Ejemplo en móvil · alcance limitado, diálogo y teclado",async({page})=>{
-  await page.setViewportSize({width:390,height:844});await page.goto("/proyectos/restage/visor");
+for(const [width,height] of [[1366,768],[390,844]])test("Ejemplo · alcance limitado, diálogo y teclado · "+width,async({page})=>{
+  test.skip(width<1000,"Solo escritorio (D-12)");
+  await page.setViewportSize({width,height});await page.goto("/proyectos/restage/visor");
   await page.getByRole("button",{name:"Revisar entrega"}).click();
   await page.getByRole("button",{name:"Preparar informe"}).click();
   const text=await exported(page);expect(text).toContain("Conjuntos del ejemplo GLB");expect(text).not.toContain("Material directo sin extraer");

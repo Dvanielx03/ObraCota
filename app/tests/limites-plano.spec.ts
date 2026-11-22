@@ -1,5 +1,6 @@
 import {test,expect} from "@playwright/test";
 import path from "node:path";
+import {MODEL_ONLY,modelShown} from "./support/visor";
 
 test("La mesa 2D limita arrastre, rueda y zoom por ventana",async({page})=>{
   const file=process.env.TEST_DWG;
@@ -7,8 +8,11 @@ test("La mesa 2D limita arrastre, rueda y zoom por ventana",async({page})=>{
   await page.goto("/proyectos/restage/visor");await expect(page.getByRole("button",{name:"Revisar entrega"})).toBeVisible();
   await page.locator("header input").setInputFiles(file!);
   await expect(page.locator(".project")).toHaveText(path.basename(file!));
+  // The sheet fades in once it is ready: the home picture is taken after the fade.
+  await modelShown(page);
   const canvas=page.locator("canvas"),box=(await canvas.boundingBox())!;
-  const image=()=>canvas.screenshot({style:".tools,.stagebar{visibility:hidden!important}"});
+  // Only the drawing: the floating bars (with the hovered button) and hints stay out of the capture.
+  const image=()=>canvas.screenshot({style:MODEL_ONLY});
   const home=await image();
   await page.getByRole("button",{name:"Alejar",exact:true}).click({clickCount:8});
   expect((await image()).equals(home)).toBe(true);

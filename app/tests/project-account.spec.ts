@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { OWNED_SUMMARY, UNTITLED, createUntitledProject } from "./support/panel-proyectos";
 
 test("La cuenta conserva su proyecto y renueva la sesión", async ({ page }) => {
   const email = "panel-" + randomUUID() + "@example.test";
@@ -11,10 +12,21 @@ test("La cuenta conserva su proyecto y renueva la sesión", async ({ page }) => 
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Crear cuenta" }).click();
   await expect(page.getByRole("heading", { name: "Mis proyectos" })).toBeVisible();
-  await page.getByRole("button", { name: "Nuevo proyecto" }).click();
-  await page.getByLabel("Nombre del proyecto").fill(project);
-  await page.getByRole("button", { name: "Crear proyecto" }).click();
+  // «Nuevo proyecto» crea «Proyecto sin título» y abre sus archivos (DU-07 = B); el nombre se cambia en
+  // la barra del proyecto, donde se llega.
+  await createUntitledProject(page);
+  await page.getByRole("button", { name: "Renombrar proyecto" }).click();
+  const field = page.getByRole("textbox", { name: "Nombre del proyecto" });
+  await expect(field).toBeFocused();
+  await expect(field).toHaveValue(UNTITLED);
+  await field.fill(project);
+  const saved = page.waitForResponse(res => res.request().method() === "PUT" && /\/api\/projects\/[^/]+$/.test(new URL(res.url()).pathname) && res.ok());
+  await field.press("Enter");
+  await saved;
+  await expect(page.getByRole("heading", { level: 1, name: project })).toBeVisible();
+  await page.getByRole("link", { name: "Proyectos", exact: true }).click();
   await page.getByRole("link", { name: project }).click();
+  await expect(page).toHaveURL(OWNED_SUMMARY);
   await expect(page.getByRole("heading", { level: 1, name: project })).toBeVisible();
   const projectUrl = page.url();
   await page.reload();
@@ -24,7 +36,10 @@ test("La cuenta conserva su proyecto y renueva la sesión", async ({ page }) => 
   await page.getByRole("button", { name: "Cerrar sesión" }).click();
   await expect(page.getByRole("heading", { name: "Sesión de invitado" })).toBeVisible();
   await page.goto(projectUrl);
-  await page.getByRole("link", { name: "Iniciar sesión" }).click();
+  // Sin sesión el proyecto no se muestra; la barra superior ofrece «Iniciar sesión».
+  await expect(page.getByRole("heading", { name: "Inicia sesión para ver este proyecto" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: project })).toHaveCount(0);
+  await page.getByRole("navigation", { name: "Panel" }).getByRole("link", { name: "Iniciar sesión", exact: true }).click();
   await page.getByLabel("Correo electrónico").fill(email);
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();

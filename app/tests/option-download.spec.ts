@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { png } from "./support/png";
+import { actions, comparePanel, createProject, downloadPanel, openFirstVersion, pickFirstPiece, renderButton, renderPanel, unfoldBatches } from "./support/opciones-visuales";
 
 test.use({ viewport: { width: 1366, height: 768 } });
 
@@ -22,10 +22,7 @@ test("Una opción se descarga como PNG con brillo, calidez y nitidez ajustados",
   test.skip(!ifc, "Indica el IFC Duplex original con DUPLEX_IFC.");
   test.setTimeout(180_000);
 
-  const auth = await page.request.post("/api/auth/register", { headers: { "X-ObraCota-Client": "web" }, data: { email: randomUUID() + "@example.test", password: randomUUID() } });
-  expect(auth.ok()).toBeTruthy();
-  const headers = { Authorization: "Bearer " + (await auth.json()).accessToken };
-  const { id } = await (await page.request.post("/api/projects", { headers, data: { name: "Prueba de descarga" } })).json();
+  const project = await createProject(page, "Prueba de descarga");
 
   // Una terna lista, sin llamar a ningún modelo de imagen.
   const colours: [number, number, number][] = [[120, 126, 134], [176, 122, 62], [58, 110, 92], [196, 188, 170]];
@@ -45,33 +42,40 @@ test("Una opción se descarga como PNG con brillo, calidez y nitidez ajustados",
   });
 
   try {
-    await page.goto("/proyectos/" + id + "/archivos");
-    await page.getByLabel("Archivo IFC o DWG").setInputFiles(ifc!);
-    await page.getByRole("button", { name: "Guardar versión" }).click();
-    await page.getByRole("link", { name: "Abrir versión 1 en el visor" }).click();
-    await expect(page.locator(".project")).toContainText("Duplex", { timeout: 120_000 });
-    if (!(await page.locator("#explorer .entry").count())) await page.locator("#explorer .level").first().click();
-    await page.locator("#explorer .entry").first().click();
-    await page.getByRole("tab", { name: "Propiedades" }).click();
-    await page.getByRole("button", { name: "Opciones visuales" }).click();
+    await openFirstVersion(page, project.id, ifc!, "Duplex");
+    await pickFirstPiece(page);
 
-    const dialog = page.getByRole("dialog", { name: "Opciones visuales" });
-    await expect(dialog.getByRole("img", { name: "Opción 2", exact: true })).toBeVisible();
-    const open = dialog.getByRole("button", { name: "Descargar opción 2" });
-    await open.click();
-    await expect(open).toHaveAttribute("aria-pressed", "true");
+    // Las tandas de la pieza están en RENDERIZAR, plegadas tras «Ver».
+    await renderButton(page).click();
+    const render = renderPanel(page);
+    await unfoldBatches(render);
+    await expect(render.getByRole("img", { name: "Opción 2", exact: true })).toBeVisible();
 
+    // «Descargar opción 2» abre el panel Descargar apuntando a esa opción (un panel a la vez).
+    await render.getByRole("button", { name: "Descargar opción 2" }).click();
+    const dialog = downloadPanel(page);
+    await expect(dialog).toBeVisible();
+    await expect(render).toBeHidden();
+    const downloadTool = actions(page).getByRole("button", { name: "Descargar", exact: true });
+    await expect(downloadTool).toHaveAttribute("aria-expanded", "true");
+    await expect(dialog.getByRole("radiogroup", { name: "Opción" }).getByRole("radio", { name: "Opción 2" })).toHaveAttribute("aria-checked", "true");
+
+    // La vista previa con los ajustes y el primer plano están plegados en «Vista previa y primer plano».
     const panel = dialog.getByRole("region", { name: "Descargar la opción 2" });
-    await expect(panel.getByRole("img", { name: "Opción 2 con los ajustes aplicados · Generado con IA" })).toBeVisible();
+    const adjusted = panel.getByRole("img", { name: "Opción 2 con los ajustes aplicados · Generado con IA" });
+    await expect(adjusted).toBeHidden();
+    await panel.getByText("Vista previa y primer plano").click();
+    await expect(adjusted).toBeVisible();
     const brightness = panel.getByRole("slider", { name: "Brillo" });
     const warmth = panel.getByRole("slider", { name: "Calidez" });
     const sharpness = panel.getByRole("slider", { name: "Nitidez" });
-    const reset = panel.getByRole("button", { name: "Restablecer" });
+    // «Restablecer» va en la cabecera del panel y «Descargar imagen» en su pie, fuera de la región.
+    const reset = dialog.getByRole("button", { name: "Restablecer", exact: true });
     await expect(brightness).toHaveValue("0");
     await expect(reset).toBeDisabled();
 
     const save = async () => {
-      const [download] = await Promise.all([page.waitForEvent("download"), panel.getByRole("button", { name: "Descargar imagen" }).click()]);
+      const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Descargar imagen" }).click()]);
       return { name: download.suggestedFilename(), file: await readFile(await download.path()) };
     };
     const near = (a: number[], b: number[], slack = 2) => a.every((v, i) => Math.abs(v - b[i]) <= slack);
@@ -79,6 +83,7 @@ test("Una opción se descarga como PNG con brillo, calidez y nitidez ajustados",
     // Sin ajustes: mismo tamaño y color que la opción, PNG con el nombre de la pieza y la marca en la esquina.
     const plain = await save();
     expect(plain.name).toMatch(/^obracota-[a-z0-9-]+-opcion-2\.png$/);
+    expect(plain.name).not.toMatch(/^obracota-(vista|pieza)-/);
     expect([...plain.file.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
     const centre = await pixel(page, plain.file, 0.5, 0.4);
     expect(centre.size).toEqual([480, 300]);
@@ -91,6 +96,7 @@ test("Una opción se descarga como PNG con brillo, calidez y nitidez ajustados",
     for (let i = 0; i < 20; i++) await page.keyboard.press("ArrowRight");
     await expect(brightness).toHaveValue("20");
     await expect(panel.locator("label", { hasText: "Brillo" }).locator("b")).toHaveText("+20");
+    await expect(reset).toBeEnabled();
     const brighter = (await pixel(page, (await save()).file, 0.5, 0.4)).colour;
     expect(brighter.every((v, i) => v > colours[2][i] + 15)).toBe(true);
 
@@ -107,6 +113,7 @@ test("Una opción se descarga como PNG con brillo, calidez y nitidez ajustados",
     await expect(brightness).toHaveValue("0");
     await expect(warmth).toHaveValue("0");
     await expect(sharpness).toHaveValue("0");
+    await expect(reset).toBeDisabled();
     expect(near((await pixel(page, (await save()).file, 0.5, 0.4)).colour, colours[2])).toBe(true);
 
     // Primer plano: es un recorte de los mismos píxeles, con su propio nombre de archivo.
@@ -127,14 +134,22 @@ test("Una opción se descarga como PNG con brillo, calidez y nitidez ajustados",
     await expect(zoom).toHaveValue("100");
     expect((await pixel(page, (await save()).file, 0.5, 0.4)).size).toEqual([480, 300]);
 
-    // Descargar y comparar no se pisan; cerrar quita el panel.
-    await dialog.getByRole("button", { name: "Comparar opción 3" }).click();
-    await expect(dialog.locator(".option-download")).toHaveCount(0);
-    await dialog.getByRole("button", { name: "Descargar opción 1" }).click();
-    await expect(dialog.locator(".compare")).toHaveCount(0);
+    // Descargar y comparar no se pisan: abrir Comparar cierra Descargar, y descargar otra opción
+    // desde las tandas cierra Comparar. La X del panel lo quita y devuelve el foco a Descargar.
+    await actions(page).getByRole("button", { name: "Comparar", exact: true }).click();
+    await expect(comparePanel(page)).toBeVisible();
+    await expect(dialog).toBeHidden();
+    await expect(page.locator(".option-download")).toHaveCount(0);
+    await renderButton(page).click();
+    await expect(comparePanel(page)).toBeHidden();
+    await render.getByRole("button", { name: "Descargar opción 1" }).click();
+    await expect(dialog.getByRole("region", { name: "Descargar la opción 1" })).toBeVisible();
+    await expect(page.locator(".compare")).toHaveCount(0);
     await dialog.getByRole("button", { name: "Cerrar descarga" }).click();
-    await expect(dialog.locator(".option-download")).toHaveCount(0);
+    await expect(dialog).toBeHidden();
+    await expect(page.locator(".option-download")).toHaveCount(0);
+    await expect(downloadTool).toBeFocused();
   } finally {
-    await page.request.delete("/api/projects/" + id, { headers }).catch(() => undefined);
+    await project.remove();
   }
 });

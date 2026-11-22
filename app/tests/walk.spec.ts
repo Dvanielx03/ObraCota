@@ -1,8 +1,10 @@
 import {expect,test} from "@playwright/test";
 import {statSync} from "node:fs";
-import {findFloor} from "./walk-support";
+import {expectWalkable,findFloor,walkButton} from "./walk-support";
 
 test("Recorrido móvil en IFC real y regreso al visor",async({page},info)=>{
+  // Variante de ancho móvil (390 × 844): la app es solo de escritorio.
+  test.skip(true,"Solo escritorio (D-12)");
   const ifc=process.env.DUPLEX_IFC;
   test.skip(!ifc);
   await page.setViewportSize({width:390,height:844});
@@ -31,9 +33,12 @@ test("Medición del IFC original de ReStage",async({page},info)=>{
   await page.setViewportSize({width:1366,height:768});
   await page.goto("/proyectos/restage/visor");
   await expect(page.locator(".project")).toHaveText("ReStage");
+  // El ejemplo no se puede recorrer: RECORRIDO está en la barra, pero deshabilitado.
+  await expect(walkButton(page)).toHaveAttribute("aria-disabled","true");
   const opened=Date.now();
   await page.locator("header input").setInputFiles(ifc!);
-  await expect(page.getByRole("button",{name:"Recorrer",exact:true})).toBeVisible({timeout:180_000});
+  await expect(page.locator(".project")).toHaveText(/\.ifc$/i,{timeout:180_000});
+  await expectWalkable(page,180_000);
   const openingMs=Date.now()-opened;
   console.log(JSON.stringify({bytes:statSync(ifc!).size,openingMs}));
   await findFloor(page);
@@ -60,4 +65,8 @@ test("Medición del IFC original de ReStage",async({page},info)=>{
   await page.screenshot({path:info.outputPath("restage-ifc.png")});
   expect(hint).toMatch(/Arrastra para mirar/);
   await page.getByRole("button",{name:"Salir",exact:true}).click();
+  // Al salir vuelve la barra de herramientas con RECORRIDO disponible.
+  await expect(page.getByRole("toolbar",{name:"Controles del recorrido"})).toHaveCount(0);
+  await expectWalkable(page);
+  await expect(page.locator("main")).not.toHaveAttribute("data-walk",/.+/);
 });

@@ -5,6 +5,9 @@ test.use({ storageState: { cookies: [], origins: [] }, viewport: { width: 1366, 
 
 const main = (page: Page) => page.locator("main");
 const card = (page: Page) => page.getByRole("region", { name: "Recorrido rápido" });
+// Prisma dejó de ser una sección (DU-16): su función vive en EDITAR, en la barra inferior del visor.
+const editButton = (page: Page) =>
+  page.getByRole("toolbar", { name: "Acciones del modelo" }).getByRole("button", { name: "Editar", exact: true });
 
 async function ready(page: Page) {
   await expect(page.locator(".project")).toHaveText("ReStage", { timeout: 90_000 });
@@ -32,11 +35,13 @@ test("El recorrido rápido sigue lo que la persona hace sobre los controles real
   await page.screenshot({ animations: "disabled", path: info.outputPath("paso-1.png") });
   await entry.click();
 
-  // 2 de 3: señala Prisma y avanza al abrirlo.
+  // 2 de 3: señala EDITAR (antes Prisma) y avanza al abrirlo.
   await expect(main(page)).toHaveAttribute("data-quick", "options");
-  const prisma = page.getByRole("button", { name: "Abrir Prisma" });
-  await expect(prisma).toHaveAttribute("aria-describedby", /quick-instruction/);
+  const edit = editButton(page);
+  await expect(edit).toHaveAttribute("aria-describedby", /quick-instruction/);
+  await expect(edit).toHaveAttribute("aria-pressed", "false");
   await expect(card(page)).toContainText("2 de 3");
+  await expect(card(page)).toContainText("Edita la pieza");
   await page.screenshot({ animations: "disabled", path: info.outputPath("paso-2.png") });
 
   // «Atrás» devuelve al primer paso sin perder la guía.
@@ -44,7 +49,10 @@ test("El recorrido rápido sigue lo que la persona hace sobre los controles real
   await expect(main(page)).toHaveAttribute("data-quick", "select");
   await page.locator(".entry").first().click();
   await expect(main(page)).toHaveAttribute("data-quick", "options");
-  await prisma.click();
+  await edit.click();
+  // EDITAR queda activo y su panel de selección ocupa el explorador.
+  await expect(edit).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#explorer").getByRole("region", { name: "Selección", exact: true })).toBeVisible();
 
   // 3 de 3 si este archivo permite recorrerlo; si no, la guía salta al cierre.
   await expect(main(page)).toHaveAttribute("data-quick", /walk|done/);
@@ -78,6 +86,16 @@ test("Llegar desde la bienvenida arranca el recorrido sin diálogo; se pausa y s
   await expect(main(page)).toHaveAttribute("data-quick", "select");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
+  // En una primera visita el explorador arranca plegado: el primer aviso señala cómo abrirlo.
+  await expect(page.locator("#explorer")).toBeHidden();
+  const toggle = page.locator(".stagebar").getByRole("button", { name: "Mostrar explorador" });
+  await expect(card(page)).toContainText("Abre el explorador");
+  await expect(toggle).toHaveAttribute("aria-describedby", /quick-instruction/);
+  await toggle.click();
+  await expect(page.locator("#explorer")).toBeVisible();
+  await expect(card(page)).toContainText("1 de 3");
+  await expect(main(page)).toHaveAttribute("data-quick", "select");
+
   await card(page).getByRole("button", { name: "Pausar" }).click();
   await expect(card(page)).toContainText("Tutorial en pausa");
   // En pausa, elegir una pieza no hace avanzar la guía.
@@ -96,5 +114,6 @@ test("Llegar desde la bienvenida arranca el recorrido sin diálogo; se pausa y s
   await page.getByRole("button", { name: "Guía de uso", exact: true }).click();
   const help = page.getByRole("dialog", { name: "Empieza por aquí" });
   await expect(help.getByRole("button", { name: "Iniciar guía" })).toBeVisible();
-  await expect(help.getByRole("button", { name: "Guía de Prisma" })).toBeVisible();
+  // La guía de Prisma pasó a llamarse «Guía de Editar» (viewer-workspace.tsx, diálogo de ayuda).
+  await expect(help.getByRole("button", { name: "Guía de Editar" })).toBeVisible();
 });

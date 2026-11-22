@@ -2,7 +2,7 @@ import {expect,test} from "@playwright/test";
 import {createHash,randomUUID} from "node:crypto";
 import {readFileSync} from "node:fs";
 import {strFromU8,unzipSync} from "three/addons/libs/fflate.module.js";
-import {findFloor} from "./walk-support";
+import {expectWalkable,findFloor,walkButton} from "./walk-support";
 
 const door="1hOSvn6df7F8_7GcBWlS8Z",alternate="2klOFZffH6WQFlV10uM1wF";
 
@@ -23,12 +23,18 @@ test("Revisión real de puerta, avisos, precio, aplicación y restauración",asy
     await page.goto(route+"/archivos");
     await page.getByLabel("Archivo IFC o DWG").setInputFiles(ifc!);
     await page.getByRole("button",{name:"Guardar versión"}).click();
-    const viewerLink=page.getByRole("link",{name:"Abrir con Prisma"});
+    // Prisma pasó a EDITAR (DU-16): el historial abre la versión con Editar activo.
+    const viewerLink=page.getByRole("link",{name:"Abrir en Editar"});
     await expect(viewerLink).toBeVisible();
     const viewerHref=(await viewerLink.getAttribute("href"))!;
+    expect(viewerHref).toContain("panel=asistente");
     const original=viewerHref.split("?")[0].split("/").pop()!;
     await page.goto(viewerHref+"&element="+door);
-    const proposal=page.getByRole("region",{name:"Cambiar tipo de puerta"});
+    await expect(page.getByRole("toolbar",{name:"Acciones del modelo"}).getByRole("button",{name:"Editar",exact:true})).toHaveAttribute("aria-pressed","true");
+    // El panel de selección de Editar (antes «Asistente de diseño») vive en el explorador.
+    const prisma=page.locator("#explorer").getByRole("region",{name:"Selección",exact:true});
+    await expect(prisma).toBeVisible();
+    const proposal=prisma.getByRole("region",{name:"Cambiar tipo de puerta"});
     await proposal.getByRole("button",{name:"Proponer cambio IFC"}).click();
     const types=proposal.getByLabel("Tipo IFC propuesto");
     await expect(types).toHaveValue(alternate);
@@ -39,7 +45,6 @@ test("Revisión real de puerta, avisos, precio, aplicación y restauración",asy
     await expect(proposal.getByText("Aviso · Medidas del hueco",{exact:true})).toBeVisible();
     await types.selectOption(alternate);
     await proposal.getByLabel("Describe el cambio").fill("Probar una puerta alternativa con el mismo hueco");
-    const prisma=page.getByRole("region",{name:"Asistente de diseño"});
     await prisma.getByText("Editar en Gemini con máscara",{exact:true}).click();
     await prisma.getByLabel("Cambio para Gemini").fill("Aplica un acabado gris solo a la puerta seleccionada.");
     await prisma.getByRole("button",{name:"Preparar paquete para Gemini"}).click();
@@ -56,7 +61,8 @@ test("Revisión real de puerta, avisos, precio, aplicación y restauración",asy
     await archive.saveAs(archivePath);
     const contents=unzipSync(readFileSync(archivePath));
     expect(strFromU8(contents["03-prompt-para-gemini.txt"])).toContain(door);
-    await prisma.getByLabel("Paquete ZIP de Prisma").setInputFiles(archivePath);
+    await prisma.getByLabel("Paquete ZIP de edición").setInputFiles(archivePath);
+    await expect(prisma.getByText("Paquete cargado. Ya puedes importar la imagen de Gemini.")).toBeVisible();
     const editedImage=await page.evaluate(async encoded=>{
       const bitmap=await createImageBitmap(await (await fetch(encoded)).blob());
       const canvas=document.createElement("canvas");
@@ -114,7 +120,8 @@ test("Revisión real de puerta, avisos, precio, aplicación y restauración",asy
     await expect(page.getByRole("region",{name:"Estimación del cambio"})).toContainText(/25[.,]000/);
     await page.goto(changes);
     await newLink.click();
-    await expect(page.getByRole("button",{name:"Recorrer",exact:true})).toBeVisible();
+    // RECORRIDO (antes «Recorrer») queda disponible en la barra inferior al abrir la revisión IFC guardada.
+    await expectWalkable(page,60_000);
     await page.getByRole("button",{name:"Encuadrar modelo"}).click();
     await findFloor(page);
     const anterior=page.getByRole("button",{name:"Anterior",exact:true}),nueva=page.getByRole("button",{name:"Nueva",exact:true});
@@ -128,6 +135,9 @@ test("Revisión real de puerta, avisos, precio, aplicación y restauración",asy
     await expect(nueva).toHaveAttribute("aria-pressed","true");
     await page.screenshot({path:info.outputPath("comparacion-primera-persona.png")});
     await page.getByRole("button",{name:"Salir",exact:true}).click();
+    // Al salir vuelve la barra de herramientas, con el foco en RECORRIDO.
+    await expect(page.getByRole("toolbar",{name:"Controles del recorrido"})).toHaveCount(0);
+    await expect(walkButton(page)).toBeFocused();
     await page.goto(changes);
     await page.getByRole("button",{name:"Crear revisión de restauración"}).click();
     const restoredLink=page.getByRole("link",{name:"Abrir revisión restaurada"});
