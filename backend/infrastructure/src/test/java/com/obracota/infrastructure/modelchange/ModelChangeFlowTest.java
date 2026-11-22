@@ -447,6 +447,7 @@ class ModelChangeFlowTest {
                 post(site.changes + "/" + id + "/preview"), post(site.changes + "/" + id + "/submit"),
                 post(site.changes + "/" + id + "/discard"), post(site.changes + "/" + id + "/apply"), post(site.changes + "/" + id + "/restore"),
                 get(version + "/summary"), get(version + "/elements"), get(version + "/elements/" + DOOR), get(version + "/prices"),
+                get(version + "/diff").param("base", v1),
                 put(version + "/prices").contentType("application/json").content("{\"prices\":[]}"),
                 post(version + "/prices/copy").param("from", v1)))
             perform(request, stranger).andExpect(status().isNotFound());
@@ -472,6 +473,37 @@ class ModelChangeFlowTest {
         site.as(post(site.changes).contentType("application/json").content(write(Map.of("baseVersion", dwg, "description", "Plano"))))
             .andExpect(status().isUnprocessableEntity());
         site.as(post(site.changes).contentType("application/json").content("{\"description\":\"Sin base\"}")).andExpect(status().isBadRequest());
+    }
+
+    // H7 · Comparar entre versiones ------------------------------------------------------------------------------------
+
+    @Test void comparesTwoRevisionsOfTheSameFile() throws Exception {
+        var site = new Site();
+        var v1 = site.v1.get("id").asText();
+        var v2 = site.upload(ORIGINAL + " /* v2 */", site.file).get("id").asText();
+        var diff = site.base + "/versions/" + v2 + "/diff";
+        // The engine receives the chosen revision as the base and the open one as the revision; its answer passes through.
+        site.as(get(diff).param("base", v1)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.compared[0]").value(v1)).andExpect(jsonPath("$.compared[1]").value(v2))
+            .andExpect(jsonPath("$.changed[0].guid").value(DOOR));
+        site.as(get(site.base + "/versions/" + v1 + "/diff").param("base", v2)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.compared[0]").value(v2)).andExpect(jsonPath("$.compared[1]").value(v1));
+        site.as(get(diff)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("BASE_REQUIRED"));
+        site.as(get(diff).param("base", v2)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SAME_VERSION"));
+        // Another file of the project, a DWG and a version of nobody: never sent to the engine.
+        var other = read(site.as(post(site.base + "/uploads").queryParam("name", "Otro.ifc").contentType("application/octet-stream")
+            .content(ORIGINAL)).andExpect(status().isCreated())).get("id").asText();
+        site.as(get(diff).param("base", other)).andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.message").value("Solo se comparan revisiones del mismo archivo."));
+        var dwg = read(site.as(post(site.base + "/uploads").queryParam("name", "planta.dwg").contentType("application/octet-stream")
+            .content(dwgBytes())).andExpect(status().isCreated())).get("id").asText();
+        site.as(get(diff).param("base", dwg)).andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.message").value("Selecciona una versión IFC."));
+        site.as(get(diff).param("base", UUID.randomUUID().toString())).andExpect(status().isNotFound());
+        // Comparing is the person's: an agent credential of the same project is refused.
+        var session = tokens.readAccess(site.user.substring("Bearer ".length()));
+        var agent = "Bearer " + tokens.agent(session, UUID.fromString(site.project), UUID.randomUUID(), Duration.ofMinutes(5));
+        perform(get(diff).param("base", v1), agent).andExpect(status().isForbidden());
     }
 
     // J15 --------------------------------------------------------------------------------------------------------------

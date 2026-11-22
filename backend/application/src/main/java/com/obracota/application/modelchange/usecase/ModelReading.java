@@ -1,6 +1,7 @@
 package com.obracota.application.modelchange.usecase;
 
 import com.obracota.application.common.exception.InvalidRequestApplicationException;
+import com.obracota.application.common.exception.UnprocessableApplicationException;
 import com.obracota.application.modelversion.usecase.ProjectVersions;
 import com.obracota.domain.modelchange.model.recipe.GlobalId;
 import com.obracota.domain.modelchange.port.ModelEnginePort;
@@ -46,6 +47,23 @@ public final class ModelReading {
     public Map<String, Object> element(Actor actor, UUID project, UUID version, String guid) {
         var reference = reference(actor, project, version);
         return engine.element(reference, GlobalId.require(guid));
+    }
+
+    /**
+     * What changed from {@code base} to {@code version}: the engine's {@code /diff} (IfcDiff plus its own control of
+     * openings) between two IFC revisions of the same file, keyed by GlobalId. The order of the revisions is free, so
+     * a later revision can be compared against an earlier one and the other way round.
+     */
+    public Map<String, Object> compare(Actor actor, UUID project, UUID version, UUID base) {
+        Guards.reach(actor, project);
+        // Ownership first: a version of somebody else is a 404 whatever the base says.
+        var revision = Guards.ifc(versions, actor, project, version);
+        if (base == null) throw new InvalidRequestApplicationException("BASE_REQUIRED", "Elige la revisión con la que comparar.");
+        if (base.equals(version)) throw new InvalidRequestApplicationException("SAME_VERSION", "Elige otra revisión del archivo para comparar.");
+        var other = Guards.ifc(versions, actor, project, base);
+        if (!revision.fileId().equals(other.fileId()))
+            throw new UnprocessableApplicationException("DIFFERENT_FILE", "Solo se comparan revisiones del mismo archivo.");
+        return engine.diff(project, VersionRef.of(project, other), VersionRef.of(project, revision));
     }
 
     private VersionRef reference(Actor actor, UUID project, UUID version) {

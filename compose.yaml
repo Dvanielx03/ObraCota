@@ -60,6 +60,10 @@ services:
         condition: service_healthy
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Images for Renderizar and Editar: "gemini" (paid per image) or "cloudflare" (Workers AI free daily quota).
+      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-gemini}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       IFC_ENGINE_URL: http://ifc-engine:8000
       ENGINE_TOKEN: ${ENGINE_TOKEN:?Configura ENGINE_TOKEN en .env}
       # The heap follows mem_limit instead of the 25 % default of the JVM.

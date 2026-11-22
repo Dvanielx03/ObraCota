@@ -39,8 +39,10 @@ public class AiRunConfiguration {
 
     @Bean DesignOptionBatchAdapter designOptionBatches(JdbcTemplate db) { return new DesignOptionBatchAdapter(db); }
 
-    @Bean DesignOptions designOptions(ProjectVersions versions, DesignOptionBatches batches, AiBudget budget, Transactions tx) {
-        return new DesignOptions(versions, batches, budget, tx);
+    @Bean DesignOptions designOptions(ProjectVersions versions, DesignOptionBatches batches, AiBudget budget, Transactions tx,
+            @org.springframework.beans.factory.annotation.Value("${IMAGE_PROVIDER:gemini}") String imageProvider) {
+        // Cloudflare Workers AI images are inside its free daily allowance: they reserve nothing from the paid budget.
+        return new DesignOptions(versions, batches, budget, tx, "cloudflare".equals(imageProvider) ? 0 : DesignOptions.RESERVE_CENTS);
     }
 
     @Bean PassageAdapter specificationPassages(JdbcTemplate db, ObjectMapper json) { return new PassageAdapter(db, json); }

@@ -44,7 +44,7 @@ public class DesignOptionController {
         var listing=options.list(project,version,user,element);
         // The client shows the cost before sending; the limit is still enforced on submit.
         return Map.of("available",gemini.configured(),"batches",listing.batches(),
-            "budget",Map.of("reserve_cents",DesignOptions.RESERVE_CENTS,"remaining_cents",listing.remainingCents()));
+            "budget",Map.of("reserve_cents",options.reserveCents(),"remaining_cents",listing.remainingCents()));
     }
     @PostMapping @ResponseStatus(HttpStatus.ACCEPTED)
     public Map<String,UUID> submit(@PathVariable UUID project,@PathVariable UUID version,@AuthenticationPrincipal UUID user,@RequestBody Input input) {

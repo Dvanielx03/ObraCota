@@ -165,7 +165,12 @@ public final class ModelChangeStubs {
             return new Build(content, bytes.length, sha, "recipe", false);
         }
 
-        @Override public Map<String, Object> diff(UUID project, VersionRef base, VersionRef revision) { return Map.of(); }
+        /** Names the two revisions it was given, in order, so a test can tell which one is the base. */
+        @Override public Map<String, Object> diff(UUID project, VersionRef base, VersionRef revision) {
+            return Map.of("changed", List.of(Map.of("guid", DOOR, "class", "IfcDoor", "flags", List.of("type_changed"))),
+                "added", List.of(), "deleted", List.of(), "unexpected", List.of(),
+                "compared", List.of(base.version().toString(), revision.version().toString()));
+        }
     }
 
     /** A {@code /build} body that breaks after {@code limit} bytes, like a 503 halfway through the stream. */

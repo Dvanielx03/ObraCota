@@ -17,7 +17,7 @@ import java.util.UUID;
  * reserved in the same transaction that queues the batch, so a batch never exists without its reservation.
  */
 public final class DesignOptions {
-    /** Cents reserved from the monthly budget by each batch of three options. */
+    /** Cents reserved from the monthly budget by each batch of three options with a paid image provider. */
     public static final int RESERVE_CENTS = 100;
     public static final String INCOMPLETE = "La terna aún no está completa.";
 
@@ -25,13 +25,22 @@ public final class DesignOptions {
     private final DesignOptionBatches batches;
     private final AiBudget budget;
     private final Transactions tx;
+    private final int reserveCents;
 
     public DesignOptions(ProjectVersions versions, DesignOptionBatches batches, AiBudget budget, Transactions tx) {
+        this(versions, batches, budget, tx, RESERVE_CENTS);
+    }
+
+    /** {@code reserveCents} is 0 when images come from a free provider, so free batches do not spend the monthly budget. */
+    public DesignOptions(ProjectVersions versions, DesignOptionBatches batches, AiBudget budget, Transactions tx, int reserveCents) {
         this.versions = versions;
         this.batches = batches;
         this.budget = budget;
         this.tx = tx;
+        this.reserveCents = reserveCents;
     }
+
+    public int reserveCents() { return reserveCents; }
 
     public record Listing(List<Map<String, Object>> batches, int remainingCents) {}
 
@@ -52,7 +61,7 @@ public final class DesignOptions {
             versions.get(project, user, batch.version());
             budget.lock();
             if (batches.exists(batch.id(), batch.version(), user, batch.element(), batch.request())) return batch.id();
-            budget.reserve(RESERVE_CENTS);
+            if (reserveCents > 0) budget.reserve(reserveCents);
             batches.queue(new NewBatch(batch.id(), batch.version(), user, batch.element(), batch.name(), batch.request(),
                 batch.captured(), batch.mask()));
             return batch.id();

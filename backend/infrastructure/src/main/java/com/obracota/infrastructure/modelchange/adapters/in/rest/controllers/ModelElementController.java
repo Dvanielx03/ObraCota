@@ -8,7 +8,8 @@ import java.util.UUID;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Readings of a stored IFC version through the engine (§4.4): its summary, a page of its elements and one element.
+ * Readings of a stored IFC version through the engine (§4.4): its summary, a page of its elements, one element and its
+ * differences with another revision of the same file.
  * The answers are the engine's JSON as it sent them; ownership and format are proved by {@link ModelReading}.
  */
 @RestController
@@ -30,6 +31,13 @@ public class ModelElementController {
                                         @RequestParam(required = false) String query, @RequestParam(required = false) Integer limit,
                                         @RequestParam(required = false) String cursor) {
         return reading.elements(actor, project, version, new ElementQuery(ifcClass, name, storey, query, limit, cursor));
+    }
+
+    /** Differences from the revision {@code base} to this one, by GlobalId (H7 · Comparar entre versiones). */
+    @GetMapping("/diff")
+    public Map<String, Object> diff(@PathVariable UUID project, @PathVariable UUID version, @RequestParam(required = false) UUID base,
+                                    Actor actor) {
+        return reading.compare(actor, project, version, base);
     }
 
     @GetMapping("/elements/{guid}")
