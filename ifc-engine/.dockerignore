@@ -1,4 +1,6 @@
 __pycache__
 .pytest_cache
 *.ifc
-
+tests/__pycache__
+obracota_engine/__pycache__
+obracota_engine/operations/__pycache__

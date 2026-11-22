@@ -1,0 +1,22 @@
+# Parallel H1 stack, next to the main one and without touching it (H1-ESPECIFICACION §9).
+#
+#   APP_PORT=3301 LANDING_PORT=3300 BACKEND_PORT=8180 POSTGRES_PORT=5532 \
+#   SITE_URL=http://localhost:3300 PANEL_URL=http://localhost:3301 GEMINI_API_KEY= \
+#     docker compose -p obracota-h1 -f compose.yaml -f compose.h1.yaml up -d --build
+#
+# SITE_URL and PANEL_URL keep the links of the parallel landing and app inside this stack (.env points them at
+# 3200/3201). The empty GEMINI_API_KEY keeps the parallel backend away from the paid API during the tests.
+#
+# -p obracota-h1 replaces `name: obracota`, so containers, network and volumes get their own names.
+# This file only renames the images that compose.yaml fixes (obracota-<service>:local): without it the
+# parallel build would overwrite the images of the main stack. The engine declares no `image:`, so its
+# image already takes the project name. Ports go through the variables above, not here: Compose
+# concatenates `ports` lists when it merges files.
+
+services:
+  app:
+    image: obracota-app:h1
+  landing:
+    image: obracota-landing:h1
+  backend:
+    image: obracota-backend:h1

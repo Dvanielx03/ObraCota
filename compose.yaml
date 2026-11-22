@@ -59,7 +59,9 @@ services:
     restart: unless-stopped
 
   ifc-engine:
-    build: ./ifc-engine
+    build:
+      context: ./ifc-engine
+      target: runtime
     restart: unless-stopped
     volumes:
       - modelos-originales:/srv/originals:ro

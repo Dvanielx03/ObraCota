@@ -1,0 +1,10 @@
+# Test stage only (H1-ESPECIFICACION §5.12). TestClient needs httpx, which the runtime does not have.
+# `pip install --dry-run --report - pytest httpx` over the runtime requirements (step 1, 21-11-2026)
+# adds exactly these 7 packages and changes no runtime version.
+httpcore==1.0.9
+httpx==0.28.1
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+Pygments==2.21.0
+pytest==9.2.0
