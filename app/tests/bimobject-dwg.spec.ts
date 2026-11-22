@@ -13,12 +13,14 @@ const folder = process.env.BIMOBJECT_DIR;
 // 2D plans are drawn as plans; 3D models made of polyface meshes (read from the raw objects, as
 // libredwg-web's converter leaves them out) are drawn in 3D. ACIS solids need a geometry kernel
 // ObraCota does not have: the viewer must say so, not hang.
-const DRAWINGS: { file: string; version: string; note: string; mode?: "Plano 2D" | "Vista 3D"; reason?: RegExp }[] = [
+// When nothing can be drawn, the thumbnail AutoCAD saved in the DWG (if any) is shown under the reason.
+const DRAWINGS: { file: string; version: string; note: string; mode?: "Plano 2D" | "Vista 3D"; reason?: RegExp; preview?: boolean }[] = [
   { file: "Basket/Furniture_Other-Furniture_Fritz-Hansen_Basket 2D.dwg", version: "AC1027", note: "2D, AutoCAD 2013" },
   { file: "Essay™ Table CM21/2D_CM21 - Essay Table.DWG", version: "AC1032", note: "2D, AutoCAD 2018" },
   { file: "Hven Bar Stool Low/1067 Hven Bar Stool Low 2d.DWG", version: "AC1015", note: "2D, AutoCAD 2000" },
   { file: "Night Owl™ Table lamp/Lighting_Desk-Table_Fritz-Hansen_Night-OwlT 2D.dwg", version: "AC1024", note: "2D, AutoCAD 2010" },
-  { file: "Basket/Furniture_Other-Furniture_Fritz-Hansen_Basket.dwg", version: "AC1027", note: "3D, sólidos ACIS", reason: /modelo 3D con 2 sólidos ACIS/ },
+  { file: "Basket/Furniture_Other-Furniture_Fritz-Hansen_Basket.dwg", version: "AC1027", note: "3D, sólidos ACIS, sin miniatura", reason: /modelo 3D con 2 sólidos ACIS/, preview: false },
+  { file: "Night Owl™ Table lamp/Lighting_Desk-Table-Lighting_Fritz-Hansen_Night-OwlT.dwg", version: "AC1027", note: "3D, sólidos ACIS, miniatura PNG", reason: /modelo 3D con \d+ sólidos? ACIS/, preview: true },
   { file: "PK60™ Table/3D_PK60.DWG", version: "AC1021", note: "3D, 10 mallas", mode: "Vista 3D" },
   { file: "Essay™ Table CM21/3D_CM21 - Essay Table.DWG", version: "AC1021", note: "3D, mallas", mode: "Vista 3D" },
 ];
@@ -59,6 +61,24 @@ for (const drawing of DRAWINGS) test(`DWG de fabricante · ${basename(drawing.fi
     if (drawing.reason) {
       await expect(page.getByText("No se pudo abrir")).toBeVisible({ timeout: 120_000 });
       await expect(page.getByText(drawing.reason)).toBeVisible();
+      const card = page.locator(".stage .feedback[data-kind=error]");
+      const preview = card.locator("figure.open-failure-preview");
+      if (drawing.preview) {
+        await expect(preview).toContainText("Vista previa guardada en el DWG");
+        await expect(preview).toContainText("Si el paquete del fabricante trae FBX u OBJ, súbelo para verlo en 3D.");
+        // The PNG stored in the DWG (512 × 242 px) decodes, cropped to the lamp, and sits between the reason and the actions.
+        const image = preview.locator("img");
+        await expect(image).toHaveAttribute("alt", "Miniatura guardada en " + basename(source));
+        await expect(preview).toContainText("recortada a su contenido");
+        const size = await image.evaluate(async (img: HTMLImageElement) => { await img.decode(); return [img.naturalWidth, img.naturalHeight]; });
+        expect(size[0]).toBeGreaterThan(8);
+        expect(size[0]).toBeLessThan(512);
+        expect(size[1]).toBeLessThanOrEqual(242);
+        const [reason, picture, actions] = await Promise.all([card.locator(":scope > p").boundingBox(), preview.boundingBox(), card.locator(":scope > div").boundingBox()]);
+        expect(reason!.y).toBeLessThan(picture!.y);
+        expect(picture!.y + picture!.height).toBeLessThanOrEqual(actions!.y);
+        await info.attach("miniatura", { body: await preview.screenshot(), contentType: "image/png" });
+      } else await expect(preview).toHaveCount(0);
       await page.screenshot({ path: info.outputPath("visor.png") });
       return;
     }
@@ -92,7 +112,7 @@ test("Un ZIP con extensión .dwg se rechaza con un motivo claro", async ({ page 
     page.on("request", request => { if (request.url().includes("/uploads")) uploads++; });
     await page.getByRole("button", { name: "Guardar versión" }).click();
     // The form names the real problem and sends nothing; the server would reject it anyway (VolumeStorage).
-    await expect(page.getByRole("alert").filter({ hasText: "pero es un archivo ZIP" })).toContainText("tiene extensión .dwg, pero es un archivo ZIP. Descomprímelo y sube el DWG o el IFC que contiene.");
+    await expect(page.getByRole("alert").filter({ hasText: "pero es un archivo ZIP" })).toContainText("tiene extensión .dwg, pero es un archivo ZIP. Descomprímelo y sube el DWG, IFC, FBX u OBJ que contiene.");
     expect(uploads).toBe(0);
     // Sent anyway (an old page, a script), the server refuses it and stores nothing.
     const direct = await page.request.post("/api/projects/" + project + "/uploads", { params: { name: "Stub.dwg" }, headers: { ...headers, "Content-Type": "application/octet-stream" }, data: readFileSync(source) });

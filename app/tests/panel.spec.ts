@@ -1,5 +1,17 @@
 import { expect, test } from "@playwright/test";
 
+// «Entrar al panel» goes from the landing to the app it was built for, which may not be VIEWER_URL (the
+// config's storage only marks that origin). Mark the guides as seen on whatever origin the links open,
+// so the welcome dialog never covers the panel under test.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      for (const [name, value] of [["obracota.guide.v1", "seen"], ["obracota.onboarding.v1", "seen"], ["obracota.explorer.v1", "open"]])
+        if (!localStorage.getItem(name)) localStorage.setItem(name, value);
+    } catch { /* Storage blocked: the page shows its guide as for a first visit. */ }
+  });
+});
+
 for (const [width, height] of [[1366, 768], [1920, 1080], [390, 844]]) {
   test(`Landing, panel y visor a ${width} × ${height}`, async ({ page }, info) => {
     test.skip(width < 1000, "Solo escritorio (D-12)");
