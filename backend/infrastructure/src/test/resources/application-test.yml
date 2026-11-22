@@ -9,3 +9,6 @@ spring:
 security:
   jwt-secret: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
   secure-cookie: false
+  # The whole suite registers from 127.0.0.1 in one context; AuthAttemptsTest lowers it in its own.
+  attempts:
+    per-address: 100000

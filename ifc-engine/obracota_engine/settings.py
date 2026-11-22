@@ -24,6 +24,9 @@ def _positive_int(name: str, default: int) -> int:
     return value
 
 
+# Shared secret with the backend. Empty leaves the engine open (tests, bare docker run); compose.yaml requires it.
+ENGINE_TOKEN = (os.environ.get("ENGINE_TOKEN") or "").strip()
+
 # Read-only volume with the originals, one file per version: {root}/{project}/{version}, no extension.
 # Same default as the root that engine.py had fixed before H1.
 ENGINE_ORIGINALS = _path("ENGINE_ORIGINALS", "/srv/originals")

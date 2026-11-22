@@ -99,6 +99,20 @@ class IfcEngineContractTest {
         assertTrue(seen.get().getRequestURI().getQuery().contains("guid=1hOSvn6df7F8_7GcBWlS8Z"));
     }
 
+    @Test void sendsTheSharedTokenOnlyWhenConfigured() {
+        route("/summary", reply(200, "{\"schema\":\"IFC4\"}"));
+        adapter.summary(BASE);
+        assertNull(seen.get().getRequestHeaders().getFirst("Authorization"), "without a token no header is sent");
+
+        var guarded = new IfcEngineHttpAdapter("http://127.0.0.1:" + server.getAddress().getPort(), Duration.ofSeconds(10),
+            Duration.ofSeconds(10), new JacksonRecipeCodec(), " s3cr3t ");
+        guarded.summary(BASE);
+        assertEquals("Bearer s3cr3t", seen.get().getRequestHeaders().getFirst("Authorization"));
+        route("/preview", reply(200, "{\"ok\":true,\"operations\":[]}"));
+        guarded.check(BASE, RECIPE);
+        assertEquals("Bearer s3cr3t", seen.get().getRequestHeaders().getFirst("Authorization"));
+    }
+
     @Test void checksOnlySendsTheRecipeAndReadsEachOperation() {
         route("/preview", reply(200, """
             {"ok":false,"operations":[{"id":"op-1","op":"ifc.change_type","ok":true,"element":"1hOSvn6df7F8_7GcBWlS8Z","errors":[]},

@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -35,17 +36,26 @@ class IfcEngineHttpAdapter implements ModelEnginePort {
     private final Duration previewTimeout;
     private final Duration readTimeout;
     private final JacksonRecipeCodec recipes;
+    private final String token;
     private final ReportJson reports = new ReportJson();
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
+    IfcEngineHttpAdapter(String engine, Duration previewTimeout, Duration readTimeout, JacksonRecipeCodec recipes) {
+        this(engine, previewTimeout, readTimeout, recipes, "");
+    }
+
+    /** {@code token} goes as {@code Authorization: Bearer} on every request; blank sends none (engine without token). */
+    @Autowired
     IfcEngineHttpAdapter(@Value("${IFC_ENGINE_URL:http://localhost:8000}") String engine,
                          @Value("${ifc.engine.preview-timeout:PT180S}") Duration previewTimeout,
                          @Value("${ifc.engine.read-timeout:PT60S}") Duration readTimeout,
-                         JacksonRecipeCodec recipes) {
+                         JacksonRecipeCodec recipes,
+                         @Value("${ENGINE_TOKEN:}") String token) {
         this.engine = URI.create(engine);
         this.previewTimeout = previewTimeout;
         this.readTimeout = readTimeout;
         this.recipes = recipes;
+        this.token = token == null ? "" : token.strip();
     }
 
     @Override
@@ -170,8 +180,9 @@ class IfcEngineHttpAdapter implements ModelEnginePort {
         return answer(send(request, HttpResponse.BodyHandlers.ofByteArray()));
     }
 
-    private static HttpRequest.Builder request(URI uri, Duration timeout) {
-        return HttpRequest.newBuilder(uri).timeout(timeout).header("Accept", "application/json");
+    private HttpRequest.Builder request(URI uri, Duration timeout) {
+        var builder = HttpRequest.newBuilder(uri).timeout(timeout).header("Accept", "application/json");
+        return token.isEmpty() ? builder : builder.header("Authorization", "Bearer " + token);
     }
 
     private byte[] answer(HttpResponse<byte[]> response) {

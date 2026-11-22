@@ -1,8 +1,11 @@
 package com.obracota.infrastructure.security.adapters.in.rest.controllers;
 
 import com.obracota.application.security.dto.SessionResponse;
+import com.obracota.application.security.exception.InvalidCredentialsException;
 import com.obracota.application.security.usecase.*;
 import com.obracota.infrastructure.security.adapters.in.rest.dtos.CredentialsRequest;
+import com.obracota.infrastructure.security.ratelimit.AuthAttempts;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -19,17 +22,27 @@ public class AuthController {
     private final LoginUseCase login;
     private final RefreshUseCase refresh;
     private final LogoutUseCase logout;
+    private final AuthAttempts attempts;
     private final boolean secure;
     public AuthController(RegisterUseCase register, LoginUseCase login, RefreshUseCase refresh, LogoutUseCase logout,
-                          @Value("${security.secure-cookie}") boolean secure) {
-        this.register=register; this.login=login; this.refresh=refresh; this.logout=logout; this.secure=secure;
+                          AuthAttempts attempts, @Value("${security.secure-cookie}") boolean secure) {
+        this.register=register; this.login=login; this.refresh=refresh; this.logout=logout; this.attempts=attempts; this.secure=secure;
     }
     public record AuthResponse(String accessToken, String email) {}
-    @PostMapping("/register") public ResponseEntity<AuthResponse> register(@Valid @RequestBody CredentialsRequest req) {
+    @PostMapping("/register") public ResponseEntity<AuthResponse> register(@Valid @RequestBody CredentialsRequest req, HttpServletRequest http) {
+        attempts.register(http.getRemoteAddr());
         return respond(register.execute(req.email(),req.password()),HttpStatus.CREATED);
     }
-    @PostMapping("/login") public ResponseEntity<AuthResponse> login(@Valid @RequestBody CredentialsRequest req) {
-        return respond(login.execute(req.email(),req.password()),HttpStatus.OK);
+    @PostMapping("/login") public ResponseEntity<AuthResponse> login(@Valid @RequestBody CredentialsRequest req, HttpServletRequest http) {
+        attempts.login(http.getRemoteAddr(),req.email());
+        try {
+            var session=login.execute(req.email(),req.password());
+            attempts.succeeded(req.email());
+            return respond(session,HttpStatus.OK);
+        } catch(InvalidCredentialsException e) {
+            attempts.failed(req.email());
+            throw e;
+        }
     }
     @PostMapping("/refresh") public ResponseEntity<AuthResponse> refresh(@CookieValue(name="oc_refresh",defaultValue="") String jwt) {
         return respond(refresh.execute(jwt),HttpStatus.OK);

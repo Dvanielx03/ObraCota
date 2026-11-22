@@ -19,6 +19,13 @@ Real models come from DUPLEX_IFC (Duplex A, IFC2X3) and TEST_IFC (ReStage, IFC4)
 temporary originals root, never copied or written. Without the variable, or without the file, the test
 is skipped, unless REQUIRE_FIXTURES=1: then it fails, so a skipped test never passes for green.
 
+TEST_IFC is any export of the ReStage model above ``ENGINE_PREVIEW_MAX_BYTES``: the published
+``Restage_IP_ALL_MULTI_001.ifc`` (189,817,172 bytes, «190 MB») or the 186 MB copy of the step 5
+experiments both pass. The tests never write its size: ``too_large_reason()`` derives the expected
+message from the file itself, with the rounding the engine documents in ``store.preview_limit_reason``
+(decimal megabytes). Inside the test container the variable points to the mount, e.g.
+``-e TEST_IFC=/fixtures/restage.ifc -v "$TEST_IFC:/fixtures/restage.ifc:ro"`` (H1-ESPECIFICACION §5.12).
+
 Every test gets its own ``ENGINE_ARTIFACTS`` (``artifact_store``). After the test it may only hold the
 artifacts the engine indexed, which are the verified outputs of previews with ``ok=true`` (§5.11).
 ``preview``, ``build_revision`` and ``recipe_of`` call the HTTP routes the way the backend does.
@@ -252,6 +259,15 @@ def _real_model(variable: str) -> Path:
             pytest.fail(f"REQUIRE_FIXTURES=1 and {problem}")
         pytest.skip(f"{problem}: set it to run this test")
     return Path(value)
+
+
+def too_large_reason(path: Path) -> str:
+    """The size reason the engine must give for ``path``, from its byte count: decimal megabytes, rounded.
+
+    Written out here rather than calling ``store.preview_limit_reason``, so a change in the engine's wording or
+    rounding still fails the tests."""
+    megabytes = max(1, round(path.stat().st_size / 1_000_000))
+    return f"El modelo supera el tamaño que H1 puede verificar ({megabytes} MB)."
 
 
 @pytest.fixture

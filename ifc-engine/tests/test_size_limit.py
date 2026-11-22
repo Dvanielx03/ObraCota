@@ -1,6 +1,6 @@
 """H1-11: the size limit for verification (H1-ESPECIFICACION §5.9, §5.11).
 
-ReStage (about 190 MB, ``TEST_IFC``) is above ``ENGINE_PREVIEW_MAX_BYTES`` (32 MiB, step 0): /summary marks
+ReStage (about 190 MB, ``TEST_IFC``; any export above the limit, see conftest) is above ``ENGINE_PREVIEW_MAX_BYTES`` (32 MiB, step 0): /summary marks
 ``ifc.change_type`` and ``ifc.set_property`` as not available with the size reason, and /preview answers
 422 ``MODEL_TOO_LARGE`` without opening the file, with and without ``checks_only``. /build and /diff refuse
 it the same way, because they generate the same geometry. Reading it still works.
@@ -12,10 +12,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 import engine
-from conftest import build_revision, recipe_of
+from conftest import build_revision, recipe_of, too_large_reason
 from obracota_engine import settings, store
 
-REASON = "El modelo supera el tamaño que H1 puede verificar (190 MB)."
 RECIPE = recipe_of({"id": "op-1", "op": "ifc.set_property", "element": "0" * 22, "scope": "occurrence",
                     "pset": "Pset_DoorCommon", "property": "FireRating", "value": "EI 60"})
 
@@ -50,13 +49,14 @@ def every_route(client, ref):
 
 def test_restage_above_the_limit(client, originals, restage_path, model_cache, no_temporaries):
     ref = originals.link(restage_path)
+    reason = too_large_reason(restage_path)
     for response in every_route(client, ref):
-        refused(response, REASON)
+        refused(response, reason)
     assert model_cache.opens == 0  # refused before opening
     summary = client.get("/summary", params=ref.params())
     assert summary.status_code == 200
-    assert summary.json()["operations"] == {"ifc.change_type": {"available": False, "reason": REASON},
-                                            "ifc.set_property": {"available": False, "reason": REASON}}
+    assert summary.json()["operations"] == {"ifc.change_type": {"available": False, "reason": reason},
+                                            "ifc.set_property": {"available": False, "reason": reason}}
 
 
 def test_limit_on_the_synthetic_model(client, originals, synthetic, model_cache, monkeypatch, no_temporaries):

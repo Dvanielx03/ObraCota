@@ -17,11 +17,14 @@ import java.util.UUID;
 class HttpBimEdit implements BimEditPort {
     private final String engine;
     private final ObjectMapper json;
+    private final String token;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
-    HttpBimEdit(@Value("${IFC_ENGINE_URL:http://localhost:8000}") String engine, ObjectMapper json) {
+    HttpBimEdit(@Value("${IFC_ENGINE_URL:http://localhost:8000}") String engine, ObjectMapper json,
+                @Value("${ENGINE_TOKEN:}") String token) {
         this.engine = engine;
         this.json = json;
+        this.token = token == null ? "" : token.strip();
     }
 
     public Door inspect(UUID project, UUID version, String element) throws IOException {
@@ -39,6 +42,7 @@ class HttpBimEdit implements BimEditPort {
             .queryParam("project", project).queryParam("version", version).queryParam("element", element);
         if (typeId != null) path.queryParam("type_id", typeId);
         var request = HttpRequest.newBuilder(path.build().encode().toUri()).timeout(Duration.ofMinutes(2));
+        if (!token.isEmpty()) request.header("Authorization", "Bearer " + token);
         if (typeId != null) request.POST(HttpRequest.BodyPublishers.noBody());
         try {
             var response = client.send(request.build(), HttpResponse.BodyHandlers.ofInputStream());

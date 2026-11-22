@@ -5,6 +5,14 @@
 #   docker compose down                             detiene todo (los datos se conservan)
 #
 # Aplicación con visor local en el puerto 3201.
+#
+# Aislamiento (R3): el motor IFC solo está en la red interna «motores», sin puertos publicados ni salida a
+# internet, y atiende únicamente peticiones con el token compartido ENGINE_TOKEN (el backend lo envía como
+# «Authorization: Bearer»). Cada servicio tiene límites de memoria y CPU: ReStage supera 4,5 GiB en la
+# primera pasada de IfcDiff, por eso el motor tiene 6 GiB.
+#
+# Variables obligatorias en .env: POSTGRES_PASSWORD, JWT_SECRET y ENGINE_TOKEN (cada una un secreto
+# aleatorio distinto, por ejemplo `openssl rand -base64 32`).
 
 name: obracota
 
@@ -23,6 +31,8 @@ services:
     image: obracota-app:local
     ports:
       - "${APP_PORT:-3201}:3000"
+    mem_limit: 1g
+    cpus: 1
     restart: unless-stopped
 
   landing:
@@ -34,10 +44,14 @@ services:
     image: obracota-landing:local
     ports:
       - "${LANDING_PORT:-3200}:3000"
+    mem_limit: 512m
+    cpus: 1
     restart: unless-stopped
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      target: runtime
     volumes:
       - modelos-originales:/srv/originals
     image: obracota-backend:local
@@ -47,6 +61,9 @@ services:
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       IFC_ENGINE_URL: http://ifc-engine:8000
+      ENGINE_TOKEN: ${ENGINE_TOKEN:?Configura ENGINE_TOKEN en .env}
+      # The heap follows mem_limit instead of the 25 % default of the JVM.
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
       AI_MONTHLY_LIMIT_CENTS: ${AI_MONTHLY_LIMIT_CENTS:-800}
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-obracota}
@@ -56,6 +73,11 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+    networks:
+      - default
+      - motores
+    mem_limit: 1536m
+    cpus: 2
     restart: unless-stopped
 
   ifc-engine:
@@ -63,8 +85,15 @@ services:
       context: ./ifc-engine
       target: runtime
     restart: unless-stopped
+    environment:
+      ENGINE_TOKEN: ${ENGINE_TOKEN:?Configura ENGINE_TOKEN en .env}
     volumes:
       - modelos-originales:/srv/originals:ro
+    # Only the internal network: no published port and no route to the internet.
+    networks:
+      - motores
+    mem_limit: 6g
+    cpus: 2
     healthcheck:
       test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8000/health', timeout=3).close()"]
       interval: 10s
@@ -76,8 +105,8 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-obracota}
       POSTGRES_USER: ${POSTGRES_USER:-obracota}
-      # La contraseña se configura en el archivo local .env.
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      # La contraseña se configura en el archivo local .env; sin ella Compose no arranca.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -87,7 +116,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 1g
+    cpus: 1
     restart: unless-stopped
+
+networks:
+  # Backend <-> engines only. internal: no outbound traffic and no published ports for its members.
+  motores:
+    internal: true
 
 volumes:
   modelos-originales:

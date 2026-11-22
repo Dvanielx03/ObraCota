@@ -19,12 +19,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 import engine
-from conftest import DUPLEX_DOOR, synthetic_model
+from conftest import DUPLEX_DOOR, synthetic_model, too_large_reason
 from obracota_engine import reading, settings, store
 
 REFERENCE = Path(__file__).parent / "fixtures" / "inspect-duplex.json"
 DUPLEX_TYPE_NOW = "2S67XPaW1CHg1jrMmPps_z"
-RESTAGE_TOO_LARGE = "El modelo supera el tamaño que H1 puede verificar (190 MB)."
 
 
 @pytest.fixture(autouse=True)
@@ -452,7 +451,7 @@ def test_restage_change_type_is_not_available_with_its_reason(client, originals,
            {"doors": 9, "doors_in_openings": 0, "door_types_with_maps": 0, "windows": 0, "coverings": 32,
             "material_layer_set_usages": 0}
     assert summary["capabilities"]["element_qto_sets"] > 0, "ReStage exports Qto_* sets (H0 §1)"
-    too_large = {"available": False, "reason": RESTAGE_TOO_LARGE}
+    too_large = {"available": False, "reason": too_large_reason(restage_path)}
     assert summary["operations"] == {"ifc.change_type": too_large, "ifc.set_property": too_large}
     assert doors["total"] == 9, "reading keeps working above the size limit"
     assert door["operations"] == {"ifc.change_type": too_large, "ifc.set_property": too_large}

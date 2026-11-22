@@ -1,14 +1,13 @@
 package com.obracota.application.designoption;
+import com.obracota.application.airun.port.AiRunJournal;
 import com.obracota.domain.assistant.port.service.*;
 import com.obracota.domain.airun.Consumption;
 import java.util.UUID;
 import java.util.List;
 
 public record GenerateOptions(ChatModelPort chat, ImageGenerationPort images, Journal journal, String chatModel, String imageModel) {
-    public interface Journal {
-        UUID start(UUID batch,int slot,String model);
-        void finish(UUID run,Consumption usage);
-        void fail(UUID run,String error,Consumption usage);
+    /** The provider-call journal plus what a batch of options stores. */
+    public interface Journal extends AiRunJournal {
         void save(UUID batch,int slot,String description,ImageGenerationPort.Image image);
         void end(UUID batch,boolean success);
         void describe(UUID batch,List<String> variants);

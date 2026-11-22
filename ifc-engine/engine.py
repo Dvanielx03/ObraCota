@@ -31,7 +31,7 @@ from fastapi import Body, FastAPI, HTTPException
 from starlette.background import BackgroundTask
 from starlette.responses import FileResponse
 
-from obracota_engine import artifacts, build, errors, operations, reading, recipe, scope, store
+from obracota_engine import artifacts, auth, build, errors, operations, reading, recipe, scope, store
 from obracota_engine.errors import EngineError
 # load and inspect stay importable from here: the step 0 capture of tests/fixtures/inspect-duplex.json
 # calls engine.inspect(*engine.load(...)) and can be repeated against any image.
@@ -47,6 +47,8 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 errors.install(app)
+# Every route but /health needs the backend's token when ENGINE_TOKEN is set (R3).
+app.add_middleware(auth.TokenGuard)
 log = logging.getLogger(__name__)
 
 

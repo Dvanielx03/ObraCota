@@ -4,6 +4,8 @@ import com.obracota.application.security.usecase.*;
 import com.obracota.domain.security.port.repository.SecurityRepository;
 import com.obracota.domain.security.port.service.*;
 import com.obracota.infrastructure.security.adapters.out.crypto.*;
+import com.obracota.infrastructure.security.ratelimit.*;
+import java.time.Clock;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
@@ -23,6 +25,14 @@ public class SecurityConfig {
     @Bean LoginUseCase login(SecurityRepository r, PasswordService p, SessionIssuer i) { return new LoginUseCase(r,p,i); }
     @Bean RefreshUseCase refresh(SecurityRepository r, TokenService t, SessionIssuer i) { return new RefreshUseCase(r,t,i); }
     @Bean LogoutUseCase logout(SecurityRepository r, TokenService t) { return new LogoutUseCase(r,t); }
+    /** Login and registration limits; the defaults leave room for a whole Playwright run from one address. */
+    @Bean AuthAttempts authAttempts(@Value("${security.attempts.per-address:120}") int perAddress,
+            @Value("${security.attempts.address-window:PT1M}") Duration addressWindow,
+            @Value("${security.attempts.failed-logins:10}") int failedLogins,
+            @Value("${security.attempts.failed-login-window:PT15M}") Duration failedLoginWindow) {
+        var clock = Clock.systemUTC();
+        return new AuthAttempts(new AttemptLimiter(perAddress,addressWindow,clock),new AttemptLimiter(failedLogins,failedLoginWindow,clock));
+    }
     @Bean SecurityFilterChain filter(HttpSecurity http, TokenService t, SecurityRepository r) throws Exception {
         return http.csrf(c -> c.disable()).sessionManagement(c -> c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(c -> c.requestMatchers(HttpMethod.GET,"/actuator/health").permitAll()

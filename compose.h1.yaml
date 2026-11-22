@@ -2,7 +2,12 @@
 #
 #   APP_PORT=3301 LANDING_PORT=3300 BACKEND_PORT=8180 POSTGRES_PORT=5532 \
 #   SITE_URL=http://localhost:3300 PANEL_URL=http://localhost:3301 GEMINI_API_KEY= \
+#   ENGINE_TOKEN=<secret of this stack> \
 #     docker compose -p obracota-h1 -f compose.yaml -f compose.h1.yaml up -d --build
+#
+# ENGINE_TOKEN is the backend <-> engine secret that compose.yaml requires (R3). Passing it here keeps the
+# parallel stack working while .env does not have one yet; once .env has it, the line can go.
+# The internal network «motores» and the memory and CPU limits come from compose.yaml unchanged.
 #
 # SITE_URL and PANEL_URL keep the links of the parallel landing and app inside this stack (.env points them at
 # 3200/3201). The empty GEMINI_API_KEY keeps the parallel backend away from the paid API during the tests.

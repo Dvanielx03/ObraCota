@@ -12,6 +12,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration,classpath:db/{vendor}
+ai:
+  budget:
+    # One monthly cap for every paid AI call (visual options and document assistant).
+    monthly-limit-cents: ${AI_MONTHLY_LIMIT_CENTS:800}
 management:
   endpoints.web.exposure.include: health
   endpoint.health.show-details: never
