@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { completeOnboarding, skipOnboarding } from "../application/onboarding.use-case";
 import { EMPTY_ANSWERS, FIRST_REVIEWS, ROLES, STARTS, STEP_COUNT, type OnboardingAnswers } from "../domain/user-profile";
 import { localUserProfileRepository } from "../infrastructure/local-user-profile.repository";
+import { BrandMark } from "@/shared/ui/brand-mark";
+import { Spinner } from "@/shared/ui/loading";
 import styles from "./onboarding.module.css";
 
 type Option = { id: string; label: string; hint?: string };
@@ -69,27 +71,23 @@ export function Onboarding() {
   return (
     <main className={styles.screen}>
       <p className={styles.brand}>
-        <svg viewBox="0 0 64 64" width="26" height="26" aria-hidden="true">
-          <path fill="currentColor" d="M8 10h48l-8 10H18L8 26zM8 30l10-6v17L8 47zM8 51l10-6h30l8 10H8z" />
-        </svg>
-        ObraCota
+        <BrandMark />
       </p>
 
-      <div
-        className={styles.progress}
-        role="progressbar"
-        aria-label="Progreso de la bienvenida"
-        aria-valuemin={1}
-        aria-valuemax={STEP_COUNT}
-        aria-valuenow={index + 1}
-        aria-valuetext={`Paso ${index + 1} de ${STEP_COUNT}`}
-      >
-        {STEPS.map((s, i) => (
-          <span key={s.field} data-done={i <= index || undefined} />
-        ))}
-      </div>
-
       <section className={styles.card} aria-labelledby="onboarding-question">
+        <div
+          className={styles.progress}
+          role="progressbar"
+          aria-label="Progreso de la bienvenida"
+          aria-valuemin={1}
+          aria-valuemax={STEP_COUNT}
+          aria-valuenow={index + 1}
+          aria-valuetext={`Paso ${index + 1} de ${STEP_COUNT}`}
+        >
+          {STEPS.map((s, i) => (
+            <span key={s.field} data-done={i <= index || undefined} />
+          ))}
+        </div>
         <p className={styles.count}>
           Paso {index + 1} de {STEP_COUNT}
         </p>
@@ -139,7 +137,7 @@ export function Onboarding() {
       </section>
 
       <p className={styles.note} role="status">
-        {leaving ? "Abriendo tu espacio de trabajo…" : "Tus respuestas se guardan en este navegador."}
+        {leaving ? <><Spinner size={12} className="spinner-inline" />Abriendo tu espacio de trabajo…</> : "Tus respuestas se guardan en este navegador."}
       </p>
     </main>
   );

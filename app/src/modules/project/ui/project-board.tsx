@@ -1,129 +1,153 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { ArchiveIcon, ArrowCounterClockwiseIcon, PlusIcon } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Archive, FolderOpen, GalleryVerticalEnd } from "lucide-react";
 import { useSession } from "@/core/auth/use-session";
-import { archiveProject, createProject, listProjects } from "../application/manage-projects";
-import type { OwnedProject } from "../domain/owned-project";
+import { PanelView } from "@/shared/ui/panel-view";
+import { EmptyArt, LoadingStatus } from "@/shared/ui/loading";
+import { archiveProject, createProject, listProjects, renameProject } from "../application/manage-projects";
+import { UNTITLED_PROJECT, type OwnedProject } from "../domain/owned-project";
 import type { Project } from "../domain/project";
-import { editedLabel, initials } from "../domain/project-card";
 import { projectHttpRepository } from "../infrastructure/project-http-repository";
+import { ExampleCard, NewProjectCard, OwnedCard, ProjectSkeletons } from "./project-card";
 
 type Tab = "active" | "archived";
-const TABS: [Tab, string][] = [["active", "Activos"], ["archived", "Archivados"]];
+const TAB_ORDER: readonly Tab[] = ["active", "archived"];
 
-function ExampleCard({ project }: { project: Project }) {
-  return <li className="project-card">
-    <img className="project-thumb" src={project.preview} alt="" width="320" height="200"/>
-    <div className="project-card-body"><h3>{project.name}</h3><p>Proyecto de ejemplo · {project.schema}</p></div>
-    <Link className="project-card-open" href={"/proyectos/" + project.slug}>Abrir proyecto →</Link>
-  </li>;
-}
-
-function OwnedCard({ project, now, busy, toggle }: { project: OwnedProject; now: number; busy: boolean; toggle(): void }) {
-  const Icon = project.archived ? ArrowCounterClockwiseIcon : ArchiveIcon;
-  return <li className="project-card" data-archived={project.archived || undefined}>
-    <div className="project-thumb project-initials" aria-hidden="true">{initials(project.name)}</div>
-    <div className="project-card-body">
-      <h3><Link className="project-card-link" href={"/proyectos/" + project.id}>{project.name}</Link></h3>
-      <p>{editedLabel(project.updatedAt, now) || "Proyecto propio"}</p>
+function Explore({ examples }: { examples: readonly Project[] }) {
+  return <section className="panel-section" aria-labelledby="explore-title">
+    <div className="panel-section-intro">
+      <div><h2 id="explore-title">Para explorar</h2><p>Un edificio real publicado como dato abierto, listo para recorrer en el visor.</p></div>
     </div>
-    <button className="project-card-action" disabled={busy} onClick={toggle}
-      aria-label={(project.archived ? "Restaurar " : "Archivar ") + project.name}>
-      <Icon size={18} aria-hidden="true"/>{project.archived ? "Restaurar" : "Archivar"}
-    </button>
-  </li>;
+    <ul className="project-grid">{examples.map(project => <ExampleCard key={project.slug} project={project}/>)}</ul>
+  </section>;
 }
 
-function Board({ examples }: { examples: readonly Project[] }) {
+function Tabs({ tab, count, onChange }: { tab: Tab; count?: number; onChange(tab: Tab): void }) {
+  const list = useRef<HTMLDivElement>(null);
+  function arrows(event: KeyboardEvent<HTMLDivElement>) {
+    const at = TAB_ORDER.indexOf(tab);
+    const next = event.key === "ArrowRight" ? (at + 1) % TAB_ORDER.length
+      : event.key === "ArrowLeft" ? (at + TAB_ORDER.length - 1) % TAB_ORDER.length
+      : event.key === "Home" ? 0 : event.key === "End" ? TAB_ORDER.length - 1 : -1;
+    if (next < 0) return;
+    event.preventDefault();
+    onChange(TAB_ORDER[next]);
+    list.current?.querySelector<HTMLButtonElement>("[data-tab=" + TAB_ORDER[next] + "]")?.focus();
+  }
+  return <div className="panel-tabs" role="tablist" aria-label="Estado de los proyectos" ref={list} onKeyDown={arrows}>
+    {TAB_ORDER.map(kind => <button key={kind} type="button" role="tab" id={"tab-" + kind} data-tab={kind}
+      className="panel-tab" aria-selected={tab === kind} aria-controls="project-panel" tabIndex={tab === kind ? 0 : -1}
+      onClick={() => onChange(kind)}>
+      {kind === "active" ? <GalleryVerticalEnd size={14} aria-hidden="true"/> : <Archive size={14} aria-hidden="true"/>}
+      {kind === "active" ? "Activos" + (count === undefined ? "" : " (" + count + ")") : "Archivados"}
+    </button>)}
+  </div>;
+}
+
+function Board({ examples, guides }: { examples: readonly Project[]; guides: ReactNode }) {
+  const router = useRouter();
   const [rows, setRows] = useState<OwnedProject[]>();
-  const [version, reload] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const [attempt, reload] = useState(0);
   const [tab, setTab] = useState<Tab>("active");
-  const [name, setName] = useState("");
+  const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const [formError, setFormError] = useState("");
+  const [alert, setAlert] = useState("");
   const [now, setNow] = useState(0);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const tabs = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let active = true;
-    listProjects(projectHttpRepository).then(items => { if (active) { setRows(items); setNow(Date.now()); } })
-      .catch(() => { if (active) setError("No se pudieron consultar tus proyectos."); });
+    listProjects(projectHttpRepository)
+      .then(items => { if (active) { setRows(items); setNow(Date.now()); } })
+      .catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
-  }, [version]);
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy("create"); setFormError("");
+  }, [attempt]);
+  async function create() {
+    setCreating(true); setAlert("");
     try {
-      const project = await createProject(projectHttpRepository, name);
-      setRows(items => [project, ...(items || [])]); setNow(Date.now()); setName(""); setTab("active");
-      dialog.current?.close();
-    } catch (e) { setFormError(e instanceof Error ? e.message : "No se pudo guardar el proyecto."); }
-    finally { setBusy(""); }
+      const project = await createProject(projectHttpRepository, UNTITLED_PROJECT);
+      router.push("/proyectos/" + project.id + "/archivos");
+    } catch { setAlert("No se pudo crear el proyecto. Inténtalo de nuevo."); setCreating(false); }
   }
-  async function toggle(project: OwnedProject) {
-    setBusy(project.id); setError("");
+  async function toggleArchived(project: OwnedProject) {
+    setBusy(project.id); setAlert("");
     try {
       const saved = await archiveProject(projectHttpRepository, project.id, !project.archived);
       setRows(items => items?.map(item => item.id === saved.id ? saved : item));
-      // The card leaves this tab, so its button disappears: keep the keyboard on the tab.
-      tabs.current?.querySelector<HTMLButtonElement>("[aria-selected=true]")?.focus();
-    } catch { setError("No se pudo " + (project.archived ? "restaurar" : "archivar") + " el proyecto."); }
+      setNow(Date.now());
+      // The card leaves this tab together with its menu button: keep the keyboard on the tab.
+      requestAnimationFrame(() => document.getElementById("tab-" + tab)?.focus());
+    } catch { setAlert("No se pudo " + (project.archived ? "restaurar" : "archivar") + " el proyecto."); }
     finally { setBusy(""); }
   }
-  function arrows(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-    event.preventDefault();
-    const next: Tab = tab === "active" ? "archived" : "active";
-    setTab(next);
-    tabs.current?.querySelector<HTMLButtonElement>("[data-tab=" + next + "]")?.focus();
+  async function rename(project: OwnedProject, name: string) {
+    setAlert("");
+    setRows(items => items?.map(item => item.id === project.id ? { ...item, name } : item));
+    try {
+      const saved = await renameProject(projectHttpRepository, project.id, name);
+      setRows(items => items?.map(item => item.id === saved.id ? saved : item));
+      setNow(Date.now());
+    } catch (error) {
+      setRows(items => items?.map(item => item.id === project.id ? { ...item, name: project.name } : item));
+      setAlert(error instanceof Error && error.message.startsWith("Escribe") ? error.message : "No se pudo cambiar el nombre del proyecto.");
+    }
   }
-  const count = (kind: Tab) => rows?.filter(row => row.archived === (kind === "archived")).length ?? 0;
   const shown = rows?.filter(row => row.archived === (tab === "archived")) ?? [];
-  return <section className="project-board">
-    <div className="project-toolbar">
-      <div className="project-tabs" role="tablist" aria-label="Estado de los proyectos" ref={tabs} onKeyDown={arrows}>
-        {TABS.map(([kind, label]) => <button key={kind} role="tab" id={"tab-" + kind} data-tab={kind} aria-selected={tab === kind}
-          aria-controls="project-panel" tabIndex={tab === kind ? 0 : -1} onClick={() => setTab(kind)}>
-          {label}<span>{rows ? count(kind) : "–"}</span></button>)}
-      </div>
-      <button className="project-new" onClick={() => { setFormError(""); dialog.current?.showModal(); }}>
-        <PlusIcon size={18} weight="bold" aria-hidden="true"/>Nuevo proyecto</button>
-    </div>
+  const activeCount = rows?.filter(row => !row.archived).length;
+  const loading = rows === undefined && !failed;
+  return <PanelView title="Proyectos" actions={<Tabs tab={tab} count={activeCount} onChange={setTab}/>}>
     <div id="project-panel" role="tabpanel" aria-labelledby={"tab-" + tab}>
-      <h2 className="project-heading">Mis proyectos</h2>
-      {error && <p role="alert">{error}</p>}
-      {rows === undefined
-        ? (error ? <button className="panel-action" onClick={() => { setError(""); reload(version + 1); }}>Reintentar</button> : <p role="status">Cargando proyectos…</p>)
-        : shown.length ? <ul className="project-grid">{shown.map(project =>
-            <OwnedCard key={project.id} project={project} now={now} busy={busy === project.id} toggle={() => toggle(project)}/>)}</ul>
-        : <p className="project-empty">{tab === "active" ? "Todavía no has creado proyectos." : "No hay proyectos archivados."}</p>}
-      {tab === "active" && <><h2 className="project-heading">Para explorar</h2>
-        <ul className="project-grid">{examples.map(project => <ExampleCard key={project.slug} project={project}/>)}</ul></>}
+      <h2 className="sr-only">Mis proyectos</h2>
+      {alert && <p role="alert" className="panel-alert">{alert}</p>}
+      {loading && <LoadingStatus hidden>Cargando proyectos…</LoadingStatus>}
+      <ul className="project-grid" aria-busy={loading || undefined}>
+        {tab === "active" && !failed && <NewProjectCard creating={creating} onCreate={() => void create()}/>}
+        {failed ? <li className="project-state project-state-wide">
+            <h3 role="alert">No se pudieron cargar tus proyectos.</h3>
+            <button type="button" className="panel-button-outline" onClick={() => { setFailed(false); reload(attempt + 1); }}>Volver a intentar</button>
+          </li>
+          : loading ? <ProjectSkeletons count={tab === "active" ? 5 : 6}/>
+          : shown.length ? shown.map(project => <OwnedCard key={project.id} project={project} now={now} busy={busy === project.id}
+              onRename={name => void rename(project, name)} onArchive={() => void toggleArchived(project)}/>)
+          : <li className={"project-state" + (tab === "archived" ? " project-state-wide" : " project-state-art")}>
+              {tab === "active" ? <EmptyArt width={176}/> : <FolderOpen size={48} strokeWidth={1.5} aria-hidden="true"/>}
+              {tab === "active"
+                ? <><h3>Todavía no has creado proyectos.</h3><p>Pulsa «Nuevo proyecto» y sube tu primer IFC o DWG.</p></>
+                : <><h3>No hay proyectos archivados.</h3><p>Lo que archives se guarda aquí y se puede restaurar.</p></>}
+            </li>}
+      </ul>
+      {tab === "active" && <Explore examples={examples}/>}
     </div>
-    <dialog className="project-dialog" ref={dialog} aria-labelledby="new-project-title">
-      <form className="account-form" onSubmit={submit}>
-        <h2 id="new-project-title">Nuevo proyecto</h2>
-        <label>Nombre del proyecto<input value={name} maxLength={120} required autoFocus onChange={event => setName(event.target.value)}/></label>
-        {formError && <p role="alert">{formError}</p>}
-        <div className="project-dialog-actions">
-          <button type="button" onClick={() => dialog.current?.close()}>Cancelar</button>
-          <button className="project-new" disabled={busy === "create"}>{busy === "create" ? "Guardando…" : "Crear proyecto"}</button>
-        </div>
-      </form>
-    </dialog>
-  </section>;
+    {guides}
+  </PanelView>;
 }
 
-export function ProjectBoard({ examples }: { examples: readonly Project[] }) {
+function Guest({ examples, guides, failed, retry }: { examples: readonly Project[]; guides: ReactNode; failed: boolean; retry(): void }) {
+  return <PanelView title="Proyectos">
+    <h2 className="sr-only">Mis proyectos</h2>
+    <ul className="project-grid">
+      {failed ? <li className="project-state project-state-wide">
+          <h3 role="alert">No se pudo consultar tu cuenta.</h3>
+          <button type="button" className="panel-button-outline" onClick={retry}>Volver a intentar</button>
+        </li>
+        : <li className="project-state project-state-wide">
+          <FolderOpen size={48} strokeWidth={1.5} aria-hidden="true"/>
+          <h3>Tus proyectos aparecerán aquí</h3>
+          <p><Link href="/ingresar">Inicia sesión</Link> o <Link href="/registro">crea una cuenta</Link> para guardar tus propios proyectos.</p>
+        </li>}
+    </ul>
+    <Explore examples={examples}/>
+    {guides}
+  </PanelView>;
+}
+
+export function ProjectBoard({ examples, guides }: { examples: readonly Project[]; guides?: ReactNode }) {
   const { session, failed, retry } = useSession();
-  if (session) return <Board key={session.email} examples={examples}/>;
-  return <section className="project-board">
-    {session === undefined
-      ? (failed ? <p role="alert">No se pudo consultar tu cuenta. <button onClick={retry}>Reintentar</button></p> : <p role="status">Consultando sesión…</p>)
-      : <p className="panel-note"><Link href="/ingresar">Inicia sesión</Link> o <Link href="/registro">crea una cuenta</Link> para guardar tus propios proyectos.</p>}
-    <h2 className="project-heading">Para explorar</h2>
-    <ul className="project-grid">{examples.map(project => <ExampleCard key={project.slug} project={project}/>)}</ul>
-  </section>;
+  if (session) return <Board key={session.email} examples={examples} guides={guides}/>;
+  if (session === null || failed) return <Guest examples={examples} guides={guides} failed={failed} retry={() => void retry()}/>;
+  return <PanelView title="Proyectos">
+    <LoadingStatus hidden>Cargando proyectos…</LoadingStatus>
+    <ul className="project-grid" aria-busy="true"><ProjectSkeletons count={5}/></ul>
+  </PanelView>;
 }
