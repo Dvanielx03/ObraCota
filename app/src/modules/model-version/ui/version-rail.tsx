@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useImperativeHandle, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useState, type ReactNode, type Ref } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Box, DraftingCompass } from "lucide-react";
@@ -17,9 +17,11 @@ const versionHref = (project: string, id: string) => "/proyectos/" + encodeURICo
 
 /**
  * Right-hand rail with every revision of the file that is open (v1, v2…). The open one is marked;
- * the others are links that open that revision in the viewer.
+ * the others are links that open that revision in the viewer. With two revisions or more, `compare`
+ * draws «Comparar versiones» at its foot (H7).
  */
-export function VersionRail({ project, version, control }: { project: string; version: string; control?: Ref<VersionRailHandle> }) {
+export function VersionRail({ project, version, control, compare }: { project: string; version: string; control?: Ref<VersionRailHandle>;
+  compare?: (versions: ModelVersion[]) => ReactNode }) {
   const [versions, setVersions] = useState<ModelVersion[]>();
   const [failed, setFailed] = useState(false);
   const router = useRouter();
@@ -62,5 +64,6 @@ export function VersionRail({ project, version, control }: { project: string; ve
             </Link>
           </li>;
         })}</ol>}
+    {versions && versions.length > 1 && compare && <div className="version-rail-foot">{compare(versions)}</div>}
   </nav>;
 }

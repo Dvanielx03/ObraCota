@@ -3,14 +3,28 @@ import Link from "next/link";
 import {useEffect,useState} from "react";
 import {PanelView} from "@/shared/ui/panel-view";
 import {LoadingStatus} from "@/shared/ui/loading";
-import type {ModelChange} from "../domain/model-change";
+import {approvedBudget,type ModelChange} from "../domain/model-change";
 import {modelChangeRepository} from "../infrastructure/model-change-http";
 import {ChangeCard,ChangeHeader,useOperationLabels} from "./change-card";
 import {ChangeEstimate} from "./change-estimate";
 
 function BudgetCard({change}:{change:ModelChange}){
   const labels=useOperationLabels(change);
-  return <article id={change.id} className="change-card"><ChangeHeader change={change}/><ChangeEstimate change={change} labels={labels}/></article>;
+  return <article id={change.id} className="change-card"><ChangeHeader change={change}/><ChangeEstimate change={change} labels={labels}/>
+    <p className="change-link"><Link href={"/proyectos/"+change.project+"/cambios#"+change.id}>Ver el cambio completo</Link></p></article>;
+}
+
+/** Head of «Presupuesto»: the running difference of the approved changes, and which ones still lack a price. */
+function BudgetTotal({rows}:{rows:readonly ModelChange[]}){
+  const sum=approvedBudget(rows);
+  const money=new Intl.NumberFormat("es-CO",{style:"currency",currency:sum.currency});
+  if(!sum.counted && !sum.missing && !sum.otherCurrency)return <p className="budget-total" role="status">Ningún cambio aprobado todavía: el presupuesto suma solo los cambios aplicados.</p>;
+  return <section className="budget-total" aria-label="Total de cambios aprobados">
+    <p><strong>Diferencia acumulada de los cambios aprobados</strong> {money.format(sum.total)}</p>
+    <p className="change-note">{sum.counted===1?"1 cambio aprobado con estimación completa":sum.counted+" cambios aprobados con estimación completa"}
+      {sum.missing>0 && <> · {sum.missing===1?"1 aprobado sin total (faltan precios); no se suma":sum.missing+" aprobados sin total (faltan precios); no se suman"}</>}
+      {sum.otherCurrency>0 && <> · {sum.otherCurrency===1?"1 aprobado en otra moneda; no se suma":sum.otherCurrency+" aprobados en otra moneda; no se suman"}</>}.</p>
+  </section>;
 }
 
 /**
@@ -40,6 +54,7 @@ export function ModelChanges({project,budget=false}:{project:string;budget?:bool
     {error && <p role="alert">{error}</p>}
     {!rows && !error && <LoadingStatus>Cargando revisiones…</LoadingStatus>}
     {rows?.length===0 && <p>Selecciona una puerta de una <Link href={"/proyectos/"+project+"/archivos"}>versión IFC guardada</Link> para registrar una propuesta.</p>}
+    {budget && !!rows?.length && <BudgetTotal rows={rows}/>}
     <div className="estimate-sheet">{rows?.map(change=>budget?<BudgetCard key={change.id} change={change}/>
       :<ChangeCard key={change.id} change={change} onChange={next=>void changed(next)} locked={busy>0}
         onWork={working=>setBusy(count=>count+(working?1:-1))}/>)}</div>

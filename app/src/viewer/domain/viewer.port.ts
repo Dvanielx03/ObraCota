@@ -34,6 +34,11 @@ export interface ViewerPort {
   cancelWalk():void;
   switchWalk(file:File,signal:AbortSignal,status:(text:string)=>void):Promise<void>;
   walkMove(key:string,held:boolean):void;
+  /**
+   * A live video track of the canvas at up to `fps` frames per second (`HTMLCanvasElement.captureStream`), to record
+   * the walk. Null when the browser cannot capture the canvas.
+   */
+  stream(fps:number):MediaStream|null;
   orient(view: ViewDirection): void;
   /** Camera of the 3D view, or null while it cannot be read (plans, walking, nothing open). */
   pose(): CameraPose | null;

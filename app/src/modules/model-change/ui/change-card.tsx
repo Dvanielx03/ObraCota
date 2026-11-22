@@ -6,6 +6,7 @@ import {BusyButton,LoadingStatus,Skeleton} from "@/shared/ui/loading";
 import {operationLabel,statusLabel,type ModelChange} from "../domain/model-change";
 import {modelChangeRepository} from "../infrastructure/model-change-http";
 import {ChangeEstimate,formatDay} from "./change-estimate";
+import {VerifiedDownload} from "@/modules/model-version/ui/verified-download";
 import {ChangeAffected,ChangeDiff,ChangeFindings,ChangeRecipe,ChangeValidation,proposalHref} from "./change-report";
 
 type Work="preview"|"submit"|"discard"|"apply"|"restore";
@@ -93,12 +94,15 @@ export function ChangeCard({change,onChange,locked,onWork}:{change:ModelChange;o
       {change.status==="READY" && <>
         {proposalReady && actions.apply?<Link className="panel-action" href={proposalHref(change)}>Ver propuesta en 3D</Link>
           :<button className="panel-action" disabled title={actions.apply?"Pendiente: previsualiza el cambio de nuevo para verlo en 3D":reason("apply")}>Ver propuesta en 3D</button>}
+        {/* The proposal file expired or the report is stale: offer the way back instead of only a disabled button. */}
+        {!proposalReady && actions.preview && button("preview",true,"Previsualizar de nuevo","panel-action change-secondary")}
         {button("apply",actions.apply,"Aprobar y aplicar cambio")}
         {button("discard",actions.discard,"Rechazar","panel-action change-secondary")}
         {!actions.preview && reason("preview") && <span className="change-note">{reason("preview")}</span>}
       </>}
       {change.status==="APPLIED" && change.appliedVersion && <>
         <p role="status">Cambio aplicado. <Link href={prefix+"/visor/"+change.appliedVersion+(target?"?element="+encodeURIComponent(target)+"&":"?")+"anterior="+change.baseVersion}>Abrir nueva versión</Link></p>
+        <VerifiedDownload project={change.project} version={change.appliedVersion} label="Descargar revisión publicada"/>
         {button("restore",actions.restore,"Crear revisión de restauración","panel-action restore-action")}
       </>}
       {change.status==="RESTORED" && change.restoredVersion && <p><Link href={prefix+"/visor/"+change.restoredVersion}>Abrir revisión restaurada</Link></p>}

@@ -45,7 +45,7 @@ for (const drawing of DRAWINGS) test(`DWG de fabricante · ${basename(drawing.fi
   try {
     // Upload through the project's form, as a person would.
     await page.goto("/proyectos/" + project + "/archivos");
-    await page.getByLabel("Archivo IFC o DWG").setInputFiles(source);
+    await page.getByTestId("model-upload").setInputFiles(source);
     const uploading = page.waitForResponse(r => r.url().includes("/uploads?"), { timeout: 180_000 });
     await page.getByRole("button", { name: "Guardar versión" }).click();
     expect((await uploading).status()).toBe(201);
@@ -107,7 +107,7 @@ test("Un ZIP con extensión .dwg se rechaza con un motivo claro", async ({ page 
   const { headers, project } = await account(page, "DWG falso");
   try {
     await page.goto("/proyectos/" + project + "/archivos");
-    await page.getByLabel("Archivo IFC o DWG").setInputFiles(source);
+    await page.getByTestId("model-upload").setInputFiles(source);
     let uploads = 0;
     page.on("request", request => { if (request.url().includes("/uploads")) uploads++; });
     await page.getByRole("button", { name: "Guardar versión" }).click();

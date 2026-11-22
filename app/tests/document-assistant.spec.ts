@@ -39,10 +39,6 @@ test("Respuesta documental real con cita, historial y aislamiento del proyecto",
     expect(Buffer.from(original).equals(readFileSync(pdf!))).toBeTruthy();
     await page.reload();await expect(cite).toBeVisible();
     await page.screenshot({path:info.outputPath("consulta-con-fuente.png")});
-    await page.setViewportSize({width:390,height:844});
-    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-    await page.screenshot({path:info.outputPath("consulta-movil.png")});
-    await page.setViewportSize({width:1280,height:720});
     await page.getByRole("link",{name:"Localizar elemento en el visor"}).click();
     await expect(page.getByRole("tab",{name:"Propiedades"})).toHaveAttribute("aria-selected","true");
     await expect(page.locator(".inspector")).toContainText("1hOSvn6df7F8_7GcBWlS8Z");

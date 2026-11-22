@@ -1,9 +1,12 @@
-import {expect,test} from "@playwright/test";
+import {expect,test,type Page} from "@playwright/test";
+import {randomUUID} from "node:crypto";
+import {readFileSync} from "node:fs";
 import {strFromU8,unzipSync} from "three/addons/libs/fflate.module.js";
 import {crc32,dosDateTime,storedZip} from "../src/modules/scene-view/domain/stored-zip";
-import {CURRENT_FRAMING,archiveName,exportIndex,exportShots,pictureName,samePose,slug} from "../src/modules/scene-view/domain/view-export";
+import {fitText,pdfString,storedPdf} from "../src/modules/scene-view/domain/stored-pdf";
+import {CURRENT_FRAMING,archiveName,documentName,documentPages,exportIndex,exportShots,pictureName,samePose,slug} from "../src/modules/scene-view/domain/view-export";
 import {clampSlide,counterLabel,coverFacts,dotSize,slideCount,startSlide} from "../src/modules/scene-view/domain/presentation";
-import {exportViews} from "../src/modules/scene-view/application/export-views";
+import {exportViews,exportViewsDocument} from "../src/modules/scene-view/application/export-views";
 import {shortcutFor,shortcutTitle,toolNotice} from "../src/modules/model-file/domain/shortcuts";
 
 const bytes=(text:string)=>new TextEncoder().encode(text);
@@ -121,4 +124,125 @@ test("La presentación y los atajos",()=>{
   expect(toolNotice("render","Elige una pieza primero")).toBe("Renderizar: elige una pieza primero");
   expect(shortcutTitle("Renderizar","R")).toBe("Renderizar · R");
   expect(shortcutTitle("Renderizar","R","Elige una pieza primero")).toBe("Renderizar · R\nElige una pieza primero");
+});
+
+/** A PDF read the way a strict reader does: header, trailer, and every xref offset landing on its object. */
+function readPdf(bytes:Uint8Array){
+  const text=Buffer.from(bytes).toString("latin1");
+  expect(text.startsWith("%PDF-1.4\n")).toBe(true);
+  expect(text.endsWith("%%EOF\n")).toBe(true);
+  const start=Number(/startxref\n(\d+)\n%%EOF\n$/.exec(text)![1]);
+  expect(text.slice(start,start+4)).toBe("xref");
+  const [,first,count]=/^xref\n(\d+) (\d+)\n/.exec(text.slice(start))!;
+  expect(Number(first)).toBe(0);
+  const rows=text.slice(start).split("\n").slice(3,2+Number(count));
+  rows.forEach((row,index)=>{
+    const offset=Number(row.slice(0,10));
+    expect(text.slice(offset,offset+String(index+1).length+6)).toBe((index+1)+" 0 obj");
+  });
+  const pages=Number(/\/Type \/Pages \/Kids \[[^\]]*\] \/Count (\d+)/.exec(text)![1]);
+  // Each stream declares its exact length.
+  for(const match of text.matchAll(/\/Length (\d+) >>\nstream\n/g)){
+    const from=match.index!+match[0].length;
+    expect(text.slice(from+Number(match[1]),from+Number(match[1])+10)).toBe("\nendstream");
+  }
+  return {text,pages,images:(text.match(/\/Subtype \/Image/g)??[]).length};
+}
+
+// A tiny baseline JPEG header: enough for the writer, which never decodes pictures.
+const JPEG=Uint8Array.from([0xff,0xd8,0xff,0xe0,0,16,0x4a,0x46,0x49,0x46,0,1,1,0,0,1,0,1,0,0,0xff,0xd9]);
+const latin=(text:string)=>[...Buffer.from(text,"latin1")];
+
+test("El PDF de vistas se escribe con offsets exactos, texto en WinAnsi y una página por vista",()=>{
+  expect(pdfString("Baño (v2) \\ «Acceso» · 2,5 m — ok €")).toEqual(latin("(Ba\xf1o \\(v2\\) \\\\ \xabAcceso\xbb \xb7 2,5 m \x97 ok \x80)"));
+  expect(pdfString("日本")).toEqual(latin("(??)"));
+  expect(fitText("Fachada norte",10,1000)).toBe("Fachada norte");
+  expect(fitText("Una vista con un nombre muy largo",10,60)).toBe("Una vista…");
+  expect(documentName("Duplex_A_20110907.ifc")).toBe("obracota-duplex-a-20110907-vistas.pdf");
+  const source={project:"Dúplex Arrayán",file:"Duplex.ifc",version:"v2",exportedAt:new Date(2026,10,21,9,5),onlyCurrent:false};
+  const pages=documentPages(source,[{name:"Fachada norte",jpeg:JPEG,width:1600,height:900},{name:"Acceso",jpeg:JPEG,width:900,height:1600}]);
+  expect(pages).toHaveLength(3);
+  expect(pages[0].texts.map(text=>text.text)).toEqual(expect.arrayContaining(["Dúplex Arrayán","Duplex.ifc · v2 · 21 nov 2026, 09:05",
+    "Contenido · 2 vistas guardadas","01  Fachada norte","pág. 2","02  Acceso","pág. 3","ObraCota · Duplex.ifc · Página 1 de 3"]));
+  expect(pages[1].texts[0].text).toBe("01 · Fachada norte");
+  // The picture keeps its proportion and stays inside the page margins.
+  for(const page of pages.slice(1)){
+    const [image]=page.images;
+    expect(image.width/image.height).toBeCloseTo(image.pixelWidth/image.pixelHeight,5);
+    expect(image.x).toBeGreaterThanOrEqual(40);expect(image.x+image.width).toBeLessThanOrEqual(842-40+1e-6);
+    expect(image.y).toBeGreaterThanOrEqual(40);expect(image.y+image.height).toBeLessThanOrEqual(595-84+1e-6);
+  }
+  const pdf=readPdf(storedPdf(pages,"Vistas · Dúplex Arrayán · Duplex.ifc",new Date(2026,10,21,9,5,7)));
+  expect(pdf.pages).toBe(3);
+  expect(pdf.images).toBe(2);
+  expect(pdf.text).toContain("/Title (Vistas \xb7 D\xfaplex Array\xe1n \xb7 Duplex.ifc)");
+  expect(pdf.text).toContain("/CreationDate (D:20261121090507)");
+  expect(pdf.text).toContain("(01 \xb7 Fachada norte) Tj");
+  expect(()=>storedPdf([],"x")).toThrow();
+});
+
+test("La exportación en PDF aplica cada vista, devuelve el encuadre y pone una página por vista",async()=>{
+  const views=[pose(0,"Vista 1"),pose(5,"Acceso")];
+  const screen=pose(9,"pantalla");
+  let camera=screen as {position:[number,number,number]};
+  const applied:number[]=[];
+  const result=await exportViewsDocument(views,{project:"P",file:"Duplex.ifc",version:"v2",onlyCurrent:false},{
+    pose:()=>({...screen,position:camera.position}),
+    apply:next=>{camera=next;applied.push(next.position[0]);},
+    picture:async()=>({jpeg:JPEG,width:640,height:360}),
+    settle:async()=>undefined,
+  },()=>undefined,undefined,()=>new Date(2026,10,21,12,0));
+  expect(applied).toEqual([0,5,9]);
+  expect(result).toMatchObject({name:"obracota-duplex-vistas.pdf",count:2});
+  const pdf=readPdf(result.bytes);
+  expect(pdf.pages).toBe(3);
+  expect(pdf.text).toContain("(02 \xb7 Acceso) Tj");
+});
+
+/** Registers, creates a project and uploads the IFC by API. */
+async function storedIfc(page:Page,ifc:string,name:string){
+  const auth=await page.request.post("/api/auth/register",{headers:{"X-ObraCota-Client":"web"},data:{email:randomUUID()+"@example.test",password:randomUUID()}});
+  expect(auth.ok()).toBeTruthy();
+  const headers={Authorization:"Bearer "+(await auth.json()).accessToken};
+  const {id}=await (await page.request.post("/api/projects",{headers,data:{name}})).json();
+  const base="/api/projects/"+id;
+  const upload=await page.request.post(base+"/uploads",{headers:{...headers,"Content-Type":"application/octet-stream"},params:{name:"Duplex_A.ifc"},data:readFileSync(ifc)});
+  expect(upload.status()).toBe(201);
+  return {id,base,headers,version:(await upload.json()).id as string};
+}
+
+test("Exportar › Documento (PDF) descarga la portada y una página por vista guardada",async({page})=>{
+  const ifc=process.env.DUPLEX_IFC;
+  test.skip(!ifc,"Indica el IFC Duplex original con DUPLEX_IFC.");
+  test.setTimeout(240_000);
+  await page.setViewportSize({width:1366,height:768});
+  const {id,base,headers,version}=await storedIfc(page,ifc!,"Prueba de exportación PDF");
+  try{
+    // Two saved views by API, so the export has something to lay out.
+    for(const [name,x] of [["Fachada sur",20],["Planta alta",-20]] as const)
+      expect((await page.request.post(base+"/versions/"+version+"/views",{headers,data:{name,position:[x,15,25],target:[0,3,0],span:12}})).status()).toBe(201);
+    await page.goto("/proyectos/"+id+"/visor/"+version);
+    await expect(page.locator(".view[data-ready]")).toBeVisible({timeout:180_000});
+    await expect(page.getByRole("region",{name:"Vistas guardadas"}).getByText("Planta alta")).toBeVisible();
+    await page.getByRole("button",{name:"Exportar",exact:true}).click();
+    const item=page.getByRole("menuitem",{name:"Documento (PDF)"});
+    await expect(item).not.toHaveAttribute("aria-disabled","true");
+    const downloading=page.waitForEvent("download");
+    await item.click();
+    const download=await downloading;
+    expect(download.suggestedFilename()).toBe("obracota-duplex-a-vistas.pdf");
+    const pdf=readPdf(new Uint8Array(readFileSync(await download.path())));
+    expect(pdf.pages).toBe(3);
+    expect(pdf.images).toBe(2);
+    expect(pdf.text).toContain("(01 \xb7 Fachada sur) Tj");
+    expect(pdf.text).toContain("(02 \xb7 Planta alta) Tj");
+    expect(pdf.text).toContain("(Prueba de exportaci\xf3n PDF) Tj");
+    // Every picture is a JPEG drawn from the canvas.
+    expect(pdf.text.match(/\/Filter \/DCTDecode/g)).toHaveLength(2);
+    expect(pdf.text).toContain("\xff\xd8\xff");
+    await expect(page.getByRole("status").filter({hasText:"Descargado obracota-duplex-a-vistas.pdf · portada y 2 páginas de vistas."})).toBeAttached();
+    if(process.env.KEEP_EXPORT)await download.saveAs(process.env.KEEP_EXPORT);
+  }finally{
+    await page.request.delete(base,{headers});
+  }
 });

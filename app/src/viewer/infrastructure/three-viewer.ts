@@ -644,6 +644,9 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       markFloor=mark;controls.enabled=false;canvas.style.cursor="crosshair";canvas.focus();
     },
     cancelWalk,
+    stream(fps){
+      try{return typeof canvas.captureStream==="function"?canvas.captureStream(fps):null;}catch{return null;}
+    },
     async switchWalk(file,signal,status){
       const session=walk;
       if(!session)throw new Error("Inicia el recorrido antes de comparar.");

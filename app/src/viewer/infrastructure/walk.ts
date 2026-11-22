@@ -82,6 +82,8 @@ export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,
   let safe=body.clone();
   const keys=new Set<string>(),vector=new T.Vector3(),step=new T.Vector3();
   let frame=0,previous=performance.now(),velocity=0,standing=true,needsDraw=true;
+  // Frames drawn while walking, per second of movement (KNOWN_ISSUES #4): the last measure is kept as a mark.
+  let measureFrom=0,measured=0;
   let pointer:{id:number;x:number;y:number}|undefined;
   camera.position.copy(body.end);camera.lookAt(camera.position.clone().add(heading));
   function move(key:string,held:boolean){if(held)keys.add(key);else keys.delete(key);}
@@ -111,8 +113,16 @@ export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,
     vector.set(Number(keys.has("right"))-Number(keys.has("left")),0,Number(keys.has("back"))-Number(keys.has("forward")));
     if(!vector.lengthSq() && standing){
       if(needsDraw){render(camera);needsDraw=false;}
+      measureFrom=0;
       return;
     }
+    if(!measureFrom){measureFrom=now;measured=0;}
+    else if(now-measureFrom>=1000){
+      performance.clearMarks("obracota:walk-fps");
+      performance.mark("obracota:walk-fps",{detail:{fps:Math.round(measured*10000/(now-measureFrom))/10}});
+      measureFrom=now;measured=0;
+    }
+    measured++;
     vector.normalize().applyAxisAngle(T.Object3D.DEFAULT_UP,camera.rotation.y);
     standing=false;
     for(let i=0;i<4;i++){

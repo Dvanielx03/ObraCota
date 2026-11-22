@@ -5,6 +5,7 @@ import { Box, Calculator, ChevronRight, Files, GitCompareArrows, LayoutDashboard
 import { InlineName } from "./inline-name";
 import { useProjectScope, type ProjectScopeValue } from "./project-scope";
 import { documentTitle, useDocumentTitle } from "@/shared/ui/document-title";
+import { useDisabledReason } from "@/shared/ui/disabled-reason";
 
 type Section = { slug: string; label: string; icon: ComponentType<LucideProps> };
 const SECTIONS: readonly Section[] = [
@@ -79,6 +80,11 @@ export function ProjectBar() {
   useDocumentTitle(name ? documentTitle(name, section) : null);
   if (!scope) return null;
   const viewer = viewerTarget(scope);
+  return <ProjectBarContent scope={scope} viewer={viewer}/>;
+}
+
+function ProjectBarContent({ scope, viewer }: { scope: ProjectScopeValue; viewer: ReturnType<typeof viewerTarget> }) {
+  const viewerOff = useDisabledReason(viewer.href ? undefined : viewer.reason);
   return <div className="panel-head project-bar">
     <div className="panel-head-title">
       <Link className="panel-crumb" href="/proyectos">Proyectos</Link>
@@ -90,10 +96,12 @@ export function ProjectBar() {
         const content = <><Icon size={14} aria-hidden="true"/>{label}</>;
         if (slug === "visor") return viewer.href
           ? <Link key={slug} className="panel-tab" href={viewer.href} title={viewer.reason}>{content}</Link>
-          : <span key={slug} className="panel-tab" role="link" aria-disabled="true" tabIndex={0} title={viewer.reason}>{content}</span>;
+          : <span key={slug} className="panel-tab" role="link" aria-disabled="true" tabIndex={0} title={viewer.reason}
+            aria-describedby={viewerOff.describedBy}>{content}</span>;
         const href = slug ? scope.route.base + "/" + slug : scope.route.base;
         return <Link key={slug} className="panel-tab" href={href} aria-current={scope.route.section === slug ? "page" : undefined}>{content}</Link>;
       })}
     </nav>
+    {viewerOff.note}
   </div>;
 }

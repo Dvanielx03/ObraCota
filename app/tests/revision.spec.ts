@@ -2,7 +2,7 @@ import {test,expect} from "@playwright/test";
 import {readFile} from "node:fs/promises";
 import path from "node:path";
 test("Área de trabajo hasta el borde inferior",async({page},info)=>{
-  for(const [width,height] of [[1480,667],[390,844]]){
+  for(const [width,height] of [[1480,667]]){
     await page.setViewportSize({width,height});await page.goto("/proyectos/restage/visor");
     await expect(page.getByRole("button",{name:"Revisar entrega"})).toBeVisible();
     await expect(page.locator("footer")).toHaveCount(0);

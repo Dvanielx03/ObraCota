@@ -28,7 +28,7 @@ test("Duplex conserva medidas y ficha con cita verificable por puerta y versión
   const files="/proyectos/"+id+"/archivos";
   try{
     await page.goto(files);
-    async function upload(){await page.getByLabel("Archivo IFC o DWG").setInputFiles(ifc!);await page.getByRole("button",{name:"Guardar versión"}).click();}
+    async function upload(){await page.getByTestId("model-upload").setInputFiles(ifc!);await page.getByRole("button",{name:"Guardar versión"}).click();}
     async function door(code:string){
       await page.getByRole("tab",{name:"Lectura"}).click();
       await page.getByRole("searchbox").fill(code);

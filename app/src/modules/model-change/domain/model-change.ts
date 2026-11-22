@@ -120,3 +120,26 @@ export function reportFindings(report:Report):Finding[]{
   const seen=new Set<string>();
   return all.filter(item=>{const key=item.rule+"|"+(item.element??"");if(seen.has(key))return false;seen.add(key);return true;});
 }
+
+/** What the project's budget adds up: only applied changes count, with the estimate frozen at approval. */
+export type ApprovedBudget={currency:string;total:number;counted:number;missing:number;otherCurrency:number};
+
+/**
+ * Sum of the frozen estimates of the applied changes (§6.3). A restored change was undone and a discarded one never
+ * happened, so neither counts; an applied change whose estimate lacks a price is reported in `missing`, not guessed.
+ * The total is in the currency of the first counted estimate: one in another currency is reported in
+ * `otherCurrency` and left out, since adding amounts of two currencies gives a meaningless figure.
+ */
+export function approvedBudget(changes:readonly ModelChange[]):ApprovedBudget{
+  let total=0,counted=0,missing=0,otherCurrency=0,currency="";
+  for(const change of changes){
+    if(change.status!=="APPLIED")continue;
+    const estimate=change.report?.estimate;
+    if(!estimate||!estimate.complete){missing++;continue;}
+    const own=estimate.currency||"COP";
+    if(!currency)currency=own;
+    else if(own!==currency){otherCurrency++;continue;}
+    total+=estimate.total;counted++;
+  }
+  return {currency:currency||"COP",total,counted,missing,otherCurrency};
+}

@@ -32,7 +32,7 @@ test("Una vista guardada devuelve la cámara a su encuadre y se renombra y elimi
 
   try {
     await page.goto("/proyectos/" + id + "/archivos");
-    await page.getByLabel("Archivo IFC o DWG").setInputFiles(ifc!);
+    await page.getByTestId("model-upload").setInputFiles(ifc!);
     await page.getByRole("button", { name: "Guardar versión" }).click();
     await page.getByRole("link", { name: "Abrir versión 1 en el visor" }).click();
     await expect(page.locator(".project")).toContainText("Duplex", { timeout: 120_000 });
@@ -149,7 +149,7 @@ test("Las vistas se presentan a pantalla completa y se recorren con el teclado",
 
   try {
     await page.goto("/proyectos/" + id + "/archivos");
-    await page.getByLabel("Archivo IFC o DWG").setInputFiles(ifc!);
+    await page.getByTestId("model-upload").setInputFiles(ifc!);
     await page.getByRole("button", { name: "Guardar versión" }).click();
     await page.getByRole("link", { name: "Abrir versión 1 en el visor" }).click();
     await expect(page.locator(".project")).toContainText("Duplex", { timeout: 120_000 });

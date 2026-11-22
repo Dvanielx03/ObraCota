@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ChevronDown, FileArchive, FileDown, FileText } from "lucide-react";
 import { Spinner } from "@/shared/ui/loading";
+import { useDisabledReason } from "@/shared/ui/disabled-reason";
 import type { CameraPose } from "@/viewer/domain/viewer.port";
 import type { SceneView } from "../domain/scene-view";
-import { exportViews } from "../application/export-views";
-import { nextPaint, pictureBytes, saveFile } from "../infrastructure/export-files";
+import { exportViews, exportViewsDocument } from "../application/export-views";
+import { nextPaint, pictureBytes, pictureJpeg, saveFile } from "../infrastructure/export-files";
 import { screenRoom } from "../infrastructure/thumbnail-canvas";
 
 /** What an export is about, read when it starts. */
@@ -14,9 +15,9 @@ export interface ExportContext { views: readonly SceneView[]; project?: string; 
 type Notice = (text: string, tone?: "info" | "error") => void;
 
 /**
- * "Exportar" pill of the workspace header and its menu (V-12, F5-04): a switch to keep only the
- * framing on screen, "Documento (PDF)" (pending) and "Imágenes (ZIP)", which builds a stored ZIP in the
- * browser with one PNG per saved view and an index. ARIA menu button: Enter, Space or ↓ open it on the
+ * "Exportar" pill of the workspace header and its menu (V-12, F5-04, H7): a switch to keep only the
+ * framing on screen, "Documento (PDF)", a cover with the list of views and one page per view, and
+ * "Imágenes (ZIP)", a stored ZIP with one PNG per saved view and an index. Both are built in the browser. ARIA menu button: Enter, Space or ↓ open it on the
  * first option and ↑ on the last; the arrows, Inicio and Fin move; Escape closes it and gives the
  * focus back to the pill; Tab or a click outside close it.
  */
@@ -40,10 +41,10 @@ export function ExportMenu({ disabledReason, viewCount, context, camera, stage, 
   const unavailable = disabledReason ?? (busy ? "Exportación en curso" : undefined);
   const zipReason = !onlyCurrent && !viewCount ? "Guarda una vista o activa «Solo la vista actual»" : undefined;
   const items = () => [...(menu.current?.querySelectorAll<HTMLElement>("[role^=menuitem]") ?? [])];
-  function focusItem(at: number) {
-    const list = items();
+  const focusItem = useCallback((at: number) => {
+    const list = [...(menu.current?.querySelectorAll<HTMLElement>("[role^=menuitem]") ?? [])];
     if (list.length) list[(at + list.length) % list.length].focus();
-  }
+  }, []);
   function close(focusButton: boolean) {
     setOpen(false);
     if (focusButton) button.current?.focus();
@@ -62,7 +63,7 @@ export function ExportMenu({ disabledReason, viewCount, context, camera, stage, 
     const outside = (event: PointerEvent) => { if (!anchor.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener("pointerdown", outside, true);
     return () => { cancelAnimationFrame(frame); document.removeEventListener("pointerdown", outside, true); };
-  }, [open]);
+  }, [open, focusItem]);
   useEffect(() => { if (unavailable) setOpen(false); }, [unavailable]);
 
   function onButtonKey(event: ReactKeyboardEvent<HTMLButtonElement>) {
@@ -79,7 +80,7 @@ export function ExportMenu({ disabledReason, viewCount, context, camera, stage, 
     if (event.key === "Tab") setOpen(false);
   }
 
-  async function exportZip() {
+  async function run(kind: "zip" | "pdf") {
     const subject = context();
     if (zipReason || !subject || busy) return;
     close(true);
@@ -88,20 +89,22 @@ export function ExportMenu({ disabledReason, viewCount, context, camera, stage, 
     const host = stage();
     const room = host ? screenRoom(host) : undefined;
     setBusy({ done: 0, total: onlyCurrent ? 1 : subject.views.length });
+    const source = { project: subject.project, file: subject.file, version: subject.version, onlyCurrent };
+    const ports = { pose: camera.pose, apply: camera.apply, settle: nextPaint };
+    // The capture is taken right away, with the camera the export has just applied.
+    const shot = () => {
+      const capture = camera.capture();
+      return capture ? Promise.resolve(capture) : Promise.reject(new Error("El visor no está disponible."));
+    };
+    const progress = (done: number, total: number) => setBusy({ done, total });
     try {
-      const result = await exportViews(subject.views, { project: subject.project, file: subject.file, version: subject.version, onlyCurrent }, {
-        pose: camera.pose,
-        apply: camera.apply,
-        // The capture is taken right away, with the camera the export has just applied.
-        picture: () => {
-          const shot = camera.capture();
-          return shot ? pictureBytes(shot, room) : Promise.reject(new Error("El visor no está disponible."));
-        },
-        settle: nextPaint,
-      }, (done, total) => setBusy({ done, total }), controller.signal);
+      const result = kind === "zip"
+        ? await exportViews(subject.views, source, { ...ports, picture: async () => pictureBytes(await shot(), room) }, progress, controller.signal)
+        : await exportViewsDocument(subject.views, source, { ...ports, picture: async () => pictureJpeg(await shot(), room) }, progress, controller.signal);
       if (controller.signal.aborted) return;
-      saveFile(result.name, result.bytes, "application/zip");
-      onNotice("Descargado " + result.name + " · " + (result.count === 1 ? "1 imagen" : result.count + " imágenes") + " e índice.");
+      saveFile(result.name, result.bytes, kind === "zip" ? "application/zip" : "application/pdf");
+      const pictures = result.count === 1 ? "1 imagen" : result.count + " imágenes";
+      onNotice("Descargado " + result.name + " · " + (kind === "zip" ? pictures + " e índice." : "portada y " + (result.count === 1 ? "1 página" : result.count + " páginas") + " de vistas."));
     } catch (error) {
       if (!controller.signal.aborted) onNotice("No se pudo exportar: " + (error instanceof Error ? error.message : "error desconocido") + ".", "error");
     } finally {
@@ -109,16 +112,18 @@ export function ExportMenu({ disabledReason, viewCount, context, camera, stage, 
     }
   }
 
+  const exportOff = useDisabledReason(busy ? undefined : unavailable), zipOff = useDisabledReason(zipReason);
   const label = busy ? "Exportando " + Math.max(1, busy.done) + " de " + busy.total + "…" : "Exportar";
   return <div className="export-anchor" ref={anchor}>
     <button ref={button} type="button" className="header-pill header-export" aria-haspopup="menu" aria-expanded={open}
       aria-controls={open ? "export-menu" : undefined} aria-disabled={unavailable ? true : undefined} aria-busy={busy ? true : undefined}
-      title={busy ? "Exportando las vistas: el lienzo pasa por cada una y vuelve a tu encuadre" : unavailable ?? "Exportar las vistas guardadas"}
+      aria-describedby={exportOff.describedBy} title={busy ? "Exportando las vistas: el lienzo pasa por cada una y vuelve a tu encuadre" : unavailable ?? "Exportar las vistas guardadas"}
       onClick={(event) => { if (open) close(false); else show(event.detail === 0 ? 0 : null); }} onKeyDown={onButtonKey}>
       {busy ? <Spinner size={12}/> : <FileDown size={12} strokeWidth={2} aria-hidden="true"/>}
       {label}
       {!busy && <ChevronDown size={12} strokeWidth={2} aria-hidden="true"/>}
     </button>
+    {exportOff.note}
     {open && <div ref={menu} id="export-menu" className="export-menu" role="menu" aria-label="Exportar" tabIndex={-1} onKeyDown={onMenuKey}>
       <button type="button" role="menuitemcheckbox" aria-checked={onlyCurrent} tabIndex={-1} className="export-switch-row"
         aria-describedby="export-switch-help" onClick={() => setOnlyCurrent(!onlyCurrent)}>
@@ -126,12 +131,15 @@ export function ExportMenu({ disabledReason, viewCount, context, camera, stage, 
       </button>
       <hr className="export-separator"/>
       <p id="export-switch-help" className="export-help">Exporta solo el encuadre en pantalla</p>
-      <button type="button" role="menuitem" tabIndex={-1} className="export-item" aria-disabled="true" title="Pendiente: exportar las vistas en un PDF">
+      <button type="button" role="menuitem" tabIndex={-1} className="export-item" aria-disabled={zipReason ? true : undefined} aria-describedby={zipOff.describedBy}
+        title={zipReason ?? (onlyCurrent ? "Un PDF con la portada y la vista actual" : "Un PDF con una portada y una página por vista guardada")}
+        onClick={() => void run("pdf")}>
         <FileText size={16} strokeWidth={1.8} aria-hidden="true"/>Documento (PDF)</button>
-      <button type="button" role="menuitem" tabIndex={-1} className="export-item" aria-disabled={zipReason ? true : undefined}
+      <button type="button" role="menuitem" tabIndex={-1} className="export-item" aria-disabled={zipReason ? true : undefined} aria-describedby={zipOff.describedBy}
         title={zipReason ?? (onlyCurrent ? "Una imagen PNG de la vista actual y su índice" : "Una imagen PNG por vista guardada y un índice")}
-        onClick={() => void exportZip()}>
+        onClick={() => void run("zip")}>
         <FileArchive size={16} strokeWidth={1.8} aria-hidden="true"/>Imágenes (ZIP)</button>
+      {zipOff.note}
     </div>}
   </div>;
 }

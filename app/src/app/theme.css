@@ -90,6 +90,38 @@
   --menu-ink: #334155;                         /* export menu option */
   --menu-label: #64748B;                       /* export menu switch label */
   --menu-hint: #94A3B8;                        /* export menu help */
+  --hint-strong: rgb(0 0 0 / .7);              /* walk hint pill over the canvas */
+  --selection-default: #FF6900;                /* note marker when the viewer gives no selection colour */
+  --tool-edit-ink: #01140F;                    /* number on a green edit mark */
+  --tool-edit-under: rgb(0 0 0 / .35);         /* 1 px dark line under the dashed mark outline */
+  --thumb-edge: rgb(0 0 0 / .06);              /* inner edge of a style thumbnail */
+  --text-shadow-card: 0 1px 2px rgb(0 0 0 / .2); /* project card title over its picture */
+
+  /* Presentation (always over --stage-dark, so the same in both modes) */
+  --present-glow: rgb(255 255 255 / .07);
+  --present-cover: linear-gradient(0deg, rgb(0 0 0 / .85), rgb(0 0 0 / .3) 55%, rgb(0 0 0 / .55));
+  --present-dot: rgb(255 255 255 / .3);
+  --on-dark-strong: rgb(255 255 255 / .92);
+  --on-dark-soft: rgb(255 255 255 / .75);
+  --on-dark-muted: rgb(255 255 255 / .6);
+  --glass-light: rgb(255 255 255 / .14);
+  --glass-light-soft: rgb(255 255 255 / .12);
+  --glass-light-hover: rgb(255 255 255 / .24);
+  --glass-light-edge: rgb(255 255 255 / .22);
+  --glass-light-edge-soft: rgb(255 255 255 / .2);
+  --focus-on-dark: #3B82F6;
+  --text-shadow-media: 0 1px 8px rgb(0 0 0 / .5);
+  --text-shadow-media-sm: 0 1px 6px rgb(0 0 0 / .5);
+
+  /* Fallback gradients of the project cards (8 tones, chosen by a hash of the id; same in both modes) */
+  --tone-0: linear-gradient(150deg, #7D96A9, #50697D);
+  --tone-1: linear-gradient(140deg, #BC8A70, #935F46);
+  --tone-2: linear-gradient(135deg, #96A485, #687957);
+  --tone-3: linear-gradient(155deg, #BBA06E, #917444);
+  --tone-4: linear-gradient(145deg, #8C8BAA, #5F5D82);
+  --tone-5: linear-gradient(130deg, #9AA2A6, #6B767B);
+  --tone-6: linear-gradient(160deg, #B07E86, #87545E);
+  --tone-7: linear-gradient(140deg, #6E9AA0, #476F76);
 
   /* Shadows (unchanged in dark mode, as in the reference) */
   --shadow-float: 0 8px 32px rgb(0 0 0 / .08), 0 2px 8px rgb(0 0 0 / .03);

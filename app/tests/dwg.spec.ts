@@ -77,7 +77,8 @@ for(const [variable,is3D] of [["TEST_DWG",false],["TEST_DWG_3D",true]] as const)
       const general=await canvas.screenshot();
       expect(focused.equals(general)).toBe(false);
       await page.getByRole("button",{name:"Volver a encuadrar"}).click();
-      expect((await canvas.screenshot()).equals(focused)).toBe(true);
+      // The camera eases back to the previous framing: wait until it settles there instead of reading one frame.
+      await expect.poll(async()=>(await canvas.screenshot()).equals(focused),{timeout:10_000}).toBe(true);
     }
   });
 }

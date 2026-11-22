@@ -44,8 +44,7 @@ test("Primera revisión guiada sobre el plano de la piscina",async({page},info)=
   await page.getByRole("button",{name:"Finalizar"}).click();
   await page.reload();await expect(page.getByRole("dialog")).toHaveCount(0);await page.getByRole("button",{name:"Guía de uso"}).click();await page.getByRole("button",{name:"Iniciar guía"}).click();await expect(page.locator("main")).toHaveAttribute("data-guide","select");
 });
-for(const [width,height] of [[1366,768],[390,844]])test("Omitir y retomar · "+width,async({page})=>{
-  test.skip(width<1000,"Solo escritorio (D-12)");
+for(const [width,height] of [[1366,768]])test("Omitir y retomar · "+width,async({page})=>{
   await page.setViewportSize({width,height});await page.goto("/proyectos/restage/visor");
   await page.getByRole("button",{name:"Ahora no"}).click();await page.reload();
   await expect(page.getByRole("dialog")).toHaveCount(0);await page.getByRole("button",{name:"Guía de uso"}).click();await page.getByRole("button",{name:"Iniciar guía"}).click();await page.getByRole("button",{name:"Omitir"}).click();

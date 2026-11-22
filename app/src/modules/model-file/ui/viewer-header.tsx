@@ -4,7 +4,6 @@ import { ChevronRight, CircleHelp, FolderOpen, Presentation, Share2, X } from "l
 import { ThemeToggle } from "@/shared/theme/theme-toggle";
 import { BrandMark } from "@/shared/ui/brand-mark";
 import { MODEL_ACCEPT } from "../domain/file-header";
-import { OpenFailurePreview } from "./open-failure-preview";
 
 interface HeaderAction { ref: RefObject<HTMLButtonElement | null>; disabled: boolean; onClick: () => void; title?: string }
 
@@ -39,7 +38,6 @@ export function ViewerHeader({ returnHref, returnLabel, projectName, fileName, p
         <Share2 size={16} strokeWidth={2} aria-hidden="true"/></button>
     </div>
     <input hidden ref={input} type="file" accept={MODEL_ACCEPT} onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (file) onFile(file); }}/>
-    <OpenFailurePreview/>
     <div className="viewer-actions">
       <ThemeToggle/>
       {exportMenu}

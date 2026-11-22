@@ -2,30 +2,6 @@ import {expect,test} from "@playwright/test";
 import {statSync} from "node:fs";
 import {expectWalkable,findFloor,walkButton} from "./walk-support";
 
-test("Recorrido móvil en IFC real y regreso al visor",async({page},info)=>{
-  // Variante de ancho móvil (390 × 844): la app es solo de escritorio.
-  test.skip(true,"Solo escritorio (D-12)");
-  const ifc=process.env.DUPLEX_IFC;
-  test.skip(!ifc);
-  await page.setViewportSize({width:390,height:844});
-  await page.goto("/proyectos/restage/visor");
-  await expect(page.locator(".project")).toHaveText("ReStage");
-  await expect(page.getByRole("button",{name:"Recorrer",exact:true})).toHaveCount(0);
-  await page.locator("header input").setInputFiles(ifc!);
-  await expect(page.getByRole("button",{name:"Recorrer",exact:true})).toBeVisible();
-  await findFloor(page);
-  const forward=page.getByRole("button",{name:"Adelante",exact:true});
-  await expect(forward).toBeVisible();
-  expect((await forward.boundingBox())?.height).toBeGreaterThanOrEqual(44);
-  const bounds=(await forward.boundingBox())!;
-  await page.mouse.move(bounds.x+20,bounds.y+20);await page.mouse.down();
-  await page.waitForTimeout(400);await page.mouse.up();
-  await page.screenshot({path:info.outputPath("recorrido-movil.png")});
-  await page.getByRole("button",{name:"Salir",exact:true}).click();
-  await expect(page.getByRole("button",{name:"Recorrer",exact:true})).toBeVisible();
-  await expect(page.getByRole("tab",{name:"Lectura"})).toBeVisible();
-});
-
 test("Medición del IFC original de ReStage",async({page},info)=>{
   test.setTimeout(240_000);
   const ifc=process.env.RESTAGE_IFC;

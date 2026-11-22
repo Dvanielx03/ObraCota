@@ -12,11 +12,9 @@ import {editBar,editButton,editTour,selectionPanel} from "./support/editar-prism
 const variants=[
   {name:"1366",width:1366,reducedMotion:false},
   {name:"1366 · movimiento reducido",width:1366,reducedMotion:true},
-  {name:"390",width:390,reducedMotion:true},
 ];
 
 for(const {name,width,reducedMotion} of variants)test("Guía de Editar · práctica sin Gemini · "+name,async({page},info)=>{
-  test.skip(width<1000,"Solo escritorio (D-12)");
   await page.setViewportSize({width,height:768});
   if(reducedMotion)await page.emulateMedia({reducedMotion:"reduce"});
   const requests:string[]=[];

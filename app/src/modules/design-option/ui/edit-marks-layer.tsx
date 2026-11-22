@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 import { createPortal } from "react-dom";
 import { ArrowUp, ImagePlus, Trash } from "lucide-react";
 import { Spinner } from "@/shared/ui/loading";
+import { useDisabledReason } from "@/shared/ui/disabled-reason";
 import type { CameraPose, ViewerPort } from "@/viewer/domain/viewer.port";
 // Same tolerance as the export (0.1 % of the visible height): a resize that keeps the framing is not a move.
 import { samePose } from "@/modules/scene-view/domain/view-export";
@@ -97,6 +98,7 @@ export function EditMarksLayer({ viewer, host, marks, marking, open, focus, area
   onCameraMoved: () => void;
   onSend: () => void;
 }) {
+  const sendOff = useDisabledReason(sendReason);
   const layer = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: host.clientWidth, h: host.clientHeight });
   const [spots, setSpots] = useState<Record<number, Spot>>({});
@@ -306,9 +308,10 @@ export function EditMarksLayer({ viewer, host, marks, marking, open, focus, area
           <ImagePlus size={16} strokeWidth={2} aria-hidden="true" /></button>
         <button type="button" className="edit-field-icon" aria-label={"Eliminar la marca " + number(current.id)} title="Eliminar" onClick={() => remove(current.id)}>
           <Trash size={16} strokeWidth={2} aria-hidden="true" /></button>
-        <button type="button" className="edit-field-send" aria-label="Enviar edición" aria-disabled={sendReason ? true : undefined} aria-busy={sending || undefined}
+        <button type="button" className="edit-field-send" aria-label="Enviar edición" aria-disabled={sendReason ? true : undefined} aria-describedby={sendOff.describedBy} aria-busy={sending || undefined}
           title={sendReason ? "Enviar edición\n" + sendReason : sendTitle} onClick={() => { if (!sendReason) onSend(); }}>
           {sending ? <Spinner size={16} /> : <ArrowUp size={16} strokeWidth={2} aria-hidden="true" />}</button>
+        {sendOff.note}
       </div>}
     </div>,
     host,

@@ -37,6 +37,7 @@ export function ElementProperties({ scope, guid }: { scope: Scope; guid: string 
     });
     return () => control.abort();
     // scope is compared through its key: a new object for the same version must not read again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key stands for scope
   }, [open, guid, key]);
   const current = state.guid === guid ? state : { guid };
   return <details className="element-psets" open={open} onToggle={event => setOpen(event.currentTarget.open)}>

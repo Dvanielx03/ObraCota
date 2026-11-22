@@ -1,0 +1,15 @@
+/* The list of a diff by GlobalId: «Comparar con la base» (H1 §7.5) and «Comparar versiones» (H7). Tokens only. */
+.change-compare{gap:12px;font:var(--type-body)}
+.change-compare p{margin:0}
+.change-compare-counts{font:var(--type-title-sm);color:var(--ink)}
+.change-compare-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.change-compare-list>li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:8px 10px;border:1px solid var(--border-faint);border-radius:var(--radius-md)}
+.change-compare-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:var(--type-ui);color:var(--ink)}
+.change-compare-list code{font:var(--type-caption);font-family:var(--font-mono);color:var(--muted)}
+.change-compare-flags{grid-column:1/-1;font:var(--type-caption);color:var(--muted)}
+.change-compare-locate{grid-column:1/-1;justify-self:start;min-height:0;height:24px;padding:0 8px;border-radius:var(--radius-sm);font:var(--type-hint);color:var(--brand-ink)}
+.change-compare-unexpected{color:var(--error)}
+.change-compare-toggle{display:flex;align-items:center;gap:8px;font:var(--type-ui);color:var(--ink);cursor:pointer}
+.change-compare-toggle input{width:16px;height:16px;margin:0;accent-color:var(--brand)}
+.change-compare-toggle:has(input:disabled){color:var(--muted);cursor:default}
+.change-compare-note{font:var(--type-caption);color:var(--muted)}

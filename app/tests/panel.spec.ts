@@ -1,4 +1,20 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * Activates a landing link for real (click or keyboard) and checks it navigates to its href. The landing
+ * links to the app it was built for, which may be another origin than the app under test (the dev server,
+ * for instance): that navigation is answered with a stub, and the same path is then opened on baseURL.
+ */
+async function follow(page: Page, baseURL: string | undefined, activate: () => Promise<void>, href: URL) {
+  const app = new URL(baseURL || href.origin);
+  const elsewhere = href.origin !== app.origin;
+  if (elsewhere) await page.route(href.origin + "/**", route => route.fulfill({ status: 200, contentType: "text/html", body: "<title>stub</title>" }));
+  await activate();
+  await page.waitForURL(href.href);
+  if (!elsewhere) return;
+  await page.unroute(href.origin + "/**");
+  await page.goto(new URL(href.pathname + href.search, app).href);
+}
 
 // «Entrar al panel» goes from the landing to the app it was built for, which may not be VIEWER_URL (the
 // config's storage only marks that origin). Mark the guides as seen on whatever origin the links open,
@@ -12,9 +28,8 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-for (const [width, height] of [[1366, 768], [1920, 1080], [390, 844]]) {
-  test(`Landing, panel y visor a ${width} × ${height}`, async ({ page }, info) => {
-    test.skip(width < 1000, "Solo escritorio (D-12)");
+for (const [width, height] of [[1366, 768], [1920, 1080]]) {
+  test(`Landing, panel y visor a ${width} × ${height}`, async ({ page, baseURL }, info) => {
     await page.setViewportSize({ width, height });
     const landing = process.env.LANDING_URL || "http://localhost:3200";
     async function capture(name: string) {
@@ -29,7 +44,11 @@ for (const [width, height] of [[1366, 768], [1920, 1080], [390, 844]]) {
     const sections = page.getByRole("navigation", { name: "Secciones del proyecto" });
     await page.goto(landing);
     await capture("landing");
-    await page.getByRole("link", { name: "Entrar al panel" }).click();
+    const enterLink = page.getByRole("link", { name: "Entrar al panel" });
+    const enter = new URL((await enterLink.getAttribute("href"))!, landing);
+    // The app's root redirects to /proyectos.
+    expect(["/", "/proyectos"]).toContain(enter.pathname);
+    await follow(page, baseURL, () => enterLink.click(), enter);
     await expect(page.getByRole("heading", { name: "Proyectos", exact: true })).toBeVisible();
     await expect(brand).toHaveAttribute("aria-current", "page");
     await expect(top.getByRole("link", { name: "Guías", exact: true })).toHaveAttribute("href", "/guias");
@@ -75,17 +94,23 @@ for (const [width, height] of [[1366, 768], [1920, 1080], [390, 844]]) {
     await page.getByRole("link", { name: "Volver al panel" }).click();
     await expect(page).toHaveURL(/\/proyectos\/restage\/cambios$/);
     await expect(page.getByRole("heading", { name: "Cambios de diseño" })).toBeVisible();
-    await page.getByRole("link", { name: "Sitio de ObraCota" }).click();
+    // NEXT_PUBLIC_SITE_URL of the app has to be LANDING_URL (app/README.md).
+    const site = page.getByRole("link", { name: "Sitio de ObraCota" });
+    await expect(site).toBeVisible();
+    expect(new URL((await site.getAttribute("href"))!).href).toBe(new URL("/", landing).href);
+    await site.click();
     await expect(page).toHaveURL(new URL("/", landing).href);
   });
 }
 
-test("El recorrido público abre ReStage y recupera su sección de origen", async ({ page }) => {
+test("El recorrido público abre ReStage y recupera su sección de origen", async ({ page, baseURL }) => {
   const landing = process.env.LANDING_URL || "http://localhost:3200";
   await page.goto(landing);
   const link = page.getByRole("link", { name: "Abrir ReStage en el visor" });
-  await link.focus();
-  await link.press("Enter");
+  const target = new URL((await link.getAttribute("href"))!, landing);
+  expect(target.pathname + target.search).toBe("/proyectos/restage/visor?desde=recorrido");
+  // Keyboard activation: the only check that this link works without a pointer.
+  await follow(page, baseURL, async () => { await link.focus(); await expect(link).toBeFocused(); await link.press("Enter"); }, target);
   await expect(page.locator(".project")).toHaveText("ReStage");
   await page.getByRole("link", { name: "Volver al recorrido" }).click();
   await expect(page).toHaveURL(new URL("/#recorrido", landing).href);

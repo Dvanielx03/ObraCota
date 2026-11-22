@@ -2,6 +2,7 @@
 import { useLayoutEffect, useRef, type ButtonHTMLAttributes, type ComponentType, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { shortcutTitle } from "../domain/shortcuts";
 import { Spinner } from "@/shared/ui/loading";
+import { useDisabledReason } from "@/shared/ui/disabled-reason";
 
 type Icon = ComponentType<{ size?: number; strokeWidth?: number; "aria-hidden"?: boolean | "true" }>;
 
@@ -62,27 +63,31 @@ export function ModeButton({ icon: Glyph, label, disabledReason, pending, shortc
   /** Work of this tool in progress (a batch of options being generated): its icon turns, as in the reference. */
   busy?: boolean;
 }) {
-  return (
+  const reason = useDisabledReason(disabledReason, rest["aria-describedby"]);
+  return (<>
     <button type="button" data-tool="" {...rest} className={"tool-mode" + (className ? " " + className : "")}
-      aria-disabled={disabledReason ? true : undefined} aria-keyshortcuts={shortcut} data-busy={busy || undefined}
+      aria-disabled={disabledReason ? true : undefined} aria-describedby={reason.describedBy} aria-keyshortcuts={shortcut} data-busy={busy || undefined}
       title={toolTitle(title ?? label, shortcut, disabledReason, title)}
       onClick={(event) => { if (disabledReason) { event.preventDefault(); return; } onClick?.(event); }}>
       <span className="tool-glyph">{busy ? <Spinner size={16} /> : <Glyph size={16} strokeWidth={2} aria-hidden="true" />}{pending && <i className="tool-pending" aria-hidden="true" />}</span>
       {label}
     </button>
-  );
+    {reason.note}
+  </>);
 }
 
 /** Square 34 × 34 icon button; its name comes from `aria-label`, repeated as a native tooltip. */
 export function IconTool({ icon: Glyph, disabledReason, pending, shortcut, className, onClick, title, ...rest }: ToolButtonProps & { "aria-label": string }) {
-  return (
+  const reason = useDisabledReason(disabledReason, rest["aria-describedby"]);
+  return (<>
     <button type="button" data-tool="" {...rest} className={"tool-icon" + (className ? " " + className : "")}
-      aria-disabled={disabledReason ? true : undefined} aria-keyshortcuts={shortcut}
+      aria-disabled={disabledReason ? true : undefined} aria-describedby={reason.describedBy} aria-keyshortcuts={shortcut}
       title={toolTitle(title ?? rest["aria-label"], shortcut, disabledReason, title ?? rest["aria-label"])}
       onClick={(event) => { if (disabledReason) { event.preventDefault(); return; } onClick?.(event); }}>
       <span className="tool-glyph"><Glyph size={16} strokeWidth={2} aria-hidden="true" />{pending && <i className="tool-pending" aria-hidden="true" />}</span>
     </button>
-  );
+    {reason.note}
+  </>);
 }
 
 export function ToolSeparator() {

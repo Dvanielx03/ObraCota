@@ -1,8 +1,7 @@
 import {expect,test} from "@playwright/test";
 import {MODEL_ONLY,modelShown} from "./support/visor";
-for(const [width,height] of [[1480,667],[390,844],[844,390]]){
+for(const [width,height] of [[1480,667]]){
   test("Panel contextual "+width,async({page},info)=>{
-    test.skip(width<1000,"Solo escritorio (D-12)");
     await page.emulateMedia({reducedMotion:"reduce"});
     await page.setViewportSize({width,height});await page.goto("/proyectos/restage/visor");
     await expect(page.locator(".project")).toHaveText("ReStage");

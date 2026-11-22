@@ -5,15 +5,6 @@
  * Desktop and laptop only (1366–1920 px); under 721 px the page simply scrolls.
  */
 .panel-shell {
-  /* Own fallback gradients of the project cards (8 tones, chosen by a hash of the id). */
-  --tone-0: linear-gradient(150deg, #7D96A9, #50697D);
-  --tone-1: linear-gradient(140deg, #BC8A70, #935F46);
-  --tone-2: linear-gradient(135deg, #96A485, #687957);
-  --tone-3: linear-gradient(155deg, #BBA06E, #917444);
-  --tone-4: linear-gradient(145deg, #8C8BAA, #5F5D82);
-  --tone-5: linear-gradient(130deg, #9AA2A6, #6B767B);
-  --tone-6: linear-gradient(160deg, #B07E86, #87545E);
-  --tone-7: linear-gradient(140deg, #6E9AA0, #476F76);
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -229,7 +220,7 @@
   color: var(--on-dark);
   pointer-events: none;
 }
-.project-card-text h3 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--type-card-title); color: var(--on-dark); text-shadow: 0 1px 2px rgb(0 0 0 / .2); }
+.project-card-text h3 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--type-card-title); color: var(--on-dark); text-shadow: var(--text-shadow-card); }
 .project-card-text p { display: flex; align-items: center; gap: 4px; margin: 0; padding: 2px 0; font: var(--type-caption); color: var(--on-dark); }
 .project-card-text p svg { width: 11px; height: 11px; }
 .project-card-input {
@@ -529,6 +520,11 @@
 
 /* Budget and changes lists. */
 .estimate-sheet { overflow-x: auto; }
+.budget-total { margin: 0 0 var(--grid-gap); padding: 16px 24px; border: 1px solid var(--border-soft); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-sm); }
+.budget-total p { margin: 0; }
+.budget-total strong { margin-right: 8px; }
+.budget-total .change-note { margin-top: 4px; }
+.estimate-sheet .change-link { margin: 12px 0 0; }
 .estimate-sheet table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--border-soft); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-sm); }
 .estimate-sheet caption { padding: 0 0 14px; font: var(--type-card-title); text-align: left; }
 .estimate-sheet th { padding: 12px 16px; border-bottom: 1px solid var(--border); font: var(--type-label); color: var(--muted); text-align: left; }

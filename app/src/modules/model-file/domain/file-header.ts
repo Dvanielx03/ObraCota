@@ -8,6 +8,8 @@ export const HEADER_BYTES = 4096;
 export const MODEL_EXTENSIONS = [".ifc", ".dwg", ".fbx", ".obj"] as const;
 /** The `accept` of the file pickers that open or store a model. */
 export const MODEL_ACCEPT = MODEL_EXTENSIONS.join(",");
+/** Stable hook of the project upload input for the end-to-end suites; its visible label may change. */
+export const MODEL_UPLOAD_TEST_ID = "model-upload";
 
 const KNOWN: { test: (head: string) => boolean; what: string; hint: string }[] = [
   { test: head => head.startsWith("PK"), what: "un archivo ZIP", hint: "Descomprímelo y sube el DWG, IFC, FBX u OBJ que contiene." },

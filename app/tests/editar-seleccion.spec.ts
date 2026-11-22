@@ -1,6 +1,6 @@
 import {test,expect} from "@playwright/test";
 import {randomUUID} from "node:crypto";
-import {readFileSync} from "node:fs";
+import {closeSync,openSync,readFileSync,readSync} from "node:fs";
 import {basename} from "node:path";
 import {editBar,editButton,selectionPanel} from "./support/editar-prisma";
 
@@ -12,8 +12,7 @@ import {editBar,editButton,selectionPanel} from "./support/editar-prisma";
  */
 const modelOnly={style:".viewer-header,.stagebar,.workspace-bars,.edit-dock,.cube-host,.edit-layer,.workspace-toast,[data-visual-tour]{visibility:hidden!important}"};
 
-for(const width of [1366,1920,390])test("Editar local · selección y exportación · "+width,async({page},info)=>{
-  test.skip(width<1000,"Solo escritorio (D-12)");
+for(const width of [1366,1920])test("Editar local · selección y exportación · "+width,async({page},info)=>{
   await page.setViewportSize({width,height:width===1920?1080:768});
   await page.emulateMedia({reducedMotion:"reduce"});
   let posts=0;
@@ -52,6 +51,10 @@ for(const width of [1366,1920,390])test("Editar local · selección y exportaci�
 test("La petición contiene el grupo IFC y una máscara con la misma cámara",async({page},info)=>{
   const file=process.env.TEST_IFC;
   test.skip(!file,"Indica el IFC completo de ReStage");
+  // The test searches ReStage's own pieces (1591462, the roofs): with another IFC it would only time out.
+  const handle=openSync(file!,"r"),start=Buffer.alloc(2048);readSync(handle,start,0,2048,0);closeSync(handle);
+  const header=start.toString("latin1");
+  expect(/FILE_NAME\('[^']*restage/i.test(header),"TEST_IFC debe ser el IFC completo de ReStage (Restage_IP_ALL_MULTI_001.ifc); se indicó "+basename(file!)).toBe(true);
   const auth=await page.request.post("/api/auth/register",{headers:{"X-ObraCota-Client":"web"},data:{email:randomUUID()+"@example.test",password:randomUUID()}});
   const headers={Authorization:"Bearer "+(await auth.json()).accessToken};
   const project=await page.request.post("/api/projects",{headers,data:{name:"Ensayo Editar"}});

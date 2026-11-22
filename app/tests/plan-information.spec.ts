@@ -48,7 +48,7 @@ test("Un PDF vinculado a Rebose permanece en la selección correcta del DWG",asy
   const id=(await result.json()).id;
   try{
     await page.goto("/proyectos/"+id+"/archivos");
-    await page.getByLabel("Archivo IFC o DWG").setInputFiles(file!);
+    await page.getByTestId("model-upload").setInputFiles(file!);
     await page.getByRole("button",{name:"Guardar versión"}).click();
     await page.getByRole("link",{name:"Abrir versión 1 en el visor"}).click();
     async function select(handle:string){

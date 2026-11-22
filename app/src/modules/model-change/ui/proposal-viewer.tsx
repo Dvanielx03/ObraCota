@@ -60,7 +60,7 @@ export function ProposalViewer({project,change:id}:{project:string;change:string
   },[project,id,attempt]);
   if(file && change)return <ViewerWorkspace initialFile={file} returnHref={back} returnLabel="Volver a cambios" projectName={projectName}
     loadPrevious={signal=>versionRepository.open(project,change.baseVersion,signal)}
-    proposal={{label:"Vista previa sin publicar",description:change.description,
+    proposal={{label:"Vista previa sin publicar",description:change.description,scope:{project,change:change.id},
       compare:({elements,viewer,selected})=><ChangeCompare diff={change.report?.diff} elements={elements} viewer={viewer} selected={selected}/>}}
     walkLabels={{older:"Base",newer:"Propuesta"}}/>;
   // Until the preview arrives: the header as the viewer will show it, with the wait in the middle (as the stored viewer).

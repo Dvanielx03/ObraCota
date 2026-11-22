@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { versionRepository } from "../infrastructure/version-http";
 import type { ModelVersion } from "../domain/model-version";
 import { LoadingStatus, Skeleton, SkeletonLines, Spinner } from "@/shared/ui/loading";
+import { VerifiedDownload } from "./verified-download";
 
 /** Placeholder for one version while the history loads: title, two lines and the open button. */
 function VersionSkeleton() {
@@ -36,6 +37,7 @@ export function FileHistory({ project, file, pending }: {project: string; file: 
           <p>{v.format} · {new Intl.NumberFormat("es-CO").format(v.byteSize)} bytes<br/>
           {new Date(v.uploadedAt).toLocaleString("es-CO")} · {v.uploaderEmail}</p>
           <details><summary>Huella SHA-256</summary><code>{v.sha256}</code></details>
+          <VerifiedDownload project={project} version={v.id} label={"Descargar versión " + v.revision}/>
           <Link className="panel-action" href={`/proyectos/${project}/visor/${v.id}`}>Abrir versión {v.revision} en el visor</Link>
           {v.format.toUpperCase()==="IFC" && <p><Link href={`/proyectos/${project}/visor/${v.id}?panel=asistente`}>Abrir en Editar</Link></p>}
         </article>)}</section>;

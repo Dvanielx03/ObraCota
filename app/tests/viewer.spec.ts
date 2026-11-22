@@ -2,9 +2,8 @@ import {expect,test} from "@playwright/test";
 import path from "node:path";
 import {MODEL_ONLY,modelShown} from "./support/visor";
 
-for (const [width,height] of [[1480,667],[1366,768],[390,844],[844,390]]) {
+for (const [width,height] of [[1480,667],[1366,768]]) {
   test("Modelo e inspector a "+width+" × "+height,async ({page},info)=>{
-    test.skip(width<1000,"Solo escritorio (D-12)");
     await page.setViewportSize({width,height});
     await page.goto("/proyectos/restage/visor");
     const canvas = page.locator("canvas");

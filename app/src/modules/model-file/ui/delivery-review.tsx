@@ -7,6 +7,24 @@ import {ListChecks,X} from "lucide-react";
 import type {ModelInfo} from "@/viewer/domain/viewer.port";
 import {reviewDelivery} from "../application/review-delivery";
 import {ToolPopover} from "./tool-popover";
+import Link from "next/link";
+import {loadServerReview,operationLines,roleLabel,serverReportLines,summaryLine,topClasses,type ReviewScope,type ServerReview} from "../infrastructure/server-review";
+import {ChangeDiff,ChangeFindings,ChangeRecipe,ChangeValidation} from "@/modules/model-change/ui/change-report";
+import {useOperationLabels} from "@/modules/model-change/ui/change-card";
+import {statusLabel,type ModelChange} from "@/modules/model-change/domain/model-change";
+
+/** One model change in the server part of the report: its recipe, notices, diff and validation (change-report.tsx). */
+function ServerChange({role,change}:{role:Parameters<typeof roleLabel>[0];change:ModelChange}){
+  const labels=useOperationLabels(change);
+  return <article className="review-server-change" aria-label={roleLabel(role)+": "+change.description}>
+    <h4>{roleLabel(role)}</h4>
+    <p>{change.description} · {statusLabel(change.status)}{change.origin==="AGENT"?" · generado con IA":""} · <Link href={"/proyectos/"+change.project+"/cambios#"+change.id}>Abrir su tarjeta</Link></p>
+    <ChangeRecipe change={change} labels={labels}/>
+    <ChangeFindings change={change}/>
+    <ChangeDiff change={change}/>
+    <ChangeValidation change={change}/>
+  </article>;
+}
 
 /** What the workspace can ask of the review (guides close it before they start). */
 export interface DeliveryReviewHandle{close():void}
@@ -18,7 +36,9 @@ export interface DeliveryReviewHandle{close():void}
  * REVISAR. `trigger` draws the bar's mode button; it receives the toggle, the anchor ref and whether
  * the panel is open.
  */
-export function DeliveryReview({model,locate,guided,onDownloaded,trigger,control,onOpenChange}:{guided:boolean;onDownloaded:()=>void;model:ModelInfo;locate:(id:string)=>void;
+export function DeliveryReview({model,locate,guided,onDownloaded,trigger,control,onOpenChange,server}:{guided:boolean;onDownloaded:()=>void;model:ModelInfo;locate:(id:string)=>void;
+  /** Where the open IFC lives on the server: Revisar adds the server's report (H7) to the one made in the browser. */
+  server?:ReviewScope;
   trigger?:(toggle:()=>void,anchor:RefObject<HTMLButtonElement|null>,open:boolean)=>ReactNode;control?:Ref<DeliveryReviewHandle>;
   /** The panel opened or closed: the bar hides Editar's sub-bar meanwhile, as it does for its own panels. */
   onOpenChange?:(open:boolean)=>void}){
@@ -34,13 +54,21 @@ export function DeliveryReview({model,locate,guided,onDownloaded,trigger,control
   useEffect(()=>()=>changed.current?.(false),[]);
   const [input,setInput]=useState(""),[error,setError]=useState(""),[running,setRunning]=useState(false);
   const [report,setReport]=useState<ReturnType<typeof reviewDelivery>|null>(null);
+  const [serverReview,setServerReview]=useState<ServerReview|null>(null),[serverError,setServerError]=useState("");
+  // Only an IFC has a reading and model changes on the server.
+  const scope=server && /^IFC/i.test(model.schema)?server:undefined;
   const stored=useContext(NotesContext);
   useImperativeHandle(control,()=>({close(){setOpen(false);dialog.current?.close();}}),[]);
   async function run(){
-    setReport(null);setError("");setRunning(true);
+    setReport(null);setError("");setRunning(true);setServerReview(null);setServerError("");
     try{
+      // The server's report is read alongside; if it fails, the browser's report still opens and says why.
+      const remote=scope?loadServerReview(scope).then(value=>{setServerReview(value);return value;},failure=>{
+        setServerError(failure instanceof Error?failure.message:"No se pudo leer el informe del servidor.");return null;}):Promise.resolve(null);
       const notes=stored ? await stored.load() : model.versionId ? await localNotes(model.versionId).load() : {};
-      setReport(reviewDelivery(model,input,notes));
+      const local=reviewDelivery(model,input,notes);
+      await remote;
+      setReport(local);
       setOpen(false);
       dialog.current?.showModal();
     }catch(e){setError(e instanceof Error?e.message:"No se pudo preparar la revisión.");}
@@ -59,6 +87,8 @@ export function DeliveryReview({model,locate,guided,onDownloaded,trigger,control
     }
     lines.push("","Observaciones del revisor ("+report.observations.length+")");
     for(const note of report.observations)lines.push(note.text+" — "+[note.source?.name??"Vínculo perdido",note.source?.group,note.id,note.source?.sourceId,note.source?.measure!==undefined?"Medida geométrica "+note.source.measure+" "+report.units:undefined,note.source?.measure!==undefined?note.source.original:undefined].filter(Boolean).join(" · "));
+    if(serverReview)lines.push(...serverReportLines(serverReview));
+    else if(scope)lines.push("","INFORME DEL SERVIDOR","No disponible: "+(serverError||"sin respuesta"));
     const url=URL.createObjectURL(new Blob([lines.join("\r\n")],{type:"text/plain;charset=utf-8"}));
     const link=document.createElement("a");link.href=url;link.download=model.name+"-revision.txt";link.click();onDownloaded();setTimeout(()=>URL.revokeObjectURL(url),1000);
     if(guided)dialog.current?.close();
@@ -88,6 +118,17 @@ export function DeliveryReview({model,locate,guided,onDownloaded,trigger,control
       <p>{model.name} · {model.schema}</p>{guided && report && <p className="guide-tip" role="status">Paso 4 de 4 · Comprueba que tu observación aparece en el resultado y pulsa Descargar informe para conservarlo.</p>}
       {report && <section aria-label="Resultados de revisión"><p role="status">{report.inspected} registros · {report.scope}</p>
       {report.omissions && <p>Sin representar: {report.omissions}</p>}
+      {scope && <section className="review-server" aria-label="Informe del servidor"><h3>Informe del servidor</h3>
+        {serverError?<p role="alert">No se pudo leer el informe del servidor: {serverError}</p>:serverReview && <>
+          {serverReview.summary?<>
+            <p>{summaryLine(serverReview.summary)}</p>
+            <p className="review-server-classes">{topClasses(serverReview.summary)}</p>
+            <ul className="review-server-operations">{operationLines(serverReview.summary).map(line=><li key={line}>{line}</li>)}</ul>
+          </>:<p>La lectura del motor no está disponible: {serverReview.summaryError}</p>}
+          {serverReview.changes.length?serverReview.changes.map(item=><ServerChange key={item.role+item.change.id} role={item.role} change={item.change}/>)
+            :<p>Ningún cambio de modelo publicó esta versión ni está abierto sobre ella.</p>}
+        </>}
+      </section>}
       {report.excerpts.length>0 && <div><h3>Extractos del revisor</h3>{report.excerpts.map(note=><p key={note.id}>{note.text} · {note.source?.name??"Vínculo perdido"}</p>)}</div>}
       {report.checks.map(row=><details key={row.check}><summary>{row.check} · {row.result} ({row.evidence.length})</summary>
         {row.evidence.slice(0,12).map(item=><button key={item.id} onClick={()=>goTo(item.id)}>{item.name} · {item.group}</button>)}

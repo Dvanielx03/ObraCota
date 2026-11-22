@@ -24,12 +24,10 @@ async function pointsTo(page:Page,target:Locator){
 const variants=[
   {name:"1006",width:1006,height:667,reducedMotion:false},
   {name:"1006 · movimiento reducido",width:1006,height:667,reducedMotion:true},
-  {name:"390",width:390,height:844,reducedMotion:true},
 ];
 
 for(const {name,width,height,reducedMotion} of variants){
   test("Cursor y spotlight desde selección a descarga · "+name,async({page})=>{
-    test.skip(width<1000,"Solo escritorio (D-12)");
     await page.setViewportSize({width,height});
     await page.emulateMedia({reducedMotion:reducedMotion?"reduce":"no-preference"});
     await page.goto("/proyectos/restage/visor");await page.getByRole("button",{name:"Iniciar guía"}).click();

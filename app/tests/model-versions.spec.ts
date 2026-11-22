@@ -19,7 +19,7 @@ for (const [format, path] of [["IFC",process.env.TEST_IFC],["DWG",process.env.TE
     const project=(await created.json()).id, base="/api/projects/"+project;
     try {
       await page.goto("/proyectos/"+project+"/archivos");
-      await page.getByLabel("Archivo IFC o DWG").setInputFiles(source);
+      await page.getByTestId("model-upload").setInputFiles(source);
       const uploading=page.waitForResponse(r=>r.url().includes("/uploads?"),{timeout:180000});
       await page.getByRole("button",{name:"Guardar versión"}).click();
       const upload=await uploading;
@@ -51,7 +51,7 @@ for (const [format, path] of [["IFC",process.env.TEST_IFC],["DWG",process.env.TE
       if(format==="DWG" && process.env.TEST_DWG_REVISION) {
         await page.getByRole("link",{name:"Volver a archivos"}).click();
         await page.getByLabel("Guardar en").selectOption(v.fileId);
-        await page.getByLabel("Archivo IFC o DWG").setInputFiles(process.env.TEST_DWG_REVISION);
+        await page.getByTestId("model-upload").setInputFiles(process.env.TEST_DWG_REVISION);
         await page.getByRole("button",{name:"Guardar versión"}).click();
         await expect(page.getByRole("link",{name:"Abrir versión 2 en el visor"})).toBeVisible();
         const [revision,previous]=await (await page.request.get(base+"/files/"+v.fileId+"/versions",{headers})).json();

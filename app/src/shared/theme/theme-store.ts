@@ -26,3 +26,15 @@ export function subscribeTheme(notify: () => void) {
     window.removeEventListener("storage", storage);
   };
 }
+
+/**
+ * Makes the browser chrome follow a forced mode too: the two `theme-color` metas of the root layout are keyed by
+ * prefers-color-scheme, so a forced mode switches off the one of the other palette (KNOWN_ISSUES #30).
+ */
+export function syncThemeColor(mode: ThemeMode) {
+  for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+    const media = meta.dataset.media ?? meta.media;
+    meta.dataset.media = media;
+    meta.media = mode === "system" ? media : media.includes(mode) ? "all" : "not all";
+  }
+}

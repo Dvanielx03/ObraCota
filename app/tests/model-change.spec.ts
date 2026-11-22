@@ -114,6 +114,26 @@ test("Cambio de modelo: borrador, vista previa en 3D, envío, rechazo, aplicaci�
     await json(await page.request.post(base+"/model-changes/"+second+"/operations",{headers,...slow,data:{op:"ifc.change_type",element:door,type_id:alternate}}),201);
     expect((await json(await page.request.post(base+"/model-changes/"+second+"/preview",{headers,...slow}),200)).report.ok).toBe(true);
     expect((await json(await page.request.post(base+"/model-changes/"+second+"/submit",{headers,...slow,data:{}}),200)).status).toBe("READY");
+    // E4b · when the preview file of a ready change is gone (the sweep removed it), the card offers «Previsualizar de
+    // nuevo» next to the disabled «Ver propuesta en 3D». The list answer is altered only to tell that state; the new
+    // preview is real and gives the link back.
+    await page.route(url=>url.pathname.endsWith("/projects/"+id+"/model-changes"),async route=>{
+      if(route.request().method()!=="GET")return route.fallback();
+      const response=await route.fetch(),rows=await response.json();
+      for(const row of rows)if(row.id===second){row.preview.available=false;row.actions.apply=false;
+        row.actions.reasons.apply="Pendiente: previsualízalo de nuevo para aprobarlo";}
+      await route.fulfill({response,json:rows});
+    });
+    await page.reload();
+    const expired=page.locator(`article[id="${second}"]`);
+    await expect(expired.getByRole("button",{name:"Ver propuesta en 3D"})).toBeDisabled();
+    await expect(expired.getByRole("button",{name:"Aprobar y aplicar cambio"})).toBeDisabled();
+    await page.unroute(url=>url.pathname.endsWith("/projects/"+id+"/model-changes"));
+    await expired.getByRole("button",{name:"Previsualizar de nuevo"}).click();
+    await expect(expired.getByRole("link",{name:"Ver propuesta en 3D"})).toBeVisible({timeout:150_000});
+    await expect(expired.getByRole("button",{name:"Previsualizar de nuevo"})).toHaveCount(0);
+    await expect(expired.getByText("Lista para aprobar",{exact:true})).toBeVisible();
+
     await page.reload();
     await expect(page.locator(`article[id="${first}"]`).getByRole("button",{name:"Aprobar y aplicar cambio"})).toBeEnabled();
     const rejected=page.locator(`article[id="${second}"]`);
@@ -147,6 +167,12 @@ test("Cambio de modelo: borrador, vista previa en 3D, envío, rechazo, aplicaci�
     const frozen=page.locator(`article[id="${first}"]`).getByRole("region",{name:"Estimación del cambio"});
     await expect(frozen).toContainText(/25[.,]000/);
     await expect(frozen).toContainText("Estimación congelada al aprobar");
+    // Only the applied change adds up (the rejected one does not), and its card links back to the full change.
+    const total=page.getByRole("region",{name:"Total de cambios aprobados"});
+    await expect(total).toContainText(/25[.,]000/);
+    await expect(total).toContainText("1 cambio aprobado con estimación completa");
+    await expect(page.locator(`article[id="${first}"]`).getByRole("link",{name:"Ver el cambio completo"}))
+      .toHaveAttribute("href","/proyectos/"+id+"/cambios#"+first);
 
     // E7 · the restoring revision v3 carries the SHA-256 of the original upload.
     await page.goto(route+"/cambios#"+first);

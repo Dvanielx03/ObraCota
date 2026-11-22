@@ -10,6 +10,7 @@ import {
 } from "@/modules/design-option/domain/edit-globals";
 import { placeAbove, useAnchorRect } from "./tool-popover";
 import { StyleThumb } from "./edit-style-thumb";
+import { useDisabledReason } from "@/shared/ui/disabled-reason";
 import { Spinner } from "@/shared/ui/loading";
 
 type Icon = ComponentType<{ size?: number; strokeWidth?: number; "aria-hidden"?: boolean | "true" }>;
@@ -122,12 +123,14 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function ApplyButton({ reason, busy, cost, onApply }: { reason?: string; busy: boolean; cost?: string; onApply: () => void }) {
   const title = reason ? "Aplicar cambios\n" + reason : "Aplicar cambios" + (cost ? " · reserva " + cost : "");
+  const off = useDisabledReason(reason);
   return (
     <div className="edit-apply-cell">
       <button type="button" className="edit-apply" aria-label="Aplicar cambios" aria-disabled={reason || busy ? true : undefined} aria-busy={busy || undefined}
-        title={title} onClick={() => { if (!reason && !busy) onApply(); }}>
+        aria-describedby={off.describedBy} title={title} onClick={() => { if (!reason && !busy) onApply(); }}>
         {busy ? <Spinner size={16} /> : <ArrowUp size={16} strokeWidth={2} aria-hidden="true" />}
       </button>
+      {off.note}
     </div>
   );
 }

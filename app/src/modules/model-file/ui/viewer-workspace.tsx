@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CubeIcon, SidebarSimpleIcon, XIcon } from "@phosphor-icons/react";
-import { Footprints, Hand, House, ListChecks, Maximize, Minus, Plus, Rotate3d, SquareDashed, X } from "lucide-react";
+import { Circle, Footprints, Hand, House, ListChecks, Maximize, Minus, Plus, Rotate3d, Square, SquareDashed, X } from "lucide-react";
 import type {CameraPose,ModelInfo,ViewerPort} from "@/viewer/domain/viewer.port";
 import { ViewCube } from "./view-cube";
 import {SidebarWidth} from "./sidebar-width";
@@ -17,14 +17,18 @@ import { SelectionAssistant } from "@/modules/design-option/ui/selection-assista
 import { PrismaTour,type MaskStep,type PrismaStep } from "@/modules/design-option/ui/prisma-tour";
 import { NotesContext } from "./notes-source";
 import { ViewerHeader } from "./viewer-header";
+import { StoredPreview, useOpenFailure } from "./stored-preview";
 import type { VersionNotes } from "@/modules/model-version/domain/model-version";
 import { VersionRail, type VersionRailHandle } from "@/modules/model-version/ui/version-rail";
+import { VersionCompare } from "@/modules/model-version/ui/version-compare";
 import { WorkspaceTools, type WorkspaceToolsHandle } from "./workspace-tools";
 import { IconTool, ModeButton, RovingToolbar, ToolSeparator } from "./tool-bar";
 import { ShortcutSheet } from "./shortcut-sheet";
 import { TOOL_KEYS, shortcutFor, toolNotice, type ShortcutAction } from "../domain/shortcuts";
 import { EmptyArt, ModelPreparing, Spinner } from "@/shared/ui/loading";
 import { ENTRY_SETTLING_PHASE, remainingHold } from "../domain/entry-hold";
+import { RECORDING_FPS, RECORDING_LIMIT_MS, recordingClock, recordingName, recordingType, startRecording, type WalkRecording } from "@/viewer/infrastructure/walk-recording";
+import { saveBlob } from "@/modules/scene-view/infrastructure/export-files";
 
 /** "Duplex.ifc · 2,3 MB": the file being opened, under the phase of the wait. */
 function fileLine(file: File | null): string {
@@ -67,6 +71,8 @@ export interface ProposalView {
   label: string;
   description: string;
   compare: (context:{elements:ModelInfo["elements"];viewer:()=>ViewerPort|null;selected:string|null})=>ReactNode;
+  /** The change on the server, so Revisar adds its report (H7). */
+  scope?: {project:string;change:string};
 }
 
 export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", initialFile, storedNotes, storedVersion, loadPrevious, projectName, revision, proposal, walkLabels }: {
@@ -83,6 +89,8 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   const previewing = !!proposal;
   const [model,setModel] = useState<ModelInfo|null>(null), [selected,setSelected] = useState<string|null>(null);
   const [status,setStatus] = useState("Iniciando visor…"), [error,setError] = useState(""), [pan,setPan] = useState(false);
+  /** The thumbnail a DWG of ACIS solids keeps, shown in the «No se pudo abrir» card that tells its failure. */
+  const failure = useOpenFailure(error);
   // Minimum time on the preparing screen when arriving from the panel (see domain/entry-hold).
   const [holding,setHolding] = useState(true);
   useEffect(()=>{
@@ -103,7 +111,13 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   const [walkError,setWalkError]=useState(""),[walkLoading,setWalkLoading]=useState(""),[walkOlder,setWalkOlder]=useState(false);
   const walkRequest=useRef<AbortController|null>(null),previousFile=useRef<File|undefined>(undefined),beforeWalk=useRef(true);
   const walkEnded=useRef(false);
+  // «Grabar» of the walk (H7): the recorder, its clock on the button and the WebM type this browser records.
+  const recording=useRef<WalkRecording|null>(null);
+  const [recordClock,setRecordClock]=useState<string|null>(null),[recordType,setRecordType]=useState<string>();
+  useEffect(()=>setRecordType(recordingType()),[]);
+  const finishRecording=useRef<()=>void>(()=>undefined);
   const stopWalk=useCallback(()=>{
+    finishRecording.current();
     walkRequest.current?.abort();
     viewer.current?.cancelWalk();
     walkEnded.current=true;
@@ -328,6 +342,35 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     return ()=>clearTimeout(timer);
   },[notice]);
   const [shortcutsOpen,setShortcutsOpen]=useState(false);
+  const modelName=model?.name;
+  finishRecording.current=()=>{
+    const active=recording.current;
+    if(!active)return;
+    recording.current=null;setRecordClock(null);
+    const length=recordingClock(active.elapsed()),name=recordingName(modelName??"modelo",new Date());
+    active.stop().then(video=>{saveBlob(name,video);say("Descargado "+name+" · "+length+" de recorrido.");})
+      .catch(error=>say(error instanceof Error?error.message:"No se pudo guardar la grabación.","error"));
+  };
+  function toggleRecording(){
+    if(recording.current){finishRecording.current();return;}
+    const stream=recordType?viewer.current?.stream(RECORDING_FPS):null;
+    if(!stream||!recordType){say("Este navegador no puede grabar el lienzo del recorrido.","error");return;}
+    try{recording.current=startRecording(stream,recordType);setRecordClock("0:00");}
+    catch{for(const track of stream.getTracks())track.stop();say("El navegador no pudo empezar la grabación.","error");}
+  }
+  // The clock on the button, and the five-minute limit.
+  useEffect(()=>{
+    if(recordClock===null)return;
+    const timer=setInterval(()=>{
+      const active=recording.current;
+      if(!active)return;
+      if(active.elapsed()>=RECORDING_LIMIT_MS)finishRecording.current();
+      else setRecordClock(recordingClock(active.elapsed()));
+    },500);
+    return ()=>clearInterval(timer);
+  },[recordClock!==null]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Leaving the page while recording keeps what was recorded.
+  useEffect(()=>()=>finishRecording.current(),[]);
   function startWalk(){
     stopTour();setPrismaStep(null);setQuick(null);
     beforeWalk.current=panel;setPanel(false);setWalk("mark");setWalkError("");
@@ -419,7 +462,8 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           </ModelPreparing>
           : !ready && <div className="feedback" role="status" data-kind={error?"error":"empty"}>
           {error ? <CubeIcon size={32}/> : <EmptyArt width={220}/>}<h2>{error?"No se pudo abrir":"Abrir un modelo"}</h2>
-          {error ? <p>{error}</p> : <p>Sube un IFC o un DWG de tu equipo, o recorre el edificio de ejemplo.</p>}
+          {error ? <p>{error}</p> : <p>Sube un IFC, DWG, FBX u OBJ de tu equipo, o recorre el edificio de ejemplo.</p>}
+          {failure && <StoredPreview failure={failure}/>}
           <div>{viewer.current ? <><button onClick={()=>input.current?.click()}>Elegir archivo</button>
             <button onClick={()=>model?setError(""):open(null)}>{model?"Volver al modelo":"Explorar ReStage"}</button></> :
             <button onClick={()=>{setError("");setStatus("Iniciando visor…");setSession(s=>s+1);}}>Reintentar</button>}</div>
@@ -428,7 +472,9 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           pose={readPose} apply={applyPose} capture={capturePicture} control={strip} onCount={setViewCount}
           deck={{title:projectName,file:model?.name??"",version:revision?.label,date:revision?.date}} explorer={{open:panel,toggle:()=>showExplorer(!panel)}}
           onPresentStart={presentStarted} onPresentEnd={presentEnded}/>}
-        {ready && !touring && serverNotes && storedVersion && <VersionRail project={storedVersion.project} version={storedVersion.version} control={rail}/>}
+        {ready && !touring && serverNotes && storedVersion && <VersionRail project={storedVersion.project} version={storedVersion.version} control={rail}
+          compare={model?versions=><VersionCompare project={storedVersion.project} version={storedVersion.version} versions={versions} model={model}
+            viewer={readViewer} selected={selected} locate={id=>{pick(id);viewer.current?.locate(id);}}/>:undefined}/>}
         <p className="visually-hidden" role="status">{notice?.tone==="info"?notice.text:""}</p>
         {notice && <p key={notice.at} className="workspace-toast" data-tone={notice.tone} role={notice.tone==="error"?"alert":undefined}
           aria-hidden={notice.tone==="error"?undefined:true}>{notice.text}</p>}
@@ -443,6 +489,12 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
               <button type="button" data-tool="" className="tool-mode" aria-disabled={walkLoading?true:undefined} aria-pressed={walkOlder} title={walkLabels?"Ver «"+walkLabels.older+"» desde el mismo punto":"Ver la versión anterior desde el mismo punto"} onClick={()=>{if(!walkLoading)void compareWalk(true);}}>{walkLabels?.older??"Anterior"}</button>
               <button type="button" data-tool="" className="tool-mode" aria-disabled={walkLoading?true:undefined} aria-pressed={!walkOlder} title={walkLabels?"Volver a «"+walkLabels.newer+"»":"Volver a esta versión"} onClick={()=>{if(!walkLoading)void compareWalk(false);}}>{walkLabels?.newer??"Nueva"}</button>
             </>}
+            {walk==="active" && recordType && <><ToolSeparator/>
+              <button type="button" data-tool="" className="tool-mode walk-record" aria-pressed={recordClock!==null}
+                aria-label={recordClock!==null?"Detener grabación":"Grabar recorrido"}
+                title={recordClock!==null?"Detener y descargar el video (WebM)":"Grabar el recorrido en video (WebM, hasta 5 minutos)"} onClick={toggleRecording}>
+                {recordClock!==null?<Square size={14} strokeWidth={2.4} aria-hidden="true"/>:<Circle size={14} strokeWidth={2.4} aria-hidden="true"/>}
+                {recordClock!==null?<>Detener <span className="walk-record-clock">{recordClock}</span></>:"Grabar"}</button></>}
             <ToolSeparator/>
             <button type="button" data-tool="" className="walk-exit" title="Salir del recorrido · Esc" onClick={stopWalk}><X size={16} strokeWidth={2} aria-hidden="true"/>Salir</button>
           </RovingToolbar>
@@ -454,11 +506,11 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
         {ready && !touring && model && <WorkspaceTools key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} control={tools} viewer={readViewer} plan={plan}
           scope={!plan && serverNotes && storedVersion ? storedVersion : undefined} pieces={optionPieces} onWorking={setOptionsWorking}
           proposal={proposal && showingInitial?{renderReason:PROPOSAL_RENDER,compare:proposal.compare({elements:model.elements,viewer:readViewer,selected})}:undefined}
-          edit={{on:assistant,grouping,reason:proposal && showingInitial?PROPOSAL_EDIT:prismaAvailable?undefined:"Editar trabaja con modelos IFC y GLB",
+          edit={{on:assistant,grouping,reason:proposal && showingInitial?PROPOSAL_EDIT:prismaAvailable?undefined:"Editar necesita un modelo 3D (IFC, FBX, OBJ o el ejemplo GLB); las propuestas de cambio solo funcionan con IFC",
             selection:ids,onSelection:next=>{setIds(next);setColor(null);},piece:findElement,onFocusPiece:setEditFocus,
             onEnter:enterEdit,onExit:exitEdit,onUngroup:()=>setGrouping(false)}}
           reviewOpen={reviewOpen} onCloseReview={()=>review.current?.close()}
-          review={<DeliveryReview control={review} onOpenChange={setReviewOpen} guided={guide==="review"&&!paused} onDownloaded={()=>{if(guide==="review"&&!paused){setGuide("done");rememberGuide();}}} key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} model={model} locate={id=>{setPanel(true);pick(id);viewer.current?.locate(id);}}
+          review={<DeliveryReview server={serverNotes && storedVersion?storedVersion:proposal && showingInitial?proposal.scope:undefined} control={review} onOpenChange={setReviewOpen} guided={guide==="review"&&!paused} onDownloaded={()=>{if(guide==="review"&&!paused){setGuide("done");rememberGuide();}}} key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} model={model} locate={id=>{setPanel(true);pick(id);viewer.current?.locate(id);}}
             trigger={(toggle,anchor,open)=><ModeButton ref={anchor} icon={ListChecks} label="Revisar" aria-label="Revisar entrega" aria-haspopup="dialog" aria-expanded={open} aria-controls="tool-review" className="review-trigger" shortcut={TOOL_KEYS.review} onClick={toggle}/>}/>}
           walk={{reason:model.walk && prismaAvailable?undefined:"Disponible al abrir un IFC guardado en uno de tus proyectos",onStart:startWalk}}
           camera={<RovingToolbar label="Controles de la cámara" className="tools">

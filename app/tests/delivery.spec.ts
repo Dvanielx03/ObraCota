@@ -80,8 +80,7 @@ test("Entrega IFC · validar evidencia del informe contra el STEP original",asyn
   await more.click();expect(await branch.locator(".entry").count()).toBeGreaterThan(initial);
   console.log(report.split(/\r?\n/).filter(l=>l.includes(" — ")||l.startsWith("Registros revisados")).slice(0,4));
 });
-for(const [width,height] of [[1366,768],[390,844]])test("Ejemplo · alcance limitado, diálogo y teclado · "+width,async({page})=>{
-  test.skip(width<1000,"Solo escritorio (D-12)");
+for(const [width,height] of [[1366,768]])test("Ejemplo · alcance limitado, diálogo y teclado · "+width,async({page})=>{
   await page.setViewportSize({width,height});await page.goto("/proyectos/restage/visor");
   await page.getByRole("button",{name:"Revisar entrega"}).click();
   await page.getByRole("button",{name:"Preparar informe"}).click();

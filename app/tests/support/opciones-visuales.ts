@@ -47,7 +47,7 @@ export async function createProject(page:Page,name:string){
 /** Sube el IFC desde «Archivos» y abre la versión 1 en el visor, hasta que la barra inferior aparece. */
 export async function openFirstVersion(page:Page,project:string,file:string,expectedName:string|RegExp,timeout=120_000){
   await page.goto("/proyectos/"+project+"/archivos");
-  await page.getByLabel("Archivo IFC o DWG").setInputFiles(file);
+  await page.getByTestId("model-upload").setInputFiles(file);
   await page.getByRole("button",{name:"Guardar versión"}).click();
   await page.getByRole("link",{name:"Abrir versión 1 en el visor"}).click();
   await expect(page.locator(".project")).toContainText(expectedName,{timeout});

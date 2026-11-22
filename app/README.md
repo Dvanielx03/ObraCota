@@ -20,11 +20,13 @@ Se eligió el lector WASM por privacidad, ejecución local y compatibilidad con 
 
 **Navegación.** Rueda para acercar al cursor, botón central para desplazar, Mayús + botón central para orbitar sobre la geometría bajo el puntero. Doble clic central encuadra la extensión manteniendo la orientación. El cubo orienta las vistas y la tríada indica los ejes del dibujo. Zoom ventana amplía un rectángulo; Esc cancela. Inicio en el lienzo restablece la cámara. Se conservan los gestos táctiles, las herramientas existentes y el control por teclado. [Navegación de AutoCAD](https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-GettingStarted/files/GUID-FFD36F14-5A5E-4DF3-86E9-4B811B158138.htm)
 
-**Pruebas.** Con el servidor activo, ejecutar `npx playwright test` con Microsoft Edge. `VIEWER_URL` cambia el servidor de destino y `LANDING_URL` el de la landing. Las pruebas que necesitan un archivo local se omiten si falta su variable:
+**Comprobaciones.** `npm run typecheck` (TypeScript), `npm run lint` (ESLint con `next/core-web-vitals`; las reglas de hooks son errores y las de accesibilidad `jsx-a11y`, advertencias) y `npm test` (Playwright).
+
+**Pruebas.** Con el servidor activo, ejecutar `npx playwright test` con Microsoft Edge. Solo hay un proyecto de escritorio: la app no se adapta a móvil. `VIEWER_URL` cambia el servidor de destino y `LANDING_URL` el de la landing. Cuando un enlace de la landing apunta a otro origen, la prueba lo activa de verdad (clic o teclado), comprueba que navega a su `href` con una respuesta simulada y después abre la misma ruta en `VIEWER_URL`. Para `panel.spec.ts`, la app debe conocer la landing con `NEXT_PUBLIC_SITE_URL` igual a `LANDING_URL` (en desarrollo, en `.env.development.local`; en un `next build`, como variable de entorno al construir). El campo de subida de «Archivos y versiones» se localiza con `getByTestId("model-upload")`, no por su texto. Las pruebas que necesitan un archivo local se omiten si falta su variable:
 
 | Variable | Qué habilita |
 |---|---|
-| `TEST_IFC` | IFC propio para el visor, la entrega y las versiones |
+| `TEST_IFC` | IFC propio para el visor, la entrega y las versiones; la prueba de Editar con máscara exige el IFC completo de ReStage y falla con un mensaje claro si es otro |
 | `RESTAGE_IFC` | IFC completo de ReStage para el recorrido (`walk.spec.ts`) |
 | `DUPLEX_IFC` | Duplex A: cambios de modelo, vistas guardadas, edición y opciones |
 | `DUPLEX_WIDER_IFC` | Variante del Duplex con una puerta más ancha (`door-evidence.spec.ts`) |
@@ -34,7 +36,7 @@ Se eligió el lector WASM por privacidad, ejecución local y compatibilidad con 
 | `BIMOBJECT_DIR` | Carpeta con DWG, FBX y OBJ de fabricante (`bimobject-dwg.spec.ts`, `fbx-obj.spec.ts`) |
 | `TEST_LIVE_RAG=1` | Asistente documental contra Gemini real (gasta; requiere autorización) |
 | `TEST_LIVE_GEMINI=1` | Opciones visuales contra Gemini real (gasta; requiere autorización) |
-| `TEST_NO_GEMINI=1` | Opciones visuales sin clave, con respuestas de ensayo |
+| `TEST_NO_GEMINI=1` | Opciones visuales contra un servidor sin clave de Gemini: comprueba el aviso y usa respuestas de ensayo |
 | `TEST_HARDWARE_GPU=1` | Usa la gráfica del equipo en lugar de SwiftShader |
 | `EVIDENCE_DIR` | Carpeta donde se guardan las capturas de evidencia |
 

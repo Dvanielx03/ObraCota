@@ -6,6 +6,7 @@ import { IconTool, RovingToolbar, ToolSeparator } from "./tool-bar";
 import { EditGlobalPopover } from "./edit-global-popover";
 import { useAnchorRect } from "./tool-popover";
 import { Spinner } from "@/shared/ui/loading";
+import { useDisabledReason } from "@/shared/ui/disabled-reason";
 
 const GLOBAL_ICONS: Record<GlobalTool, typeof SunMedium> = { time: SunMedium, atmosphere: CloudSun, environment: Trees, people: UsersRound, style: Paintbrush };
 
@@ -51,6 +52,7 @@ export function EditBar({ anchor, hidden, active, onActive, marks, edit, pill, a
   const openTool = active && active !== "select" ? active : null;
   const pendingTool = edit?.tool;
   const summary = globalSummary(edit);
+  const addOff = useDisabledReason(addReason);
   return (
     <div className="edit-dock" hidden={hidden} style={dock ? { left: Math.max(12, dock.left), bottom: window.innerHeight - dock.top + 10 } : { visibility: "hidden" }}>
       {pill && !openTool && <p className="edit-pill" data-tone={pill.tone} role={pill.tone === "error" ? "alert" : "status"}>{pill.busy && <Spinner size={12} />}{pill.text}</p>}
@@ -69,7 +71,8 @@ export function EditBar({ anchor, hidden, active, onActive, marks, edit, pill, a
           <IconTool icon={RotateCcw} aria-label="Restablecer ediciones" disabledReason={resetReason} onClick={onReset} />
         </RovingToolbar>
         <button type="button" className="edit-add-center" aria-disabled={addReason ? true : undefined} title={addReason ?? "Añade una marca en el centro del lienzo"}
-          onClick={() => { if (!addReason) onAddCenter(); }}>Añadir marca en el centro</button>
+          aria-describedby={addOff.describedBy} onClick={() => { if (!addReason) onAddCenter(); }}>Añadir marca en el centro</button>
+        {addOff.note}
       </div>
       {openTool && <EditGlobalPopover key={openTool} tool={openTool} anchor={bar} opener={() => buttons.current[openTool] ?? null}
         edit={edit} cost={cost} applyReason={applyReason} busy={applying} error={error}

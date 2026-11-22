@@ -3,6 +3,7 @@ import {createHash,randomUUID} from "node:crypto";
 import {readFileSync} from "node:fs";
 import {strFromU8,unzipSync} from "three/addons/libs/fflate.module.js";
 import {expectWalkable,findFloor,walkButton} from "./walk-support";
+import {backendReady} from "./support/backend";
 
 const door="1hOSvn6df7F8_7GcBWlS8Z",alternate="2klOFZffH6WQFlV10uM1wF";
 
@@ -10,6 +11,7 @@ test("Revisión real de puerta, avisos, precio, aplicación y restauración",asy
   test.setTimeout(180_000);
   const ifc=process.env.DUPLEX_IFC;
   test.skip(!ifc,"Indica el IFC Duplex original con DUPLEX_IFC.");
+  await backendReady(page.request);
   const auth=await page.request.post("/api/auth/register",{headers:{"X-ObraCota-Client":"web"},
     data:{email:randomUUID()+"@example.test",password:randomUUID()}});
   expect(auth.ok()).toBeTruthy();
@@ -21,7 +23,7 @@ test("Revisión real de puerta, avisos, precio, aplicación y restauración",asy
   const expectedSha=createHash("sha256").update(readFileSync(ifc!)).digest("hex");
   try{
     await page.goto(route+"/archivos");
-    await page.getByLabel("Archivo IFC o DWG").setInputFiles(ifc!);
+    await page.getByTestId("model-upload").setInputFiles(ifc!);
     await page.getByRole("button",{name:"Guardar versión"}).click();
     // Prisma pasó a EDITAR (DU-16): el historial abre la versión con Editar activo.
     const viewerLink=page.getByRole("link",{name:"Abrir en Editar"});

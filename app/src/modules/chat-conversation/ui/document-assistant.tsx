@@ -55,14 +55,16 @@ function Consultation({project,source}:{project:string;source:Source}){
 }
 export function SelectedDocuments({project,version,keys}:{project:string;version:string;keys:string[]}){
   const [rows,setRows]=useState<Source[]>(),[id,setId]=useState(""),[failed,setFailed]=useState(false);
+  // Compared by value: a new array with the same elements must not query again.
+  const wanted=JSON.stringify(keys);
   useEffect(()=>{
-    const control=new AbortController();
+    const control=new AbortController(),elements:string[]=JSON.parse(wanted);
     authenticated<Source[]>("projects/"+project+"/assistant",{signal:control.signal}).then(all=>{
-      const linked=all.filter(row=>row.version===version && keys.includes(row.element));
+      const linked=all.filter(row=>row.version===version && elements.includes(row.element));
       setRows(linked);setId(linked[0]?.id??"");
     }).catch(()=>{if(!control.signal.aborted)setFailed(true);});
     return ()=>control.abort();
-  },[project,version,JSON.stringify(keys)]);
+  },[project,version,wanted]);
   if(failed)return <p role="alert">No se pudieron consultar las fichas.</p>;
   if(!rows)return <LoadingStatus>Buscando fichas…</LoadingStatus>;
   if(!rows.length)return <p>Esta selección no tiene fichas vinculadas en esta versión.</p>;

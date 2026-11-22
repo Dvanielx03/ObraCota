@@ -97,7 +97,7 @@ for (const mesh of MESHES) test(`Malla de fabricante · ${basename(mesh.file)} (
     });
     // Upload through the project's form, as a person would.
     await page.goto("/proyectos/" + project + "/archivos");
-    const picker = page.getByLabel("Archivo IFC o DWG, o modelo 3D FBX u OBJ");
+    const picker = page.getByTestId("model-upload");
     expect(await picker.getAttribute("accept")).toBe(".ifc,.dwg,.fbx,.obj");
     await picker.setInputFiles(source);
     const uploading = page.waitForResponse(r => r.url().includes("/uploads?"), { timeout: 180_000 });
@@ -162,7 +162,8 @@ for (const mesh of MESHES) test(`Malla de fabricante · ${basename(mesh.file)} (
     const outside = requests.filter(url => !/^(data|blob):/.test(url) && new URL(url).origin !== origin);
     expect(outside, "peticiones fuera de la app").toEqual([]);
     const assets = requests.filter(url => !/^(data|blob):/.test(url) && /\.(png|jpe?g|tga|bmp|tiff?|dds|psd|gif|mtl)(\?|$)/i.test(new URL(url).pathname)
-      && !/^\/(_next|loaders|icons?|images?)\//.test(new URL(url).pathname));
+      // /models/ holds the app's own pictures (the guide card shows /models/restage-vista.jpg), never a texture of the upload.
+      && !/^\/(_next|loaders|icons?|images?|models)\//.test(new URL(url).pathname));
     expect(assets, "texturas o materiales pedidos").toEqual([]);
   } finally {
     await page.request.delete(base, { headers });
@@ -178,7 +179,7 @@ test("Editar con una malla FBX: lo que hoy permite", async ({ page }, info) => {
   const base = "/api/projects/" + project;
   try {
     await page.goto("/proyectos/" + project + "/archivos");
-    await page.getByLabel("Archivo IFC o DWG, o modelo 3D FBX u OBJ").setInputFiles(source);
+    await page.getByTestId("model-upload").setInputFiles(source);
     await page.getByRole("button", { name: "Guardar versión" }).click();
     await page.getByRole("link", { name: "Abrir versión 1 en el visor" }).click();
     await expect(page.locator(".project")).toHaveText(basename(source), { timeout: 120_000 });
@@ -210,7 +211,7 @@ test("Un FBX con extensión .obj se rechaza con un motivo claro", async ({ page 
   const { headers, project } = await account(page, "OBJ falso");
   try {
     await page.goto("/proyectos/" + project + "/archivos");
-    await page.getByLabel("Archivo IFC o DWG, o modelo 3D FBX u OBJ").setInputFiles({ name: "PK60.obj", mimeType: "application/octet-stream", buffer: readFileSync(source) });
+    await page.getByTestId("model-upload").setInputFiles({ name: "PK60.obj", mimeType: "application/octet-stream", buffer: readFileSync(source) });
     let uploads = 0;
     page.on("request", request => { if (request.url().includes("/uploads")) uploads++; });
     await page.getByRole("button", { name: "Guardar versión" }).click();

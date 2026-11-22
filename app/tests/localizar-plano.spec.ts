@@ -1,7 +1,7 @@
 import {test,expect} from "@playwright/test";
 import path from "node:path";
 
-for(const width of [1480,390])test("Lectura localiza sin perder la escala · "+width,async({page},info)=>{
+for(const width of [1480])test("Lectura localiza sin perder la escala · "+width,async({page},info)=>{
   const file=process.env.TEST_DWG;
   test.skip(!file || path.basename(file).toLowerCase()!=="dwg_piscina_030824.dwg");
   // Read the horizontal scale that the live WebGL renderer sends to its shaders.
@@ -20,7 +20,7 @@ for(const width of [1480,390])test("Lectura localiza sin perder la escala · "+w
       return send.call(this,location,transpose,data,...args);
     };
   });
-  await page.setViewportSize({width,height:width===390?844:667});
+  await page.setViewportSize({width,height:667});
   await page.goto("/proyectos/restage/visor");await expect(page.getByRole("button",{name:"Revisar entrega"})).toBeVisible();
   await page.locator("header input").setInputFiles(file!);
   await expect(page.locator(".project")).toHaveText(path.basename(file!),{timeout:60_000});

@@ -24,7 +24,7 @@ test("La ingeniera puede consultar la captura de su IFC antes de enviar datos",a
   page.on("request",request=>{if(request.method()==="POST" && /\/options(?:[/?]|$)/.test(request.url()))posts.push(request.url());});
   try {
     await page.goto(base+"/archivos");
-    await page.getByLabel("Archivo IFC o DWG").setInputFiles(file!);
+    await page.getByTestId("model-upload").setInputFiles(file!);
     await page.getByRole("button",{name:"Guardar versión"}).click();
     await page.getByRole("link",{name:"Abrir versión 1 en el visor"}).click();
     await expect(page.locator(".project")).toHaveText(basename(file!),{timeout:120000});
