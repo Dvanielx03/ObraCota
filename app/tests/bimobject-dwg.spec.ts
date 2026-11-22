@@ -10,16 +10,17 @@ import { MODEL_ONLY, modelShown } from "./support/visor";
  * the files are not in the repository (their licence allows use, not redistribution).
  */
 const folder = process.env.BIMOBJECT_DIR;
-// 2D plans must be drawn. 3D models are stored and kept, but the plan reader cannot draw them yet:
-// ACIS solids need a geometry kernel, and libredwg-web drops polyface meshes (ACadSharp reads them;
-// they arrive with the DWG engine, Fase H · H3). Until then the viewer must say why, not hang.
-const DRAWINGS: { file: string; version: string; note: string; reason?: RegExp }[] = [
+// 2D plans are drawn as plans; 3D models made of polyface meshes (read from the raw objects, as
+// libredwg-web's converter leaves them out) are drawn in 3D. ACIS solids need a geometry kernel
+// ObraCota does not have: the viewer must say so, not hang.
+const DRAWINGS: { file: string; version: string; note: string; mode?: "Plano 2D" | "Vista 3D"; reason?: RegExp }[] = [
   { file: "Basket/Furniture_Other-Furniture_Fritz-Hansen_Basket 2D.dwg", version: "AC1027", note: "2D, AutoCAD 2013" },
   { file: "Essay™ Table CM21/2D_CM21 - Essay Table.DWG", version: "AC1032", note: "2D, AutoCAD 2018" },
   { file: "Hven Bar Stool Low/1067 Hven Bar Stool Low 2d.DWG", version: "AC1015", note: "2D, AutoCAD 2000" },
   { file: "Night Owl™ Table lamp/Lighting_Desk-Table_Fritz-Hansen_Night-OwlT 2D.dwg", version: "AC1024", note: "2D, AutoCAD 2010" },
   { file: "Basket/Furniture_Other-Furniture_Fritz-Hansen_Basket.dwg", version: "AC1027", note: "3D, sólidos ACIS", reason: /modelo 3D con 2 sólidos ACIS/ },
-  { file: "PK60™ Table/3D_PK60.DWG", version: "AC1021", note: "3D, mallas", reason: /9 referencias a bloques sin geometría dibujable.*motor DWG/ },
+  { file: "PK60™ Table/3D_PK60.DWG", version: "AC1021", note: "3D, 10 mallas", mode: "Vista 3D" },
+  { file: "Essay™ Table CM21/3D_CM21 - Essay Table.DWG", version: "AC1021", note: "3D, mallas", mode: "Vista 3D" },
 ];
 
 async function account(page: import("@playwright/test").Page, name: string) {
@@ -63,7 +64,7 @@ for (const drawing of DRAWINGS) test(`DWG de fabricante · ${basename(drawing.fi
     }
     await expect(page.locator(".project")).toHaveText(basename(source), { timeout: 180_000 });
     await modelShown(page);
-    await expect(page.locator(".stagebar")).toContainText("Plano 2D");
+    await expect(page.locator(".stagebar")).toContainText(drawing.mode ?? "Plano 2D");
     await expect(page.locator("#explorer .level, #explorer .entry").first()).toBeVisible();
     const groups = await page.locator("#explorer .level").count();
     const view = page.locator(".stage > .view");

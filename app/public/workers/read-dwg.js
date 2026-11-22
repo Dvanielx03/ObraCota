@@ -15,6 +15,56 @@ function ocs(normal) {
 }
 function sweep(start,end) {const d=(end-start)%tau;return d<=0 ? d+tau : d;}
 
+/**
+ * Polyface meshes (POLYLINE_PFACE with its VERTEX_PFACE and VERTEX_PFACE_FACE records) are how many
+ * manufacturer 3D DWG files keep their geometry, but the converter of libredwg-web leaves them out.
+ * They are read here from the raw objects: vertex points through the dynamic API, and the four face
+ * indices (`vertind`, a fixed array the bindings do not return) straight from the WASM memory at the
+ * field's offset. Each mesh is handed to `extract` as a synthetic entity in its owner block, so block
+ * inserts, layers and visibility apply to it like to any other entity.
+ */
+const PFACE=29, PFACE_VERTEX=13, PFACE_FACE=14;
+const hexId=id=>BigInt(id??0).toString(16).toUpperCase();
+export function addPolyfaceMeshes(reader,ptr,database){
+  const meshes=new Map();
+  const heap=reader.wasmInstance.HEAP16;
+  const total=reader.dwg_get_num_objects(ptr);
+  for(let i=0;i<total;i++){
+    const object=reader.dwg_get_object(ptr,i), type=reader.dwg_object_get_fixedtype(object);
+    if(type!==PFACE && type!==PFACE_VERTEX && type!==PFACE_FACE)continue;
+    const entity=reader.dwg_object_to_entity(object), tio=reader.dwg_object_to_entity_tio(object);
+    if(!entity || !tio)continue;
+    const owner=hexId(reader.dwg_object_entity_get_ownerhandle_object(entity).absolute_ref);
+    if(type===PFACE){
+      const handle=hexId(reader.dwg_object_entity_get_handle_object(entity).value);
+      const layerRef=reader.dwg_object_entity_get_layer_object_ref(entity);
+      const layer=database.tables.LAYER.entries.find(l=>l.handle===hexId(layerRef?.handleref?.value))?.name ?? "0";
+      const mesh=meshes.get(handle) ?? {vertices:[],faces:[]};
+      Object.assign(mesh,{type:"PFACE_MESH",handle,owner,layer,isVisible:!reader.dwg_object_entity_get_invisible(entity)});
+      meshes.set(handle,mesh);
+    }else{
+      const mesh=meshes.get(owner) ?? {vertices:[],faces:[]};
+      meshes.set(owner,mesh);
+      if(type===PFACE_VERTEX)mesh.vertices.push(reader.dwg_dynapi_entity_data(tio,"point"));
+      else{
+        const at=(tio+reader.dwg_dynapi_entity_field_offset(tio,"vertind"))>>1;
+        mesh.faces.push([heap[at],heap[at+1],heap[at+2],heap[at+3]]);
+      }
+    }
+  }
+  const blocks=new Map(database.tables.BLOCK_RECORD.entries.map(b=>[b.handle,b]));
+  let added=0;
+  for(const mesh of meshes.values()){
+    if(mesh.type!=="PFACE_MESH" || !mesh.vertices.length || !mesh.faces.length)continue;
+    // Old files leave the owner of model-space entities empty (0).
+    const block=blocks.get(mesh.owner);
+    if(block && block.name!=="*Model_Space" && !block.name.startsWith("*Paper_Space"))(block.entities??=[]).push(mesh);
+    else if(!block?.name?.startsWith("*Paper_Space"))database.entities.push(mesh);
+    added++;
+  }
+  return added;
+}
+
 // Says what the drawing holds when nothing in it can be drawn, so the person knows whether the file
 // is a 3D model (solids need a geometry kernel; meshes arrive with the DWG engine) or simply empty.
 const SOLIDS=["3DSOLID","REGION","BODY","SURFACE","EXTRUDEDSURFACE","LOFTEDSURFACE","REVOLVEDSURFACE","SWEPTSURFACE","PLANESURFACE","NURBSURFACE"];
@@ -84,7 +134,7 @@ export function extract(db, unknown,indexOnly=false) {
     }
     if(indexOnly)return;
     const space=["ARC","CIRCLE","LWPOLYLINE","POLYLINE2D"].includes(e.type)?parent.clone().multiply(ocs(e.extrusionDirection)):parent;
-    const kind=e.type==="3DFACE"?"faces":e.type==="POINT"?"points":"lines";
+    const kind=e.type==="3DFACE" || e.type==="PFACE_MESH"?"faces":e.type==="POINT"?"points":"lines";
     let batch;
     function vertex(p){
       p.applyMatrix4(space);
@@ -111,6 +161,16 @@ export function extract(db, unknown,indexOnly=false) {
     switch(e.type){
       case "LINE":segment(vec(e.startPoint),vec(e.endPoint));break;
       case "POINT":vertex(vec(e.position));break;
+      case "PFACE_MESH":{
+        // Faces of 3 or 4 corners; indices start at 1, a negative one only hides that edge, 0 means "no corner".
+        const corners=e.vertices.map(vec);
+        for(const face of e.faces){
+          const ids=face.filter(i=>i!==0).map(i=>Math.abs(i)-1);
+          if(ids.length<3 || ids.some(i=>i>=corners.length))continue;
+          for(let k=1;k+1<ids.length;k++)for(const i of [ids[0],ids[k],ids[k+1]])vertex(corners[i].clone());
+        }
+        break;
+      }
       case "3DFACE":{
         const [a,b,c,d]=[e.corner1,e.corner2,e.corner3,e.corner4||e.corner3].map(vec);
         for(const p of [a,b,c])vertex(p.clone());
@@ -167,6 +227,10 @@ self.onmessage=async({data})=>{
     ptr=reader.dwg_read_data(bytes,Dwg_File_Type.DWG);
     if(!ptr)throw new Error("No se pudo decodificar el DWG.");
     const {database,stats}=reader.convertEx(ptr);
+    if(!data.indexOnly){
+      try{addPolyfaceMeshes(reader,ptr,database);}
+      catch{/* A file whose meshes cannot be read still opens with the rest of its geometry. */}
+    }
     reader.dwg_free(ptr);ptr=null;
     self.postMessage({status:"Agrupando geometría por capa…"});
     const result=extract(database,stats.unknownEntityCount,data.indexOnly);
