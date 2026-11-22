@@ -1,0 +1,163 @@
+/*
+ * Loading states (V-09): spinner, skeleton, busy button, the wait over the canvas and the
+ * empty-state drawing. Measures from docs/reference/vibe3d/03-herramientas.md §9 and
+ * 01-proyectos.md §4.4: a turn every 0.8 s (linear) and a 2 s pulse on cubic-bezier(.4,0,.6,1).
+ * Imported by app/layout.tsx after globals.css; everything is still with reduced motion.
+ */
+:root {
+  --loader-paper: #F5F6F7;   /* background of the line-art animations (sampled from the files) */
+  --loader-turn: .8s;
+  --loader-pulse: 2s;
+}
+
+@keyframes loading-turn { to { transform: rotate(360deg); } }
+@keyframes loading-pulse { 50% { opacity: .5; } }
+@keyframes loading-appear { from { opacity: 0; transform: translateY(4px); } }
+@keyframes loading-reveal { from { opacity: 0; } }
+
+/* Spinner (lucide Loader2). */
+.spinner { flex: none; transform-origin: 50% 50%; animation: loading-turn var(--loader-turn) linear infinite; }
+
+/* Spinner inside a line of text. */
+.spinner-inline { margin-right: 6px; vertical-align: -2px; }
+
+/* Skeleton: neutral fill with the reference's pulse. */
+.skeleton { display: block; flex: none; width: 100%; min-height: 1px; border-radius: var(--radius-md); background: var(--hover);
+  animation: loading-pulse var(--loader-pulse) var(--ease-pulse) infinite; }
+.skeleton[data-shape="line"] { height: 12px; border-radius: var(--radius-xs); }
+.skeleton[data-shape="circle"] { aspect-ratio: 1; border-radius: 50%; }
+.skeleton[data-shape="thumb"] { aspect-ratio: 3 / 2; border-radius: var(--radius-lg); }
+.skeleton[data-shape="card"] { aspect-ratio: 3 / 2; border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); border-radius: var(--radius-2xl); background: transparent; }
+.skeleton-lines { display: grid; gap: 8px; width: 100%; }
+
+/* Live status line with its spinner; [data-hidden] keeps it for screen readers only. */
+.loading-status { display: flex; align-items: center; gap: 8px; margin: 0; font: var(--type-hint); color: var(--muted); }
+.loading-status > span { min-width: 0; }
+.loading-status[data-hidden] { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* Busy button: the spinner sits where the icon was; the pointer says the app is working. */
+.busy-button[aria-busy="true"] { cursor: progress; }
+/* The main tool button keeps the reference's disabled fill while it works, but its words stay
+   readable (the reference halves the whole button; here the text keeps 4.5:1). */
+.main-button.busy-button[aria-busy="true"] { opacity: 1; color: var(--muted); }
+/* Panel buttons dim to .75 while they work (the reference's "creating" card uses .7), not .5. */
+.panel-shell .busy-button[aria-busy="true"][disabled] { opacity: .75; }
+
+/* Decorative animation tile: a 20 px-radius card with the animation's own paper. */
+.loader-art { position: relative; display: block; flex: none; width: var(--art-size, 160px); height: var(--art-size, 160px); overflow: hidden; isolation: isolate;
+  border: 1px solid var(--border-soft); border-radius: var(--radius-2xl); background: var(--loader-paper); box-shadow: var(--shadow-card); }
+.loader-art :is(video, img) { display: block; width: 100%; height: 100%; object-fit: cover; user-select: none; pointer-events: none; }
+.loader-art.loader-art-small { border-radius: var(--radius-lg); box-shadow: none; }
+/* Dark mode: the line drawings are inverted (light lines, green kept as a green) and their black
+   paper gives way to the surface; shaded images only dim a little. */
+:root[data-theme="dark"] .loader-art[data-tone="paper"] { background: var(--surface); }
+:root[data-theme="dark"] .loader-art[data-tone="paper"] :is(video, img) { filter: invert(1) hue-rotate(180deg); mix-blend-mode: lighten; }
+:root[data-theme="dark"] .loader-art[data-tone="photo"] :is(video, img) { filter: brightness(.88); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .loader-art[data-tone="paper"] { background: var(--surface); }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .loader-art[data-tone="paper"] :is(video, img) { filter: invert(1) hue-rotate(180deg); mix-blend-mode: lighten; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .loader-art[data-tone="photo"] :is(video, img) { filter: brightness(.88); }
+}
+
+/* Wait over the canvas while a model opens. It appears after 150 ms (the reference's delay), so a
+   quick open does not flash; outside its content the pointer goes through to the canvas. */
+.model-preparing { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  padding: calc(var(--stage-top, 0px) + 24px) 24px 24px; text-align: center; pointer-events: none; animation: loading-appear .2s var(--ease-standard) .15s both; }
+.model-preparing > * { pointer-events: auto; }
+.model-preparing-text { display: grid; justify-items: center; gap: 4px; max-width: min(440px, 100%); }
+.model-preparing-phase { display: inline-flex; align-items: center; gap: 8px; margin: 0; font: var(--type-title-sm); color: var(--ink); }
+.model-preparing-detail { max-width: 100%; margin: 0; overflow: hidden; font: var(--type-caption); color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.model-preparing-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.model-preparing-actions :is(button, a) { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; min-height: 0; margin: 0; padding: 0 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--ink); font: var(--type-tab); text-decoration: none; box-shadow: var(--shadow-sm);
+  transition: background-color var(--duration-base) var(--ease-standard); }
+.model-preparing-actions :is(button, a):hover { background: var(--hover); }
+.model-preparing-actions :is(button, a):focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* Page shown while a stored version downloads (before the viewer exists): the canvas, its dot grid
+   and the floating header, so the viewer opens in the same place. */
+.workspace-pending { position: relative; min-height: 100dvh; background: var(--bg); color: var(--ink); isolation: isolate; overflow: hidden; --stage-top: calc(var(--nav-offset) + var(--nav-height)); }
+.workspace-pending::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background-image: radial-gradient(circle, var(--dot) var(--dot-radius), transparent calc(var(--dot-radius) + .15px)); background-size: var(--dot-gap) var(--dot-gap);
+  background-position: 1.1px 1.1px; mask-image: radial-gradient(ellipse at center, #000, transparent 100%); }
+.workspace-pending-bar { position: absolute; z-index: var(--z-nav); inset: var(--nav-offset) 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  height: var(--nav-height); padding: 0 var(--nav-padding); border: 0; }
+.workspace-pending-crumbs { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.workspace-pending-crumbs > a { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: var(--radius-sm); color: var(--ink); }
+.workspace-pending-crumbs > a:hover { opacity: .75; }
+.workspace-pending-crumbs > svg { flex: none; color: var(--border); }
+.workspace-pending-name { min-width: 0; margin: 0; overflow: hidden; font: var(--type-project-title); color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.workspace-pending-name .skeleton { width: 180px; height: 20px; border-radius: var(--radius-sm); }
+.workspace-pending :is(a, button):focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.workspace-pending .model-preparing { position: absolute; }
+.workspace-pending-error { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px; text-align: center; }
+.workspace-pending-error h2 { margin: 0; font: var(--type-section-title); letter-spacing: var(--tracking-section); }
+.workspace-pending-error p { max-width: 46ch; margin: 0; font: var(--type-description); color: var(--muted); }
+
+/* Tool panels: a batch on its way, private images, the comparison and the download preview. */
+.options-waiting { display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--border-faint); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--field) 50%, transparent); }
+.options-waiting > div { display: grid; gap: 2px; min-width: 0; }
+.options-waiting .options-working { color: var(--ink); font-weight: 600; }
+.options-waiting .options-note { font: var(--type-caption); }
+.option-thumb .image-skeleton { width: 100%; height: 100%; border-radius: 0; }
+.option-original .image-skeleton { aspect-ratio: 3 / 2; margin-top: 6px; border-radius: var(--radius-md); }
+.compare-wait { display: grid; gap: 8px; }
+.compare-wait .compare-skeleton { aspect-ratio: 1.6; max-height: min(50dvh, 28rem); border-radius: var(--radius-lg); }
+.option-download-preview { position: relative; }
+.option-download-preview .download-skeleton { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; }
+.option-download-preview .loading-status { position: relative; }
+.tool-glyph .spinner { width: 16px; height: 16px; }
+.edit-apply .spinner, .edit-field-send .spinner { color: currentColor; }
+.edit-pill .spinner { margin-right: 6px; vertical-align: -2px; }
+
+/* Files page: placeholder columns, the empty list, the upload card and the history rows. */
+.library-skeleton { display: grid; gap: 14px; align-content: start; }
+.library-skeleton-rows { display: grid; gap: 4px; }
+.library-empty { display: grid; justify-items: center; gap: 6px; margin: 8px 0 16px; padding: 12px 0 4px; text-align: center; }
+.panel-columns .library-empty p { margin: 0; font: var(--type-ui); color: var(--muted); }
+.upload-status .upload-card { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 10px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); background: var(--field); }
+.upload-status .upload-card > div { min-width: 0; }
+.upload-status .upload-card p { margin: 2px 0 0; font: var(--type-caption); color: var(--muted); overflow-wrap: anywhere; }
+.upload-status .upload-card .upload-card-title { margin: 0; font: var(--type-title-sm); color: var(--ink); }
+.file-history .file-history-skeleton { display: grid; gap: 10px; }
+.file-history .file-history-pending h3 { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.file-history .file-history-pending p { color: var(--muted); }
+
+/* Empty projects tab: the drawing instead of the folder icon. */
+.project-state .empty-art { width: 176px; height: auto; margin-bottom: 12px; color: inherit; }
+
+/* Account card while the session is read: avatar circle and three lines. */
+.account-identity .account-avatar-skeleton { width: 64px; flex: none; }
+.account-identity .account-identity-skeleton { display: grid; flex: 1; gap: 10px; min-width: 0; }
+
+/* Empty canvas («Abrir un modelo») and its error: drawing, title, one line and two 36 px buttons. */
+.feedback[data-kind] { gap: 12px; }
+.feedback[data-kind] .empty-art { margin-bottom: 4px; }
+.feedback[data-kind] p { font: var(--type-description); color: var(--muted); }
+.feedback[data-kind] > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+.feedback[data-kind] button { height: 36px; min-height: 0; margin: 0; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--surface); color: var(--ink); font: var(--type-tab); box-shadow: var(--shadow-sm); transition: background-color var(--duration-base) var(--ease-standard); }
+.feedback[data-kind] button:hover { background: var(--hover); }
+.feedback[data-kind] button:first-child { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+.feedback[data-kind] button:first-child:hover { background: var(--primary-hover); }
+.feedback[data-kind] button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* Spinner inside the walk hint pill (another revision opening). */
+.walk-hint .spinner { margin-right: 6px; vertical-align: -2px; }
+
+/* Explorer rows while the first model opens. */
+.tree-skeleton { display: grid; gap: 16px; padding: 14px 12px; }
+
+/* The model appears with a 350 ms fade once it is ready (ESPECIFICACION.md §4.3). */
+.stage > .view[data-ready] { animation: loading-reveal var(--duration-fade) var(--ease-standard); }
+
+/* Empty-state drawing: thin lines in the muted ink, the building in the brand colour. */
+.empty-art { display: block; flex: none; max-width: 100%; height: auto; overflow: visible; }
+.empty-art path { vector-effect: non-scaling-stroke; stroke-width: 1.5px; }
+.empty-art-desk { stroke: var(--muted); fill: var(--surface); }
+.empty-art-place { stroke: var(--muted); stroke-dasharray: 3 4; }
+.empty-art-building { stroke: var(--brand); fill: var(--surface); }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner, .skeleton, .model-preparing, .stage > .view[data-ready] { animation: none; }
+}

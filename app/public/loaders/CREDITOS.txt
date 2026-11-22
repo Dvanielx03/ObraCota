@@ -1,0 +1,11 @@
+Animaciones e ilustracion generadas con IA en Higgsfield el 21 de noviembre de 2026
+(GPT Image 2.6 para GIF y SVG; Seedance 2.5 para el video), con la prueba gratuita del usuario.
+Los carteles (*-poster.*) son el primer cuadro de cada animacion, para prefers-reduced-motion.
+
+Derivados (21 de noviembre de 2026, FFmpeg 9.0.2, sin audio):
+- edificio-arma.webm, plano-a-volumen.webm, fachada-revela.webm: VP9 CRF 30, 1,5 veces mas lentos que el GIF.
+- listo.webm: VP9 CRF 30, 1,25 veces mas lento; se reproduce una vez.
+- *-poster.webp y listo-inicio.webp: primer cuadro. listo-poster.webp: ultimo cuadro.
+- edificio-arma-quieto.webp (cuadro 16) y fachada-revela-quieto.webp (cuadro 10): imagen fija para movimiento reducido.
+- maqueta-orbita-poster.webp: el mismo cartel en WebP.
+Los GIF y PNG originales se conservan; la aplicacion usa los WebM y WebP.
