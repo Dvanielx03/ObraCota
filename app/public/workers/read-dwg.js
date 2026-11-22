@@ -15,6 +15,19 @@ function ocs(normal) {
 }
 function sweep(start,end) {const d=(end-start)%tau;return d<=0 ? d+tau : d;}
 
+// Says what the drawing holds when nothing in it can be drawn, so the person knows whether the file
+// is a 3D model (solids need a geometry kernel; meshes arrive with the DWG engine) or simply empty.
+const SOLIDS=["3DSOLID","REGION","BODY","SURFACE","EXTRUDEDSURFACE","LOFTEDSURFACE","REVOLVEDSURFACE","SWEPTSURFACE","PLANESURFACE","NURBSURFACE"];
+export function emptyReason(skipped){
+  const solids=SOLIDS.reduce((n,type)=>n+(skipped.get(type)||0),0);
+  if(solids)return "Este DWG es un modelo 3D con "+solids+(solids===1?" sólido":" sólidos")+" ACIS. El visor dibuja planos (líneas, arcos, polilíneas, caras 3D y textos); los sólidos ACIS necesitan un núcleo geométrico que ObraCota todavía no tiene.";
+  const names={INSERT:"referencias a bloques sin geometría dibujable",TEXT:"textos vacíos",MTEXT:"textos vacíos",DIMENSION:"cotas no admitidas"};
+  const found=[...skipped].filter(([type])=>type!=="Otros objetos sin decodificar").map(([type,n])=>n+" "+(names[type]??"entidades "+type)).join(", ");
+  return found
+    ? "No hay geometría de plano que dibujar: el espacio modelo solo contiene "+found+". Si es un modelo 3D con mallas, se podrá abrir cuando llegue el motor DWG."
+    : "El espacio modelo del DWG está vacío.";
+}
+
 export function extract(db, unknown,indexOnly=false) {
   const blocks=new Map(db.tables.BLOCK_RECORD.entries.map(b=>[b.name,b]));
   const layers=new Map(db.tables.LAYER.entries.map(l=>[l.name,l]));
@@ -134,7 +147,7 @@ export function extract(db, unknown,indexOnly=false) {
   if(unknown)skipped.set("Otros objetos sin decodificar",unknown);
   const records=labels.concat(dimensions);
   if(indexOnly)return {groups:[],labels:records,units:db.header.INSUNITS??0};
-  if(!batches.size)throw new Error("El espacio modelo no contiene geometría DWG compatible.");
+  if(!batches.size)throw new Error(emptyReason(skipped));
   const groups=Array.from(batches.values(),batch=>({...batch,positions:new Float32Array(batch.positions)}));
   for(const {annotation} of records){
     const [x,y,z]=annotation.anchor;

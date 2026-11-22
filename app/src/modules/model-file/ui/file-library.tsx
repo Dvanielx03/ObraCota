@@ -9,6 +9,7 @@ import type { ProjectFile } from "../domain/project-file";
 import { listProjectFiles } from "../application/list-project-files";
 import { FileHistory } from "@/modules/model-version/ui/file-history";
 import { storeVersion } from "@/modules/model-version/application/store-version";
+import { HEADER_BYTES, headerProblem } from "../domain/file-header";
 import { versionRepository } from "@/modules/model-version/infrastructure/version-http";
 
 /** "2,3 MB" for the upload card. */
@@ -50,7 +51,10 @@ function Library({project}:{project:string}) {
     const form=event.currentTarget;
     const file=new FormData(form).get("original");
     if (!(file instanceof File)) return;
-    setUploading({name:file.name,size:file.size}); setStatus(""); setError("");
+    setStatus(""); setError("");
+    const problem=headerProblem(file.name,await file.slice(0,HEADER_BYTES).text());
+    if (problem) { setError(problem); return; }
+    setUploading({name:file.name,size:file.size});
     try {
       const version=await storeVersion(versionRepository,project,file,target || undefined);
       select(version.fileId); reload(v=>v+1); form.reset(); setTarget("");
