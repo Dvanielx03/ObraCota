@@ -9,3 +9,11 @@ Derivados (21 de noviembre de 2026, FFmpeg 9.0.2, sin audio):
 - edificio-arma-quieto.webp (cuadro 16) y fachada-revela-quieto.webp (cuadro 10): imagen fija para movimiento reducido.
 - maqueta-orbita-poster.webp: el mismo cartel en WebP.
 Los GIF y PNG originales se conservan; la aplicacion usa los WebM y WebP.
+
+Entrada al visor (22 de noviembre de 2026):
+- entrada.webm: video generado con IA en Higgsfield (Seedance 2.5, 5 s, 480p, sin audio; job 6470bae8-2257-4290-a786-f2f5951c8c9f),
+  con la prueba gratuita del usuario y generacion ilimitada (sin creditos). Derivado con FFmpeg 9.0.2: colores llevados a la
+  paleta de ObraCota (papel #F3F2F1, tinta #171E2B, verde #0D9674) con una tabla 3D, 336 x 336, bucle cerrado con un fundido
+  de 0,5 s entre el final y el principio, VP9 CRF 33.
+- entrada-poster.webp: primer cuadro. entrada-quieto.webp: cuadro de 3,25 s, imagen para movimiento reducido.
+- Sustituye a maqueta-orbita.webm, que se conserva fuera de la aplicacion.

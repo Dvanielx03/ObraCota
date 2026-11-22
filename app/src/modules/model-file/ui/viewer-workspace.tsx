@@ -254,6 +254,10 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   const plan=model?.environment==="plan";
   const settling = holding && !status && !error && !!model;
   const ready = !!model && !status && !error && !holding;
+  // The way in from the panel is one wait with one animation (download, reading and settling alike);
+  // later loads in the same visit (another file, another version) show the file being read.
+  const [entered,setEntered] = useState(false);
+  useEffect(()=>{if(ready)setEntered(true);},[ready]);
   const prismaAvailable=ready && !plan && !model?.drawing;
   // The quick tour follows what the person does and skips a stop whose control this file lacks.
   useEffect(()=>{
@@ -388,7 +392,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           {model && <><small>{model.schema}</small><button className="close" aria-label="Cerrar modelo" onClick={closeModel}><XIcon/></button></>}
         </div>}
         <div className="view" style={{visibility:ready?"visible":"hidden"}} data-ready={ready || undefined} ref={container}/>
-        {status || settling ? <ModelPreparing phase={status || ENTRY_SETTLING_PHASE} stage={engine?"model":"viewer"} detail={opening}>
+        {status || settling ? <ModelPreparing phase={status || ENTRY_SETTLING_PHASE} stage={entered && engine?"model":"viewer"} detail={opening}>
             {engine && status && <button type="button" onClick={()=>{request.current?.abort();setStatus("");setHolding(false);}}>Cancelar</button>}
           </ModelPreparing>
           : !ready && <div className="feedback" role="status" data-kind={error?"error":"empty"}>

@@ -22,7 +22,8 @@ interface Art {
  * The GIFs were converted to WebM (1.5× slower, 1.25× for the one-shot check) to weigh 10–38 KB.
  */
 export const LOADER_ART: Record<LoaderArtName, Art> = {
-  viewer: { video: "/loaders/maqueta-orbita.webm", poster: "/loaders/maqueta-orbita-poster.webp", still: "/loaders/maqueta-orbita-poster.webp", loop: true, tone: "photo" },
+  // The way in from the panel (download, reading and settling): slabs, floors and roof rise, the outline turns green.
+  viewer: { video: "/loaders/entrada.webm", poster: "/loaders/entrada-poster.webp", still: "/loaders/entrada-quieto.webp", loop: true, tone: "paper" },
   model: { video: "/loaders/edificio-arma.webm", poster: "/loaders/edificio-arma-poster.webp", still: "/loaders/edificio-arma-quieto.webp", loop: true, tone: "paper" },
   upload: { video: "/loaders/plano-a-volumen.webm", poster: "/loaders/plano-a-volumen-poster.webp", still: "/loaders/plano-a-volumen-poster.webp", loop: true, tone: "paper" },
   options: { video: "/loaders/fachada-revela.webm", poster: "/loaders/fachada-revela-poster.webp", still: "/loaders/fachada-revela-quieto.webp", loop: true, tone: "photo" },
@@ -42,11 +43,31 @@ export function LoaderArt(props: {
   return <LoaderArtPlayer key={props.name} {...props} />;
 }
 
+/**
+ * One clock per looping animation. When a wait hands over to the next screen (the download of a stored
+ * version gives way to the viewer), the new player picks up the loop where the old one was instead of
+ * starting over, so the animation reads as one continuous wait.
+ */
+const clocks = new Map<LoaderArtName, { start: number; seen: number }>();
+const HANDOVER_MS = 1500;
+
 function LoaderArtPlayer({ name, size = 160, maxLoopMs, className, style }: {
   name: LoaderArtName; size?: number; maxLoopMs?: number; className?: string; style?: CSSProperties;
 }) {
   const art = LOADER_ART[name];
   const reduced = useReducedMotion();
+  const [clock] = useState(() => {
+    const now = performance.now(), previous = clocks.get(name);
+    const current = previous && now - previous.seen < HANDOVER_MS ? previous : { start: now, seen: now };
+    clocks.set(name, current);
+    return current;
+  });
+  useEffect(() => () => { clock.seen = performance.now(); }, [clock]);
+  function resume(node: HTMLVideoElement) {
+    clock.seen = performance.now();
+    const elapsed = (clock.seen - clock.start) / 1000;
+    if (art.loop && elapsed > .05 && Number.isFinite(node.duration) && node.duration > 0) node.currentTime = elapsed % node.duration;
+  }
   // "playing" → "finishing" (the cap passed: the current loop ends) → "still".
   const [phase, setPhase] = useState<"playing" | "finishing" | "still">("playing");
   const video = useRef<HTMLVideoElement>(null);
@@ -77,6 +98,7 @@ function LoaderArtPlayer({ name, size = 160, maxLoopMs, className, style }: {
     {still ? <img src={art.still} alt="" width={size} height={size} decoding="async" draggable={false} />
       : <video ref={video} src={art.video} poster={art.poster} width={size} height={size} muted autoPlay playsInline preload="auto"
           loop={art.loop && phase === "playing"} disablePictureInPicture disableRemotePlayback tabIndex={-1}
+          onLoadedMetadata={event => resume(event.currentTarget)} onTimeUpdate={() => { clock.seen = performance.now(); }}
           onEnded={() => { if (art.loop) setPhase("still"); }} onError={() => setPhase("still")} />}
   </span>;
 }
