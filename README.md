@@ -12,7 +12,7 @@
 
 </div>
 
-ObraCota es una plataforma para ingenieros y diseñadores que coordinan planos, modelos BIM y avance de obra en Colombia. El repositorio contiene la landing pública, el panel de proyectos, la API y el motor IFC. El panel permite abrir un modelo, proponer un cambio de tipo de puerta, revisar el costo estimado y recorrer las revisiones del IFC en primera persona.
+ObraCota es una plataforma para ingenieros y diseñadores que coordinan planos, modelos BIM y avance de obra en Colombia. El repositorio contiene la landing pública, el panel de proyectos, la API y el motor IFC. El panel guarda versiones de modelos IFC, planos DWG y mallas FBX u OBJ; las abre en un visor 3D con vistas guardadas, presentación y exportación de imágenes; y permite proponer un cambio sobre el IFC, revisarlo con su informe y su costo estimado antes de publicarlo como revisión nueva, y recorrer las revisiones en primera persona.
 
 > [!NOTE]
 > ObraCota es un proyecto académico en fase de definición. El formulario valida y confirma, pero no envía datos. El edificio del recorrido 3D sí es real: es el demostrador ReStage de RWTH Aachen, publicado como dato abierto.
@@ -101,12 +101,12 @@ Para cambiar los orígenes públicos, configura `SITE_URL` y `PANEL_URL` en el a
 
 ## Probar un cambio IFC
 
-1. Entra al panel, crea un proyecto y guarda el IFC desde **Archivos y versiones**.
-2. Abre la versión con **Prisma**, selecciona una puerta y pulsa **Proponer cambio IFC**. Elige un tipo del mismo archivo y usa una captura del visor o un PNG como referencia visual.
-3. Introduce precios y sus fuentes si dispones de ellos. Revisa las medidas y los avisos. Registra la propuesta, abre **Cambios de diseño** y decide si aplicarla.
-4. Abre la nueva versión. Pulsa **Recorrer**, elige un punto libre en el piso y alterna **Anterior** y **Nueva**. Si quieres restaurar el original, vuelve a **Cambios de diseño** y crea una revisión de restauración.
+1. Entra al panel, crea un proyecto y guarda el IFC desde **Archivos y versiones**. También se aceptan DWG, FBX y OBJ, pero los cambios de modelo solo funcionan sobre IFC.
+2. Abre la versión en el visor, selecciona una puerta, ve a **EDITAR** y pulsa **Proponer cambio IFC**. Elige un tipo del mismo archivo y envía la propuesta: el motor la construye sobre una copia, la verifica y la deja lista para aprobar.
+3. Abre **Cambios de diseño**. Cada cambio muestra la receta, los avisos, la estimación de costo, las diferencias con la base y la validación del archivo. **Ver propuesta en 3D** abre la vista previa sin publicarla, con **RECORRIDO** entre Base y Propuesta y **Comparar**.
+4. Pulsa **Aprobar y aplicar cambio** para publicar la revisión y ábrela. Para volver al original, crea una revisión de restauración desde la misma tarjeta.
 
-El motor solo aplica tipos de puerta con representación verificable y medidas nominales compatibles con el hueco actual. Los avisos son informativos. El flujo admite una referencia visual local y funciona sin llamar a un proveedor de IA. Consulta el alcance técnico en la [arquitectura](backend/docs/ARCHITECTURE.md).
+El motor solo cambia tipos de puerta con representación verificable y medidas compatibles con el hueco actual, y propiedades de un elemento o de su tipo. Aprobar publica exactamente el archivo que se previsualizó (se comprueba su SHA-256). Los avisos son informativos y el flujo funciona sin llamar a un proveedor de IA. Consulta el alcance técnico en la [arquitectura](backend/docs/ARCHITECTURE.md).
 
 > [!NOTE]
 > La imagen usa el modo `standalone` de Next.js: solo lleva el servidor, los archivos estáticos y `public/`. La API de proyectos se documenta en [la arquitectura del backend](backend/docs/ARCHITECTURE.md) y [el mapa de contextos](backend/docs/CONTEXT-MAP.md).
@@ -122,10 +122,13 @@ landing/
   public/                     imágenes, vídeo y modelo convertido (GLB)
   scripts/                    conversión de IFC a GLB, plantas, vídeo y capturas
   tests/                      pruebas de extremo a extremo
+app/                          panel de proyectos y visor (Next.js, three.js, web-ifc, LibreDWG)
+backend/                      API hexagonal en Java 21 y Spring Boot (domain, application, infrastructure)
+ifc-engine/                   motor IFC privado con IfcOpenShell (lectura, vista previa, construcción y diferencias)
 docs/capturas/                capturas usadas en este documento
 ```
 
-El detalle técnico (coreografía del recorrido, conversión del IFC, decisiones de rendimiento y pendientes) está en [landing/README.md](landing/README.md).
+El detalle técnico de la landing (coreografía del recorrido, conversión del IFC, decisiones de rendimiento y pendientes) está en [landing/README.md](landing/README.md); el del panel, en [app/README.md](app/README.md), y el de la API, en [backend/docs/ARCHITECTURE.md](backend/docs/ARCHITECTURE.md).
 
 ## Datos y créditos
 
