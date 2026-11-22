@@ -2,6 +2,8 @@ import * as T from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import type { ElementInfo, ModelInfo } from "../domain/viewer.port";
+import { openFailures } from "../domain/open-failure";
+import { readMesh } from "./mesh-source";
 
 export type SceneModel = ModelInfo & {root: T.Group;coordination?: number[]};
 interface SampleIndex {
@@ -88,7 +90,12 @@ async function readWorker<T>(format:"ifc"|"dwg",file:File,signal:AbortSignal,sta
     worker.onmessage = ({data}) => {
       if (data.status) {status(data.status); return;}
       close();
-      if (data.error) reject(new Error(data.error));
+      if (data.error) {
+        // An index read (labels for a revision) never replaces the picture of the failed open.
+        if (!indexOnly && data.reason==="acis" && data.preview?.bytes) openFailures.report({message:data.error,file:file.name,reason:"acis",kind:data.preview.kind,cropped:!!data.preview.crop,
+          preview:URL.createObjectURL(new Blob([data.preview.bytes],{type:data.preview.mime}))});
+        reject(new Error(data.error));
+      }
       else resolve(data);
     };
     worker.postMessage(indexOnly?{file,indexOnly}:file);
@@ -108,9 +115,11 @@ export function readDrawingIndex(file: File, signal: AbortSignal) {
   return readWorker<DrawingData>("dwg",file,signal,()=>{},true);
 }
 export async function loadModel(file: File | null, signal: AbortSignal, status:(s:string)=>void): Promise<SceneModel> {
+  openFailures.clear();
   if (!file) return readSample(signal);
   if (/\.ifc$/i.test(file.name)) return assemble(file,await readWorker<Payload>("ifc",file,signal,status));
-  if (!/\.dwg$/i.test(file.name)) throw new Error("Elige un archivo DWG o IFC.");
+  if (/\.(fbx|obj)$/i.test(file.name)) return readMesh(file,signal,status);
+  if (!/\.dwg$/i.test(file.name)) throw new Error("Elige un archivo IFC, DWG, FBX u OBJ.");
   const data=await readWorker<DrawingData>("dwg",file,signal,status);
   const root=new T.Group();
   const elements=data.groups.map(group=>{

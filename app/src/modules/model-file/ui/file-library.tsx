@@ -9,7 +9,7 @@ import type { ProjectFile } from "../domain/project-file";
 import { listProjectFiles } from "../application/list-project-files";
 import { FileHistory } from "@/modules/model-version/ui/file-history";
 import { storeVersion } from "@/modules/model-version/application/store-version";
-import { HEADER_BYTES, headerProblem } from "../domain/file-header";
+import { HEADER_BYTES, MODEL_ACCEPT, headerProblem } from "../domain/file-header";
 import { versionRepository } from "@/modules/model-version/infrastructure/version-http";
 
 /** "2,3 MB" for the upload card. */
@@ -52,7 +52,7 @@ function Library({project}:{project:string}) {
     const file=new FormData(form).get("original");
     if (!(file instanceof File)) return;
     setStatus(""); setError("");
-    const problem=headerProblem(file.name,await file.slice(0,HEADER_BYTES).text());
+    const problem=headerProblem(file.name,await file.slice(0,HEADER_BYTES).text(),file.size<HEADER_BYTES);
     if (problem) { setError(problem); return; }
     setUploading({name:file.name,size:file.size});
     try {
@@ -74,8 +74,8 @@ function Library({project}:{project:string}) {
       <form className="account-form upload-form" onSubmit={upload}>
         {files.length>0 && <label>Guardar en<select disabled={busy} value={target} onChange={e=>setTarget(e.target.value)}>
           <option value="">Agrupar por nombre de archivo</option>{files.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select></label>}
-        <label>Archivo IFC o DWG<input type="file" name="original" accept=".ifc,.dwg" disabled={busy} required/></label>
-        <p>Hasta 256 MiB. Cada entrega conserva su original.</p>
+        <label>Archivo IFC o DWG, o modelo 3D FBX u OBJ<input type="file" name="original" accept={MODEL_ACCEPT} disabled={busy} required/></label>
+        <p>Hasta 256 MiB. Cada entrega conserva su original. Si el DWG de un fabricante solo trae sólidos ACIS, sube su FBX u OBJ para verlo en 3D.</p>
         <BusyButton className="panel-action" busy={busy} busyLabel="Subiendo original…" spinnerSize={14}>Guardar versión</BusyButton>
       </form>
       <div className="upload-status" role="status">

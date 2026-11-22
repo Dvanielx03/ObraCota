@@ -51,13 +51,16 @@ export function reviewDelivery(model:ModelInfo,input:string,notes:Record<string,
   const terms=input.split(/\r?\n/).map(t=>t.trim()).filter(t=>/[\p{L}\p{N}]/u.test(t));
   const unique=Array.from(new Map(terms.map(t=>[normalize(t),t])).values());
   const checks:Finding[]=[];
+  // FBX and OBJ pieces carry a name and a material, never an IFC GlobalId.
+  const mesh=/^(FBX|OBJ)\b/.exec(model.schema)?.[1];
   if(model.drawing){
     if((!unique.length && !Object.keys(notes).length) || unique.length>30)throw new Error("Indica entre 1 y 30 conceptos distintos, uno por línea.");
     checks.push(...textChecks(model.elements,unique));
   }else if(!model.sample){
     const rules:[string,(e:ElementInfo)=>boolean][]=[
-      ["GlobalId sin extraer",e=>!e.guid],["Nivel directo sin extraer",e=>e.level==="Sin nivel directo"],
-      ["Material directo sin extraer",e=>!e.material]
+      ...(mesh?[]:[["GlobalId sin extraer",(e:ElementInfo)=>!e.guid] as [string,(e:ElementInfo)=>boolean]]),
+      ["Nivel directo sin extraer",e=>e.level==="Sin nivel directo"],
+      [mesh?"Pieza sin material declarado":"Material directo sin extraer",e=>!e.material]
     ];
     for(const [check,predicate] of rules){
       const hits=model.elements.filter(predicate);
@@ -67,7 +70,8 @@ export function reviewDelivery(model:ModelInfo,input:string,notes:Record<string,
   const index=new Map(model.elements.map(e=>[e.id,e]));
   const observations=Object.entries(notes).map(([id,text])=>({text,id,source:index.has(id)?evidence(index.get(id)!):null}));
   return {file:model.name,version:model.versionId??null,schema:model.schema,
-    scope:model.drawing?"TEXT y MTEXT indexados del espacio modelo":model.sample?"Conjuntos del ejemplo GLB":"Elementos IFC con geometría importada y relaciones directas",
+    scope:model.drawing?"TEXT y MTEXT indexados del espacio modelo":model.sample?"Conjuntos del ejemplo GLB"
+      :mesh?"Mallas "+mesh+" importadas, una por pieza":"Elementos IFC con geometría importada y relaciones directas",
     inspected:model.drawing?model.elements.filter(e=>e.annotation && !e.dimension).length:model.elements.length,
     units:model.drawing?.units,omissions:model.drawing?.omissions,checks,
     excerpts:representativeNotes(observations),observations};

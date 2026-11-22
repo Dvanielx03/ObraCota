@@ -51,7 +51,7 @@ export function walkWorld(model:SceneModel){
     proxy.matrix.copy(node.matrixWorld);
     meshes.add(proxy);
   });
-  if(!triangles)throw new Error("El IFC carece de superficies utilizables para recorrer.");
+  if(!triangles)throw new Error("El modelo carece de superficies utilizables para recorrer.");
   const tree=new WalkOctree();
   // Long slabs or repeated faces can occupy many children. Bound subdivision for IFC meshes.
   tree.maxLevel=6;

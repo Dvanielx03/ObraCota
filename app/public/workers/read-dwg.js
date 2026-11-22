@@ -207,7 +207,12 @@ export function extract(db, unknown,indexOnly=false) {
   if(unknown)skipped.set("Otros objetos sin decodificar",unknown);
   const records=labels.concat(dimensions);
   if(indexOnly)return {groups:[],labels:records,units:db.header.INSUNITS??0};
-  if(!batches.size)throw new Error(emptyReason(skipped));
+  if(!batches.size){
+    const error=new Error(emptyReason(skipped));
+    // Only a model of ACIS solids is the manufacturer case the stored thumbnail and the mesh hint serve.
+    if(SOLIDS.some(type=>skipped.get(type)))error.code="acis";
+    throw error;
+  }
   const groups=Array.from(batches.values(),batch=>({...batch,positions:new Float32Array(batch.positions)}));
   for(const {annotation} of records){
     const [x,y,z]=annotation.anchor;
@@ -215,9 +220,65 @@ export function extract(db, unknown,indexOnly=false) {
   }
   return {groups,labels:records,units:db.header.INSUNITS??0,depth:maxZ-minZ,omissions:[...skipped].map(([t,n])=>t+" ("+n+")").join(", ")};
 }
+/**
+ * The thumbnail AutoCAD saves in the DWG (shown in its file dialog), as an image a browser can draw:
+ * PNG as stored; a BMP is a bare DIB, so it gets its 14-byte file header; WMF (vector metafile) and
+ * files without a picture give null.
+ */
+export function storedThumbnail(reader,ptr){
+  const thumbnail=reader.dwg_bmp(ptr);
+  const bytes=thumbnail?.data;
+  if(!bytes?.length)return null;
+  if(thumbnail.type===6 && bytes[0]===0x89 && bytes[1]===0x50)return {kind:"PNG",mime:"image/png",bytes:new Uint8Array(bytes)};
+  if(thumbnail.type!==2 || bytes.length<40)return null;
+  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const size=view.getUint32(0,true),bits=view.getUint16(14,true),compression=view.getUint32(16,true),used=view.getUint32(32,true);
+  if(size<40 || size>bytes.length)return null;
+  const palette=(used || (bits<=8?1<<bits:0))*4,masks=size===40 && compression===3?12:0;
+  const file=new Uint8Array(14+bytes.length),header=new DataView(file.buffer);
+  file[0]=0x42;file[1]=0x4D;
+  header.setUint32(2,file.length,true);
+  header.setUint32(10,14+size+masks+palette,true);
+  file.set(bytes,14);
+  return {kind:"BMP",mime:"image/bmp",bytes:file};
+}
+
+/**
+ * AutoCAD draws the thumbnail on the drawing's background with the design small in the middle. Crop
+ * the uniform margin (the colour of the corner) so the design fills the picture; the pixels are the
+ * stored ones, only the frame changes. Without OffscreenCanvas, or if nothing stands out, the stored
+ * picture is kept as is.
+ */
+export async function framedThumbnail(image){
+  if(typeof OffscreenCanvas==="undefined" || typeof createImageBitmap!=="function")return image;
+  try{
+    const bitmap=await createImageBitmap(new Blob([image.bytes],{type:image.mime}));
+    const {width,height}=bitmap;
+    const context=new OffscreenCanvas(width,height).getContext("2d",{willReadFrequently:true});
+    context.drawImage(bitmap,0,0);
+    const pixels=context.getImageData(0,0,width,height).data;
+    const [r,g,b]=pixels;
+    let left=width,top=height,right=-1,bottom=-1;
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+      const i=(y*width+x)*4;
+      if(Math.abs(pixels[i]-r)+Math.abs(pixels[i+1]-g)+Math.abs(pixels[i+2]-b)<=36)continue;
+      if(x<left)left=x;if(x>right)right=x;if(y<top)top=y;if(y>bottom)bottom=y;
+    }
+    if(right<0)return image;
+    const pad=Math.round(Math.max(right-left,bottom-top)*.12)+2;
+    left=Math.max(0,left-pad);top=Math.max(0,top-pad);right=Math.min(width-1,right+pad);bottom=Math.min(height-1,bottom+pad);
+    const w=right-left+1,h=bottom-top+1;
+    if(w*h>=width*height*.9)return image;
+    const out=new OffscreenCanvas(w,h);
+    out.getContext("2d").drawImage(bitmap,left,top,w,h,0,0,w,h);
+    const blob=await out.convertToBlob({type:"image/png"});
+    return {...image,mime:"image/png",bytes:new Uint8Array(await blob.arrayBuffer()),crop:[left,top,w,h,width,height]};
+  }catch{return image;}
+}
+
 self.onmessage=async({data})=>{
   const file=data.file??data;
-  let reader,ptr;
+  let reader,ptr,thumbnail=null;
   try{
     const bytes=await file.arrayBuffer();
     const version=new TextDecoder().decode(bytes.slice(0,6));
@@ -231,9 +292,25 @@ self.onmessage=async({data})=>{
       try{addPolyfaceMeshes(reader,ptr,database);}
       catch{/* A file whose meshes cannot be read still opens with the rest of its geometry. */}
     }
-    reader.dwg_free(ptr);ptr=null;
     self.postMessage({status:"Agrupando geometría por capa…"});
-    const result=extract(database,stats.unknownEntityCount,data.indexOnly);
+    let result;
+    try{result=extract(database,stats.unknownEntityCount,data.indexOnly);}
+    catch(error){
+      // A model of ACIS solids draws nothing, but its stored thumbnail still shows the design. Any other
+      // failure (an empty model space, content only in layouts) keeps its reason alone.
+      const message=error instanceof Error?error.message:"Error de lectura DWG.";
+      if(error?.code==="acis" && !data.indexOnly){
+        try{thumbnail=storedThumbnail(reader,ptr);}
+        catch{/* The picture only completes the message; without it the message stands alone. */}
+      }
+      if(thumbnail){
+        const framed=await framedThumbnail(thumbnail);
+        self.postMessage({error:message,reason:"acis",preview:{kind:framed.kind,mime:framed.mime,bytes:framed.bytes,crop:framed.crop}},[framed.bytes.buffer]);
+        return;
+      }
+      throw error;
+    }
+    reader.dwg_free(ptr);ptr=null;
     self.postMessage({...result,version,versionId:await fileVersion(bytes)},result.groups.map(g=>g.positions.buffer));
   }catch(error){self.postMessage({error:error instanceof Error?error.message:"Error de lectura DWG."});}
   finally{if(ptr)reader.dwg_free(ptr);}

@@ -636,7 +636,9 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     },
     captureGroup,
     enterWalk(mark){
-      if(!activeModel?.coordination || !originalFile || plan){mark("Abre un IFC 3D con unidades verificables.");return;}
+      if(!activeModel?.coordination || !originalFile || plan){mark("Abre un IFC 3D o un FBX con unidades verificables.");return;}
+      // A manufacturer piece in metres without a floor at its base (a lamp, a chair) has nowhere to stand.
+      if(activeModel.walk===false){mark("Este modelo no tiene un piso para recorrer.");return;}
       if(windowMode)exitWindow();
       endPulse();stopTween();
       markFloor=mark;controls.enabled=false;canvas.style.cursor="crosshair";canvas.focus();
@@ -713,7 +715,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
         sheet=new PlanSheet(initialPlanBounds,root);
       }
       fit();
-      return {environment:plan?"plan":"model",name:next.name,schema:next.schema,sample:next.sample,elements:next.elements,drawing:next.drawing,versionId:next.versionId,walk:!!next.coordination && !plan};
+      return {environment:plan?"plan":"model",name:next.name,schema:next.schema,sample:next.sample,elements:next.elements,drawing:next.drawing,versionId:next.versionId,walk:next.walk!==false && !!next.coordination && !plan};
     },
       fit,select(id){canvas.removeAttribute("data-group-preview");select(id);},locate,orient,pose,applyPose,extents:()=>fit(false),
     windowZoom(){stopTween();if(windowMode)exitWindow();else{windowMode=true;canvas.style.cursor="crosshair";canvas.focus();}},

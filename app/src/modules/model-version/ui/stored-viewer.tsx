@@ -48,8 +48,9 @@ export function StoredViewer({ project, version, previous }: { project: string; 
     if(!previous)throw new Error("Elige una revisión anterior.");
     const base=`projects/${project}/versions/`;
     const [current,prior]=await Promise.all([version,previous].map(id=>authenticated<ModelVersion>(base+id,{signal})));
-    if(prior.fileId!==current.fileId || prior.revision>=current.revision || prior.format!=="IFC")
-      throw new Error("La comparación requiere una revisión IFC anterior del mismo archivo.");
+    // The walk compares two models in metres: IFC, or FBX with its declared unit, of the same file.
+    if(prior.fileId!==current.fileId || prior.revision>=current.revision || prior.format!==current.format || !["IFC","FBX"].includes(prior.format))
+      throw new Error("La comparación requiere una revisión IFC o FBX anterior del mismo archivo.");
     return versionRepository.open(project,previous,signal);
   }
   if(file) return <ViewerWorkspace initialFile={file} storedVersion={{project,version}} storedNotes={notes} returnHref={href} returnLabel="Volver a archivos" loadPrevious={previous?loadPrevious:undefined} projectName={projectName} revision={revision}/>;
