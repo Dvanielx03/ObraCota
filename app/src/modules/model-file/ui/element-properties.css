@@ -1,0 +1,17 @@
+/* «Conjuntos de propiedades» in the explorer's «Propiedades» tab (§7.6). Same rhythm as .door-evidence. */
+.element-psets{margin-block:1rem;border-block:1px solid var(--border);padding-block:.75rem;overflow-wrap:anywhere}
+.element-psets summary{cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px}
+.element-psets summary small{font:var(--type-chip);color:var(--muted);background:var(--hover);border-radius:var(--radius-pill);padding:1px 8px}
+.element-psets-body{display:grid;gap:12px;margin-top:10px}
+.element-psets-loading{display:grid;gap:8px}
+.element-pset{display:grid;gap:6px;padding-top:10px;border-top:1px solid var(--border-faint)}
+.element-pset:first-child{padding-top:0;border-top:0}
+.element-pset h3{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0;font-size:12px;font-weight:600;color:var(--ink)}
+.element-pset h3 .guid{min-width:0;overflow-wrap:anywhere}
+.element-pset-source{flex:none;font:var(--type-chip);letter-spacing:var(--tracking-chip);border-radius:var(--radius-pill);padding:2px 8px;background:var(--brand-soft);color:var(--brand-ink)}
+.element-pset-source[data-source=type]{background:var(--hover);color:var(--muted)}
+.element-pset dl{grid-template-columns:minmax(0,auto) minmax(0,1fr)}
+.element-property{display:contents}
+.element-property dd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 8px}
+.element-property dd small{color:var(--muted);font-size:11px}
+.element-psets-note{color:var(--muted);font-size:11px;line-height:1.5}

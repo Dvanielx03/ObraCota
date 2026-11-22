@@ -71,7 +71,12 @@ const pieceName = (piece: ElementInfo) => piece.name || piece.type;
  * the bottom right, the tool panels that open above their buttons, and Editar: its floating sub-bar,
  * the numbered marks anchored to the model and the global edits.
  */
-export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, reviewOpen = false, onCloseReview, walk, camera, onWorking, control }: {
+export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, reviewOpen = false, onCloseReview, walk, camera, onWorking, control, proposal }: {
+  /**
+   * An unpublished preview is open (H1 §7.4, §7.5): Renderizar explains why it is off, and Comparar opens
+   * «Comparar con la base» with `compare` instead of the image options.
+   */
+  proposal?: { renderReason: string; compare: ReactNode };
   /** Shortcuts and the presentation reach the tools through this handle. */
   control?: Ref<WorkspaceToolsHandle>;
   viewer: () => ViewerPort | null;
@@ -131,13 +136,16 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   const selectionName = pieces.map(pieceName).join(", ");
   const name = viewScope ? VIEW_NAME : selectionName;
   const noScope = "Disponible en una versión guardada de un modelo 3D";
-  const unavailable = !scope ? noScope : !viewScope && tooLong ? "Reduce la selección: hay demasiadas piezas para una petición" : undefined;
+  const unavailable = proposal ? proposal.renderReason : !scope ? noScope : !viewScope && tooLong ? "Reduce la selección: hay demasiadas piezas para una petición" : undefined;
   const [wanted, setWanted] = useState<OptionTarget | null>(null);
   useEffect(() => setWanted(null), [key]);
   const target = resolveTarget(state.history, wanted);
   const batch = targetBatch(state.history, target);
   const optionReason = unavailable ?? (state.loading ? "Consultando las opciones…"
     : !target ? (viewScope ? "Genera opciones primero: la vista aún no tiene ninguna lista" : "Genera opciones primero: esta pieza aún no tiene ninguna lista") : undefined);
+  // Over a preview, Comparar lists the differences with the base and does not depend on image options.
+  const comparing = !!proposal;
+  const compareReason = comparing ? undefined : optionReason;
   const working = isWorking(state.history);
   // Opening a panel reads the history again: the budget or a batch may have changed meanwhile.
   const { reload } = state;
@@ -178,8 +186,8 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   useEffect(() => () => viewer()?.setMarking(false), [viewer]);
   // A panel whose subject disappears closes by itself.
   useEffect(() => {
-    if ((tool === "render" && unavailable) || ((tool === "compare" || tool === "download") && !batch && !state.loading)) setTool(null);
-  }, [tool, unavailable, batch, state.loading]);
+    if ((tool === "render" && unavailable) || (((tool === "compare" && !comparing) || tool === "download") && !batch && !state.loading)) setTool(null);
+  }, [tool, unavailable, batch, state.loading, comparing]);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(null), 2600);
@@ -386,8 +394,8 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   const clickReview = () => { setTool(null); bars.current?.querySelector<HTMLButtonElement>(".review-trigger")?.click(); };
 
   // Keyboard shortcuts run what the buttons run, and say why when a tool is off (DU-12, DU-16).
-  const latest = useRef({ startWalk, toggle, toggleEdit, guard, clearEdit, clickReview, unavailable, optionReason, editReason: edit.reason, walkReason: walk.reason, plan, editing: edit.on, onExit: edit.onExit });
-  latest.current = { startWalk, toggle, toggleEdit, guard, clearEdit, clickReview, unavailable, optionReason, editReason: edit.reason, walkReason: walk.reason, plan, editing: edit.on, onExit: edit.onExit };
+  const latest = useRef({ startWalk, toggle, toggleEdit, guard, clearEdit, clickReview, unavailable, optionReason, compareReason, editReason: edit.reason, walkReason: walk.reason, plan, editing: edit.on, onExit: edit.onExit });
+  latest.current = { startWalk, toggle, toggleEdit, guard, clearEdit, clickReview, unavailable, optionReason, compareReason, editReason: edit.reason, walkReason: walk.reason, plan, editing: edit.on, onExit: edit.onExit };
   useImperativeHandle(control, () => ({
     run(name) {
       const now = latest.current;
@@ -395,7 +403,12 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
       if (now.plan) return "No disponible en un plano 2D";
       if (name === "render") { if (now.unavailable) return now.unavailable; now.toggle("render"); return undefined; }
       if (name === "edit") { if (now.editReason && !now.editing) return now.editReason; now.toggleEdit(); return undefined; }
-      if (name === "compare" || name === "download") { if (now.optionReason) return now.optionReason; now.toggle(name); return undefined; }
+      if (name === "compare" || name === "download") {
+        const reason = name === "compare" ? now.compareReason : now.optionReason;
+        if (reason) return reason;
+        now.toggle(name);
+        return undefined;
+      }
       if (now.walkReason) return now.walkReason;
       now.startWalk();
       return undefined;
@@ -433,7 +446,7 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
             shortcut={TOOL_KEYS.walk} onClick={startWalk} />
           <ToolSeparator />
           <IconTool ref={compareButton} icon={PanelRightDashed} aria-label="Comparar" aria-haspopup="dialog" aria-expanded={tool === "compare"}
-            aria-controls="tool-compare" disabledReason={optionReason} shortcut={TOOL_KEYS.compare} onClick={() => toggle("compare")} />
+            aria-controls="tool-compare" disabledReason={compareReason} shortcut={TOOL_KEYS.compare} onClick={() => toggle("compare")} />
           <IconTool ref={downloadButton} icon={Download} aria-label="Descargar" aria-haspopup="dialog" aria-expanded={tool === "download"}
             aria-controls="tool-download" disabledReason={optionReason} shortcut={TOOL_KEYS.download} onClick={() => toggle("download")} />
         </>}
@@ -456,10 +469,14 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
         reveal={reveal} onRevealed={revealed}
         onCompare={(next) => { setWanted(next); setTool("compare"); }} onDownload={(next) => { setWanted(next); setTool("download"); }} />}
     </ToolPopover>
-    <ToolPopover open={tool === "compare"} anchor={compareButton} id="tool-compare" label="Comparar" title="Comparar con el modelo"
+    {proposal ? <ToolPopover open={tool === "compare"} anchor={compareButton} id="tool-compare" label="Comparar con la base" title="Comparar con la base"
+      closeLabel="Cerrar comparación" width={384} keepMounted onClose={() => setTool(null)}>
+      {proposal.compare}
+    </ToolPopover>
+    : <ToolPopover open={tool === "compare"} anchor={compareButton} id="tool-compare" label="Comparar" title="Comparar con el modelo"
       closeLabel="Cerrar comparación" width={384} onClose={() => setTool(null)}>
       {base && batch && target && <OptionCompare base={base} batch={batch} slot={target.slot} onSlot={(slot) => setWanted({ batch: batch.id, slot })} />}
-    </ToolPopover>
+    </ToolPopover>}
     <ToolPopover open={tool === "download"} anchor={downloadButton} id="tool-download" label="Descargar" title="Ajustar detalles"
       closeLabel="Cerrar descarga" width={320} onClose={() => setTool(null)}
       actions={<button type="button" className="tool-popover-reset" disabled={untouched} onClick={() => { setAdjust(NEUTRAL); setFraming(FULL_FRAME); }}>

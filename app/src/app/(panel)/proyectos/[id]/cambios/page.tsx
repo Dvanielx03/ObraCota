@@ -1,4 +1,4 @@
-import {ProjectChanges} from "@/modules/design-change/ui/project-changes";
+import {ModelChanges} from "@/modules/model-change/ui/model-changes";
 export default async function Page({params}:{params:Promise<{id:string}>}){
-  return <ProjectChanges project={(await params).id}/>;
+  return <ModelChanges project={(await params).id}/>;
 }

@@ -15,7 +15,7 @@ function entries(base: string, overview: OverviewStatus): SummaryEntry[] {
   const files = ready ? (ready.files === 1 ? "1 archivo" : ready.files + " archivos") : "";
   return [
     { key: "archivos", title: "Archivos y versiones", icon: Files, href: base + "/archivos",
-      text: !ready ? "Originales IFC o DWG y su historial" : latest ? files + " · última versión " + latest.revision : "Sube tu primer IFC o DWG" },
+      text: !ready ? "Originales IFC, DWG, FBX u OBJ y su historial" : latest ? files + " · última versión " + latest.revision : "Sube tu primer IFC, DWG, FBX u OBJ" },
     { key: "visor", title: "Visor", icon: Box, href: latest ? base + "/visor/" + latest.id : undefined,
       text: latest ? "Abrir la versión " + latest.revision + " · " + latest.name : "",
       reason: overview.status === "loading" ? "Buscando la última versión…" : "Sube una versión para abrirla en el visor" },

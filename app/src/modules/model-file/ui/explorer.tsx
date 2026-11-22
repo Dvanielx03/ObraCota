@@ -4,6 +4,7 @@ import type {ElementInfo,ModelInfo} from "@/viewer/domain/viewer.port";
 import {DoorEvidence} from "@/modules/knowledge/ui/door-evidence";
 import {DrawingEvidence} from "./drawing-evidence";
 import {ReviewNotes} from "./review-notes";
+import {ElementProperties} from "./element-properties";
 import {Skeleton} from "@/shared/ui/loading";
 
 export type SidebarTab="reading"|"properties";
@@ -87,7 +88,8 @@ export function Explorer({tab,changeTab,elements,selected,drawing,locate,version
         {selected.dimension && <><dt>Medida geométrica</dt><dd>{selected.dimension.value.toLocaleString("es-CO",{maximumFractionDigits:6})} {drawing?.units}</dd><dt>Estilo CAD</dt><dd>{selected.dimension.style || "Sin identificar"}</dd></>}
         {selected.guid && <><dt>GlobalId</dt><dd className="guid">{selected.guid}</dd></>}
         {selected.annotation ? <><dt>Handle CAD</dt><dd>{selected.annotation.handle || "Sin identificador"}</dd></> : selected.count && !selected.guid ? <><dt>{drawing?"Entidades":"Piezas"}</dt><dd>{selected.count}</dd></> : <><dt>Material</dt><dd>{selected.material || "Sin dato disponible"}</dd></>}
-      </dl>{selected.annotation && <details><summary>Texto de origen</summary><code>{selected.annotation.raw}</code></details>}
+      </dl>{scope && selected.guid && !drawing && <ElementProperties scope={scope} guid={selected.guid}/>}
+      {selected.annotation && <details><summary>Texto de origen</summary><code>{selected.annotation.raw}</code></details>}
       <button className="locate" onClick={()=>locate(selected.id)}>Volver a encuadrar</button></> : <p>Selecciona un resultado para consultar sus propiedades.</p>}
       {selected?.evidence && <DoorEvidence key={"evidence:"+selected.id} item={selected} scope={scope}/>}
       {drawing && selected && <DrawingEvidence key={"dwg:"+selected.id} item={selected} units={drawing.units} scope={scope}/>}

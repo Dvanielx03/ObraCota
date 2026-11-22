@@ -42,6 +42,12 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;margin-bottom:0;font
 
 .feedback{position:absolute;inset:44px 0 0;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;padding:20px;text-align:center}
 .feedback button{border:1px solid var(--border);border-radius:var(--radius-md);margin:4px;padding:4px 12px}.feedback p{max-width:46ch}
+/* Thumbnail stored in a DWG that holds only ACIS solids: between the reason and the actions. */
+.feedback:has(>.open-failure-preview)>div{order:2}
+.open-failure-preview{order:1;margin:0;display:grid;justify-items:center;gap:10px;max-width:min(420px,100%)}
+.open-failure-preview img{display:block;height:min(30vh,240px);width:auto;max-width:100%;object-fit:contain;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--plan-paper);box-shadow:var(--shadow-sm)}
+.open-failure-preview figcaption{display:grid;gap:4px;font:var(--type-caption);color:var(--muted);max-width:46ch}
+.open-failure-preview strong{font:var(--type-label);color:var(--ink)}
 
 @media(max-width:720px){header{gap:8px}.brand{font-size:18px}.brand svg{width:19px}.project{font-size:12px}.open{padding:0 10px}
 .workarea{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(130px,32%)}.workarea.collapsed{grid-template-rows:minmax(0,1fr)}

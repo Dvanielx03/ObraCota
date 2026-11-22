@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CubeIcon, SidebarSimpleIcon, XIcon } from "@phosphor-icons/react";
 import { Footprints, Hand, House, ListChecks, Maximize, Minus, Plus, Rotate3d, SquareDashed, X } from "lucide-react";
 import type {CameraPose,ModelInfo,ViewerPort} from "@/viewer/domain/viewer.port";
@@ -55,14 +55,32 @@ function shortcutAllowed(target: EventTarget | null, action: ShortcutAction): bo
   return true;
 }
 
-export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", initialFile, storedNotes, storedVersion, loadPrevious, projectName, revision }: {
+/** Why Editar and Renderizar are off over an unpublished preview (H1 §7.4). */
+const PROPOSAL_EDIT="Pendiente: Editar trabaja sobre versiones guardadas; esto es una vista previa";
+const PROPOSAL_RENDER="Pendiente: renderizar una vista previa llega en H6";
+
+/**
+ * An unpublished proposal opened as `initialFile` (H1 §7.4): the header says so, Editar and Renderizar stay off,
+ * and Comparar shows `compare`, built by the caller over the open model.
+ */
+export interface ProposalView {
+  label: string;
+  description: string;
+  compare: (context:{elements:ModelInfo["elements"];viewer:()=>ViewerPort|null;selected:string|null})=>ReactNode;
+}
+
+export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", initialFile, storedNotes, storedVersion, loadPrevious, projectName, revision, proposal, walkLabels }: {
   returnHref: string; returnLabel?: string; initialFile?: File; storedNotes?: VersionNotes; storedVersion?: {project:string;version:string};
   loadPrevious?: (signal:AbortSignal)=>Promise<File>; projectName?: string;
   /** Revision label ("v2") and upload date of a stored version: cover of the presentation and export index. */
   revision?: {label:string;date:string};
+  proposal?: ProposalView;
+  /** Names of the two models of the walk comparison; «Anterior» and «Nueva» by default. */
+  walkLabels?: {older:string;newer:string};
 }) {
   const container = useRef<HTMLDivElement>(null), viewer = useRef<ViewerPort|null>(null), input = useRef<HTMLInputElement>(null);
   const request = useRef<AbortController|null>(null), last = useRef<File|null>(initialFile ?? null);
+  const previewing = !!proposal;
   const [model,setModel] = useState<ModelInfo|null>(null), [selected,setSelected] = useState<string|null>(null);
   const [status,setStatus] = useState("Iniciando visor…"), [error,setError] = useState(""), [pan,setPan] = useState(false);
   // Minimum time on the preparing screen when arriving from the panel (see domain/entry-hold).
@@ -213,7 +231,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
       if (!job.signal.aborted) {
         last.current=file;setPan(false);
         setPrismaStep(null);
-        const design=!next.drawing && next.environment!=="plan" && new URLSearchParams(window.location.search).get("panel")==="asistente";
+        const design=!previewing && !next.drawing && next.environment!=="plan" && new URLSearchParams(window.location.search).get("panel")==="asistente";
         setAssistant(design);setGrouping(false);setColor(null);
         setTab("reading");setModel(next);
         setGuide(step=>step==="done"?"off":step==="note"||step==="review"?"select":step);
@@ -228,7 +246,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     } catch (e) {
       if (!job.signal.aborted) {setError(e instanceof Error ? e.message : "No se pudo abrir el modelo.");setStatus("");}
     }
-  },[initialFile]);
+  },[initialFile,previewing]);
   useEffect(()=>{
     let active = true;
     import("@/viewer/infrastructure/three-viewer").then(({createViewer})=>{
@@ -276,7 +294,10 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
       if(guide==="off")helpButton.current?.focus();
     }
   },[ready,guide]);
-  const serverNotes = initialFile && last.current === initialFile ? storedNotes : undefined;
+  // Whether the open model is the one the page was opened with (and not a file chosen afterwards): the stored
+  // notes and the walk comparison only make sense over it.
+  const showingInitial = !!initialFile && last.current === initialFile;
+  const serverNotes = showingInitial ? storedNotes : undefined;
   const readPose=useCallback(()=>viewer.current?.pose()??null,[]);
   const applyPose=useCallback((next:CameraPose,duration?:number)=>viewer.current?.applyPose(next,duration),[]);
   const capturePicture=useCallback(()=>viewer.current?.capture("jpeg")??null,[]);
@@ -369,8 +390,9 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     return ()=>window.removeEventListener("keydown",onKey,true);
   },[ready,touring,presenting,say]);
   return <NotesContext.Provider value={serverNotes}><main className="workspace" data-walk={touring?"on":undefined} data-guide={ready?guide:"off"} data-quick={ready && quick?quick:undefined} data-plan={plan || undefined} data-stored={serverNotes && storedVersion?"":undefined}>
-    <ViewerHeader returnHref={returnHref} returnLabel={returnLabel} projectName={storedVersion?projectName:undefined}
+    <ViewerHeader returnHref={returnHref} returnLabel={returnLabel} projectName={storedVersion || proposal?projectName:undefined}
       fileName={model?.name || "Visor de modelos"} pending={!model} meta={model?(plan?"Plano 2D":"Vista 3D")+" · "+model.schema:undefined}
+      badge={proposal && showingInitial?{label:proposal.label,detail:proposal.description}:undefined}
       onFile={file=>void open(file)} input={input} openDisabled={touring || (!viewer.current && !!error)} inert={presenting}
       exportMenu={<ExportMenu disabledReason={exportReason} viewCount={viewCount} onNotice={say}
         context={()=>{const list=strip.current?.snapshot();return list && model?{views:list.views,project:projectName,file:model.name,version:revision?.label}:null;}}
@@ -417,9 +439,9 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           <span aria-hidden="true"/>
           <RovingToolbar label="Controles del recorrido" className="tool-bar walk-bar">
             <ModeButton icon={Footprints} label="Recorrido" aria-pressed={true} title="Salir del recorrido · Esc" onClick={stopWalk}/>
-            {serverNotes && loadPrevious && walk==="active" && <><ToolSeparator/>
-              <button type="button" data-tool="" className="tool-mode" aria-disabled={walkLoading?true:undefined} aria-pressed={walkOlder} title="Ver la versión anterior desde el mismo punto" onClick={()=>{if(!walkLoading)void compareWalk(true);}}>Anterior</button>
-              <button type="button" data-tool="" className="tool-mode" aria-disabled={walkLoading?true:undefined} aria-pressed={!walkOlder} title="Volver a esta versión" onClick={()=>{if(!walkLoading)void compareWalk(false);}}>Nueva</button>
+            {showingInitial && loadPrevious && walk==="active" && <><ToolSeparator/>
+              <button type="button" data-tool="" className="tool-mode" aria-disabled={walkLoading?true:undefined} aria-pressed={walkOlder} title={walkLabels?"Ver «"+walkLabels.older+"» desde el mismo punto":"Ver la versión anterior desde el mismo punto"} onClick={()=>{if(!walkLoading)void compareWalk(true);}}>{walkLabels?.older??"Anterior"}</button>
+              <button type="button" data-tool="" className="tool-mode" aria-disabled={walkLoading?true:undefined} aria-pressed={!walkOlder} title={walkLabels?"Volver a «"+walkLabels.newer+"»":"Volver a esta versión"} onClick={()=>{if(!walkLoading)void compareWalk(false);}}>{walkLabels?.newer??"Nueva"}</button>
             </>}
             <ToolSeparator/>
             <button type="button" data-tool="" className="walk-exit" title="Salir del recorrido · Esc" onClick={stopWalk}><X size={16} strokeWidth={2} aria-hidden="true"/>Salir</button>
@@ -431,7 +453,8 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           onLostPointerCapture={()=>viewer.current?.walkMove(direction,false)}>{icon}</button>)}</div>}
         {ready && !touring && model && <WorkspaceTools key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} control={tools} viewer={readViewer} plan={plan}
           scope={!plan && serverNotes && storedVersion ? storedVersion : undefined} pieces={optionPieces} onWorking={setOptionsWorking}
-          edit={{on:assistant,grouping,reason:prismaAvailable?undefined:"Editar trabaja con modelos IFC y GLB",
+          proposal={proposal && showingInitial?{renderReason:PROPOSAL_RENDER,compare:proposal.compare({elements:model.elements,viewer:readViewer,selected})}:undefined}
+          edit={{on:assistant,grouping,reason:proposal && showingInitial?PROPOSAL_EDIT:prismaAvailable?undefined:"Editar trabaja con modelos IFC y GLB",
             selection:ids,onSelection:next=>{setIds(next);setColor(null);},piece:findElement,onFocusPiece:setEditFocus,
             onEnter:enterEdit,onExit:exitEdit,onUngroup:()=>setGrouping(false)}}
           reviewOpen={reviewOpen} onCloseReview={()=>review.current?.close()}
