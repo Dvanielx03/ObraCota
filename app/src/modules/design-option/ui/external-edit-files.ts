@@ -39,7 +39,7 @@ export async function readEditArchive(file:File):Promise<EditFiles>{
   const parts=unzipSync(new Uint8Array(await file.arrayBuffer()),{
     filter:entry=>entry.compression===0 && entry.size<=maxBytes && names.delete(entry.name),
   });
-  if(names.size)throw new Error("Abre el ZIP original descargado desde Prisma.");
+  if(names.size)throw new Error("Abre el ZIP original descargado desde Editar.");
   return {original:new Uint8Array(parts[originalName]),mask:new Uint8Array(parts[maskName]),prompt:strFromU8(parts[promptName])};
 }
 
@@ -51,7 +51,7 @@ export async function protectEdit(files:EditFiles,edited:File):Promise<string>{
     const [original,mask,result]=images;
     const {width,height}=original;
     if(width>1280 || height>1280 || mask.width!==width || mask.height!==height)
-      throw new Error("La máscara y la vista de Prisma deben tener las mismas dimensiones.");
+      throw new Error("La máscara y la vista del paquete deben tener las mismas dimensiones.");
     if(Math.abs(result.width*height/(result.height*width)-1)>.01)
       throw new Error("La imagen tiene otro formato de encuadre. Pide a Gemini conservar la proporción de la vista original.");
     const canvas=document.createElement("canvas");

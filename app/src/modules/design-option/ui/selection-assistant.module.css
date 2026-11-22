@@ -1,49 +1,51 @@
-.panel{display:flex;flex:1;flex-direction:column;min-height:0;min-width:0;color:#0a1522}
+.panel{display:flex;flex:1;flex-direction:column;min-height:0;min-width:0;color:var(--ink)}
 .head,.row,.actions{display:flex;align-items:center;gap:.6rem}
-.head{border-bottom:1px solid var(--line);padding:.7rem 1rem}.head button,.row button,.row input{margin-left:auto}
-.head h2{font:1.85rem/1 Bebas,sans-serif;margin:0}.head small,.scroll small{font-size:.72rem;color:var(--mute)}
-.prism{width:38px;height:44px;flex:none}
-.prismEntry{display:grid;place-items:center;flex:none}
-.scroll{overflow:auto;padding:.85rem 1rem;display:flex;flex-direction:column;gap:.8rem;font: .85rem/1.45 Manrope,sans-serif}
-.scroll h3{margin:0;font-size:.92rem}.scroll section{border-top:1px solid var(--line);padding-top:.8rem}.scroll p{margin:.35rem 0}
-.panel button{min-height:36px;padding:0 .55rem;border:1px solid var(--line);border-radius:4px}.panel button[aria-pressed=true]{background:#0a1522;color:white}
-.scroll input:not([type=color]),.scroll textarea{display:block;font:inherit;width:100%;padding:.5rem;border:1px solid var(--line);background:#fffdf8;color:inherit}
+.head{border-bottom:1px solid var(--border);padding:.7rem 1rem}.head button,.row button,.row input{margin-left:auto}
+.head h2{font:var(--type-card-title);margin:0}.head small,.scroll small{font-size:.72rem;color:var(--muted)}
+/* Editar mark (DU-16): the pencil of the bottom bar on the green of the edit tools (DU-09). */
+.editEntry{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:var(--radius-md);background:var(--brand-soft);color:var(--brand-ink)}
+.editGlyph{width:18px;height:18px;flex:none}
+.scroll{overflow:auto;padding:.85rem 1rem;display:flex;flex-direction:column;gap:.8rem;font:13px/1.45 var(--font-sans)}
+.scroll h3{margin:0;font-size:.92rem}.scroll section{border-top:1px solid var(--border);padding-top:.8rem}.scroll p{margin:.35rem 0}
+.panel button{min-height:36px;padding:0 .55rem;border:1px solid var(--border);border-radius:var(--radius-md)}.panel button[aria-pressed=true]{background:var(--primary);color:var(--on-primary)}
+.scroll input:not([type=color]),.scroll textarea{display:block;font:inherit;width:100%;padding:.5rem;border:1px solid var(--border-strong);border-radius:var(--radius-md);background:var(--field);color:inherit}
 .scroll textarea{min-height:5rem}.scroll input[type=color]{width:44px;height:36px}
-.scroll ul{margin:0;padding:0;list-style:none}.scroll li{border-left:2px solid #cb852b;padding:.3rem .5rem;display:flex;align-items:center;justify-content:space-between;gap:.4rem;overflow-wrap:anywhere}.scroll li small{display:block}
+.scroll ul{margin:0;padding:0;list-style:none}.scroll li{border-left:2px solid var(--brand);padding:.3rem .5rem;display:flex;align-items:center;justify-content:space-between;gap:.4rem;overflow-wrap:anywhere}.scroll li small{display:block}
 .results{max-height:9rem;overflow:auto}.results button{width:100%;text-align:left}.actions{flex-wrap:wrap;margin-top:.5rem}.scroll img{max-width:100%}
 .scroll>*{flex-shrink:0}
-.scroll .intro{border-top:0;border-bottom:1px solid var(--line);padding:0 0 .75rem}
-.intro p{margin:0 0 .55rem;max-width:30ch;color:var(--mute)}
-.panel .intro button{background:#f6dfb9;border-color:#bd9257;font-weight:750}
-.maskEdit{border:1px solid var(--line);border-radius:4px;padding:.65rem .75rem;min-width:0}
-.maskEdit summary{font-weight:750;cursor:pointer}
+.scroll .hint{color:var(--muted);border-top:1px solid var(--border);padding-top:.8rem;margin:0}
+.scroll .intro{border-top:0;border-bottom:1px solid var(--border);padding:0 0 .75rem}
+.intro p{margin:0 0 .55rem;max-width:30ch;color:var(--muted)}
+.panel .intro button{background:var(--brand-soft);border-color:var(--brand-edge);color:var(--brand-ink);font-weight:700}
+.maskEdit{border:1px solid var(--border);border-radius:var(--radius-lg);padding:.65rem .75rem;min-width:0}
+.maskEdit summary{font-weight:700;cursor:pointer}
 .maskEdit form,.captureReview{display:grid;gap:.5rem;margin:.65rem 0}
-.captureCallout{margin:.55rem 0;padding:.5rem .65rem;border-left:3px solid #a46723;background:#f6ead6}
-.captureCallout button{background:#f6dfb9;border-color:#bd9257;font-weight:750}
+.captureCallout{margin:.55rem 0;padding:.5rem .65rem;border-left:3px solid var(--brand);background:var(--brand-soft)}
+.captureCallout button{background:var(--brand-soft);border-color:var(--brand-edge);color:var(--brand-ink);font-weight:700}
 .captureImages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem}
 .captureImages figure{min-width:0;margin:0}
-.captureImages img{display:block;width:100%;border:1px solid var(--line);border-radius:3px}
-.captureImages figcaption{padding-top:.2rem;font-size:.72rem;color:var(--mute)}
+.captureImages img{display:block;width:100%;border:1px solid var(--border);border-radius:var(--radius-xs)}
+.captureImages figcaption{padding-top:.2rem;font-size:.72rem;color:var(--muted)}
 .captureReview :global(.panel-action){
   display:grid;place-items:center;width:100%;min-height:44px;padding:.4rem .65rem;
-  background:var(--ink);color:#fff7e9;border-radius:4px;font-weight:750;text-align:center;text-decoration:none
+  background:var(--primary);color:var(--on-primary);border-radius:var(--radius-md);font-weight:700;text-align:center;text-decoration:none
 }
-.captureReview :global(.panel-action):hover{background:#28394c}
-.captureReview :global(.panel-action):focus-visible{outline:2px solid #eeae52;outline-offset:2px}
+.captureReview :global(.panel-action):hover{background:var(--primary-hover)}
+.captureReview :global(.panel-action):focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 .editPickers{display:grid;gap:.75rem;margin:.75rem 0}
-.editPickers>div{border-top:1px solid var(--line);padding-top:.6rem}
+.editPickers>div{border-top:1px solid var(--border);padding-top:.6rem}
 .editPickers small{display:block;margin-top:.3rem}
-.editPickers button{font-weight:650}
+.editPickers button{font-weight:600}
 @media(max-width:720px) and (orientation:portrait){
   :global(.workarea:not(.collapsed)):has(.panel){grid-template-rows:minmax(0,1fr) minmax(0,43%)}
   :global(.stagebar){gap:4px;font-size:12px}
   .panel button{min-height:44px}
 }
 @media(prefers-reduced-motion:no-preference){
-  .prismEntry{animation:prism-arrival .8s ease-out both}
-  .panel:has([data-working=true]) .prism{animation:survey 1.4s ease-in-out infinite}
+  .editEntry{animation:edit-arrival .8s ease-out both}
+  .panel:has([data-working=true]) .editGlyph{animation:survey 1.4s ease-in-out infinite}
   .captureReview{animation:reveal-capture .22s ease-out both}
   @keyframes reveal-capture{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-  @keyframes prism-arrival{from{opacity:.25;transform:translateY(5px)}55%{transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes edit-arrival{from{opacity:.25;transform:translateY(5px)}55%{transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
   @keyframes survey{50%{transform:rotate(-8deg) translateY(-2px)}}
 }

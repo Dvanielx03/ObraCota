@@ -3,6 +3,7 @@ import type {ElementInfo,GroupCapture,GroupCaptureView,ViewerPort} from "@/viewe
 import type {MaskStep} from "./prisma-tour";
 import {archiveEditFiles,prepareEditFiles,protectEdit,readEditArchive,type EditFiles} from "./external-edit-files";
 import styles from "./selection-assistant.module.css";
+import {LoadingStatus} from "@/shared/ui/loading";
 
 function download(url:string,name:string){
   const link=document.createElement("a");
@@ -40,7 +41,7 @@ export function ExternalEdit({pieces,viewer,onGuide,onPrepared,onImported,onSave
         setNotice("");
         if(view==="current"){
           setRecovery("reframe");
-          setError("Hay piezas fuera de vista. Prisma necesita ver una parte de cada pieza seleccionada.");
+          setError("Hay piezas fuera de vista. Para preparar el paquete tiene que verse una parte de cada pieza seleccionada.");
         }else if(view==="reframe"){
           setRecovery("isolated");
           setError("La selección sigue tapada. Puedes capturar solo las piezas seleccionadas en el ZIP.");
@@ -58,13 +59,13 @@ export function ExternalEdit({pieces,viewer,onGuide,onPrepared,onImported,onSave
     try{
       setFiles(await readEditArchive(file));setArchive(undefined);setRecovery(undefined);setCapture(undefined);setPreview("");setNotice("Paquete cargado. Ya puedes importar la imagen de Gemini.");
       onPrepared();
-    }catch{setError("No se pudo abrir el paquete. Usa el ZIP original que descargaste de Prisma.");}
+    }catch{setError("No se pudo abrir el paquete. Usa el ZIP original que descargaste desde Editar.");}
     finally{setBusy(false);}
   }
   async function apply(file:File){
     if(!files)return;
     if(/\.zip$/i.test(file.name)){
-      setError("Para recuperar un ZIP, pulsa Abrir ZIP de Prisma. Aquí se carga la imagen que devuelve Gemini.");
+      setError("Para recuperar un ZIP, pulsa Abrir ZIP de edición. Aquí se carga la imagen que devuelve Gemini.");
       return;
     }
     setBusy(true);setError("");setNotice("");setPreview("");
@@ -86,7 +87,7 @@ export function ExternalEdit({pieces,viewer,onGuide,onPrepared,onImported,onSave
     {error && <div className={styles.captureCallout} role="alert"><p>{error}</p>
       {recovery && <button data-prisma-tour={recovery==="reframe"?"edit-recover":"edit-isolate"} disabled={!pieces.length||!request.trim()} onClick={()=>void prepare(recovery)}>
         {recovery==="reframe"?"Reencuadrar y preparar de nuevo":"Aislar y preparar el ZIP"}</button>}</div>}
-    {notice && <p role="status">{notice}</p>}
+    {notice && <LoadingStatus busy={busy}>{notice}</LoadingStatus>}
     {archiveUrl && capture && <div className={styles.captureReview}>
       <div className={styles.captureImages} data-prisma-tour="edit-preview">
         <figure><img src={capture.image} alt="Vista original del paquete"/><figcaption>Vista original</figcaption></figure>
@@ -96,9 +97,9 @@ export function ExternalEdit({pieces,viewer,onGuide,onPrepared,onImported,onSave
     </div>}
     <div className={styles.editPickers}>
       <div>
-        <button type="button" data-prisma-tour="edit-archive" disabled={busy} onClick={()=>archiveInput.current?.click()}>Abrir ZIP de Prisma</button>
+        <button type="button" data-prisma-tour="edit-archive" disabled={busy} onClick={()=>archiveInput.current?.click()}>Abrir ZIP de edición</button>
         <small>Recupera un paquete guardado en Descargas.</small>
-        <input ref={archiveInput} hidden aria-label="Paquete ZIP de Prisma" type="file" accept=".zip,application/zip,application/x-zip-compressed" disabled={busy} onChange={e=>{
+        <input ref={archiveInput} hidden aria-label="Paquete ZIP de edición" type="file" accept=".zip,application/zip,application/x-zip-compressed" disabled={busy} onChange={e=>{
           const file=e.target.files?.[0];e.target.value="";if(file)void open(file);
         }}/>
       </div>
