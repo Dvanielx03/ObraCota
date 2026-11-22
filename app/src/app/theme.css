@@ -45,6 +45,7 @@
   --brand: #0D9674;                            /* brand mark, add buttons; text only from 18px */
   --on-brand: #FFFFFF;
   --brand-ink: #047857;                        /* small text on --brand-soft (5.5:1) */
+  --brand-mark: #047857;                       /* own accent of the logo's level bar (P-03): 5.5:1 on white, 4.9:1 on --bg */
   --brand-soft: rgb(16 185 129 / .1);          /* active chip: fill and border */
   --brand-tint: rgb(13 150 116 / .12);         /* active version: fill */
   --brand-edge: rgb(13 150 116 / .7);          /* active version: border; dashed card on hover */
@@ -246,6 +247,7 @@
   --brand: #79D2C9;
   --on-brand: #040506;
   --brand-ink: #79D2C9;
+  --brand-mark: #34D399;                       /* logo level bar: 8.1:1 on --surface, 8.5:1 on --bg */
   --brand-soft: rgb(121 210 201 / .12);
   --brand-tint: rgb(121 210 201 / .12);
   --brand-edge: rgb(121 210 201 / .7);
@@ -288,6 +290,7 @@
     --brand: #79D2C9;
     --on-brand: #040506;
     --brand-ink: #79D2C9;
+    --brand-mark: #34D399;
     --brand-soft: rgb(121 210 201 / .12);
     --brand-tint: rgb(121 210 201 / .12);
     --brand-edge: rgb(121 210 201 / .7);

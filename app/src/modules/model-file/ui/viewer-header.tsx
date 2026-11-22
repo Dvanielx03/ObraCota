@@ -2,6 +2,7 @@
 import type { ReactNode, RefObject } from "react";
 import { ChevronRight, CircleHelp, FolderOpen, Presentation, Share2, X } from "lucide-react";
 import { ThemeToggle } from "@/shared/theme/theme-toggle";
+import { BrandMark } from "@/shared/ui/brand-mark";
 import { MODEL_ACCEPT } from "../domain/file-header";
 import { OpenFailurePreview } from "./open-failure-preview";
 
@@ -25,7 +26,7 @@ export function ViewerHeader({ returnHref, returnLabel, projectName, fileName, p
   return <header className="viewer-header" inert={inert}>
     <div className="viewer-crumbs">
       <a href={returnHref} className="brand viewer-back" aria-label={returnLabel} title={returnLabel}>
-        <svg width="26" height="26" viewBox="0 -1 25 25" fill="currentColor" aria-hidden="true"><path d="M1 2h23l-5 5H6l-5 5zm0 13 5-5v7h13l5 5H1z"/></svg>
+        <BrandMark wordmark={false}/>
       </a>
       <ChevronRight className="crumb-chevron" size={24} strokeWidth={2} aria-hidden="true"/>
       {projectName && <><span className="project-name" title={projectName}>{projectName}</span>{!pending && <span className="crumb-dot" aria-hidden="true">·</span>}</>}

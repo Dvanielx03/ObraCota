@@ -31,13 +31,6 @@
   display: inline-flex;
   align-items: center;
 }
-.brand :global(.brand-mark) {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font: var(--type-logo);
-  letter-spacing: var(--tracking-logo);
-}
 
 .card {
   width: min(100%, 652px);

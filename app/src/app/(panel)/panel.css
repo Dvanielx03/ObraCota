@@ -43,7 +43,6 @@
   border: 0;
 }
 .panel-brand { display: inline-flex; align-items: center; border-radius: var(--radius-sm); text-decoration: none; }
-.brand-mark { display: inline-flex; align-items: center; gap: 10px; font: var(--type-logo); letter-spacing: var(--tracking-logo); color: var(--ink); white-space: nowrap; }
 .panel-top-actions, .panel-nav { display: flex; align-items: center; gap: 12px; }
 .panel-site { display: inline-flex; align-items: center; gap: 4px; font: var(--type-ui); color: var(--muted); text-decoration: none; border-radius: var(--radius-sm); }
 .panel-site:hover { color: var(--ink); text-decoration: underline; }

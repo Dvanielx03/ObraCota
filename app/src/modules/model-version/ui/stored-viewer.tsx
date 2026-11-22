@@ -8,6 +8,7 @@ import {revisionLabel,type ModelVersion} from "../domain/model-version";
 import {authenticated} from "@/core/http/http-client";
 import {projectHttpRepository} from "@/modules/project/infrastructure/project-http-repository";
 import { ThemeToggle } from "@/shared/theme/theme-toggle";
+import { BrandMark } from "@/shared/ui/brand-mark";
 import { ModelPreparing, Skeleton } from "@/shared/ui/loading";
 import { documentTitle, useDocumentTitle } from "@/shared/ui/document-title";
 
@@ -60,7 +61,7 @@ export function StoredViewer({ project, version, previous }: { project: string; 
     <header className="workspace-pending-bar">
       <div className="workspace-pending-crumbs">
         <Link href={href} aria-label="Volver a archivos" title="Volver a archivos">
-          <svg width="26" height="26" viewBox="0 -1 25 25" fill="currentColor" aria-hidden="true"><path d="M1 2h23l-5 5H6l-5 5zm0 13 5-5v7h13l5 5H1z"/></svg>
+          <BrandMark wordmark={false}/>
         </Link>
         <ChevronRight size={24} strokeWidth={2} aria-hidden="true"/>
         <p className="workspace-pending-name">{projectName ?? <Skeleton/>}</p>

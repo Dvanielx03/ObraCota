@@ -13,7 +13,9 @@ header,.stagebar{display:flex;align-items:center}header{padding:8px clamp(14px,2
 .brand{display:flex;align-items:center;gap:9px;font:var(--type-logo);letter-spacing:var(--tracking-logo)}
 .separator{color:var(--muted)}.project{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:var(--type-project-title)}
 .viewer-back{color:inherit;text-decoration:none;min-height:44px}.viewer-back:hover{text-decoration:underline}
-.viewer-back::before{content:"←";font:500 17px var(--font-sans)}
+/* ObraCota symbol and wordmark (shared/ui/brand-mark.tsx): outer bars in the text colour, level bar in its own accent. */
+.brand-mark{display:inline-flex;align-items:center;gap:10px;font:var(--type-logo);letter-spacing:var(--tracking-logo);color:var(--ink);white-space:nowrap}
+.brand-symbol-level{fill:var(--brand-mark)}
 .open{margin-left:auto;background:var(--primary);color:var(--on-primary);border-radius:var(--radius-md);padding:0 15px;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
 .open:hover{background:var(--primary-hover)}
 .workarea{display:grid;grid-template-columns:clamp(242px,23vw,342px) minmax(0,1fr);min-height:0}
@@ -49,7 +51,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;margin-bottom:0;font
 .open-failure-preview figcaption{display:grid;gap:4px;font:var(--type-caption);color:var(--muted);max-width:46ch}
 .open-failure-preview strong{font:var(--type-label);color:var(--ink)}
 
-@media(max-width:720px){header{gap:8px}.brand{font-size:18px}.brand svg{width:19px}.project{font-size:12px}.open{padding:0 10px}
+@media(max-width:720px){header{gap:8px}.project{font-size:12px}.open{padding:0 10px}
 .workarea{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(130px,32%)}.workarea.collapsed{grid-template-rows:minmax(0,1fr)}
 .stage{grid-row:1}.workarea aside{grid-row:2;border-right:0;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto minmax(0,1fr)}
 .panelHead{padding:8px 12px}.panelHead h1{font-size:23px}.search{margin-top:0}.tree{grid-row:2;padding:0 6px;min-height:0}.inspector{grid-column:2;grid-row:1/3;border:0;border-left:1px solid var(--border);max-height:none;padding:14px}
@@ -227,9 +229,7 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
   .viewer-crumbs{flex:0 1 auto}
   .viewer-actions{flex:none;gap:12px}
   .viewer-header .viewer-back{display:grid;place-items:center;flex:none;width:26px;height:26px;min-height:0;border-radius:var(--radius-sm);color:var(--ink)}
-  .viewer-header .viewer-back::before{content:none}
   .viewer-header .viewer-back:hover{text-decoration:none;opacity:.75}
-  .viewer-header .viewer-back svg{width:26px;height:26px}
   .crumb-chevron{display:block;flex:none;color:var(--border);user-select:none}
   .project-name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:var(--type-project-title);color:var(--ink)}
   .crumb-dot{display:block;flex:none;color:var(--muted);font:var(--type-project-title)}
