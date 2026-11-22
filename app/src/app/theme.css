@@ -1,0 +1,313 @@
+/*
+ * ObraCota application tokens (V-01, decisions DU-01, DU-02 and DU-10 of 21 Nov 2026).
+ * Light values are the ones measured in the reference app; dark values were measured there too,
+ * except the ones marked "derived". Sources: docs/reference/vibe3d/01-proyectos.md §8,
+ * 02-espacio-de-trabajo.md §7 and 03-herramientas.md. Documented in docs/architecture/DESIGN_SYSTEM.md.
+ *
+ * Modes live on <html data-theme="light|dark|system">. "system" (and a missing attribute)
+ * follows prefers-color-scheme. The landing page does not load this file.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg: #F3F2F1;                               /* page and 3D canvas */
+  --bg-app: #F9FAFB;                           /* document body behind full-height pages */
+  --surface: #FFFFFF;                          /* cards, panels, menus, dialogs */
+  --surface-float: rgb(255 255 255 / .95);     /* bottom toolbar */
+  --surface-rail: rgb(255 255 255 / .94);      /* version rail */
+  --surface-strip: rgb(255 255 255 / .92);     /* saved-view strip */
+  --surface-ghost: rgb(255 255 255 / .45);     /* "new project" card */
+  --surface-ghost-hover: rgb(255 255 255 / .7);
+  --field: #F9FAFB;                            /* text fields and selects on a surface */
+
+  /* Text */
+  --ink: #171E2B;                              /* headings, body text, icons on hover */
+  --muted: #646A78;                            /* secondary text, idle icons, inactive tabs */
+
+  /* Lines and neutral fills */
+  --border: #DCDFE4;
+  --border-soft: rgb(220 223 228 / .7);        /* card outlines */
+  --border-faint: rgb(220 223 228 / .4);       /* chip outlines, text boxes */
+  --border-strong: #858B97;                    /* form fields: 3:1 against white (accessibility) */
+  --hover: #F3F4F6;                            /* hover and active toolbar button, icon boxes */
+  --secondary: #E5E7EB;                        /* secondary pill (export) */
+  --secondary-soft: rgb(229 231 235 / .3);     /* idle chip fill */
+
+  /* Actions */
+  --primary: #171E2B;                          /* dark pill, main button, active tab */
+  --on-primary: #FFFFFF;
+  --primary-hover: rgb(23 30 43 / .9);
+  --ring: #0C0C0E;                             /* focus outline */
+
+  /* Brand and states */
+  --brand: #0D9674;                            /* brand mark, add buttons; text only from 18px */
+  --on-brand: #FFFFFF;
+  --brand-ink: #047857;                        /* small text on --brand-soft (5.5:1) */
+  --brand-soft: rgb(16 185 129 / .1);          /* active chip: fill and border */
+  --brand-tint: rgb(13 150 116 / .12);         /* active version: fill */
+  --brand-edge: rgb(13 150 116 / .7);          /* active version: border; dashed card on hover */
+  --brand-dashed: rgb(13 150 116 / .35);       /* dashed "new project" border */
+  --brand-on-primary: #55C498;                 /* accent text on a --primary surface (tour card title) */
+  --thumb-active: #55C498;                     /* active thumbnail border, same in both modes */
+  --favorite: #F59E0B;                         /* favourite star */
+  --error: hsl(0 72% 46%);
+  --on-error: #FFFFFF;
+
+  /* Tool colours (DU-09) */
+  --tool-edit: #10B981;                        /* annotate / edit marks */
+  --tool-edit-hover: #059669;
+  --tool-edit-stroke: #6EE7B7;
+  --tool-edit-fill: rgb(52 211 153 / .15);
+  --tool-detail: #8B5CF6;                      /* close-up marks */
+  --tool-detail-strong: #7C3AED;
+  --tool-detail-stroke: #C4B5FD;
+  --tool-detail-fill: rgb(167 139 250 / .15);
+  --tool-transition: #F59E0B;                  /* transitions */
+  --tool-transition-ink: #B45309;
+  --tool-transition-soft: rgb(245 158 11 / .1);
+  --tool-transition-strong: rgb(217 119 6 / .9);
+  --pending-dot: #10B981;                      /* 6 px dot on a tool with unsent changes */
+
+  /* Overlays and media chrome (same in both modes unless overridden) */
+  --dot: rgb(163 163 163 / .8);                /* canvas dot grid */
+  --plan-paper: #F3F2F1;                       /* 2D drawing sheet: DWG strokes are dark, so it stays light */
+  --capture-bg: #F3F2F1;                       /* background baked into viewer captures and exports */
+  --on-dark: #FFFFFF;                          /* text and lines over --hint, --glass-dark, images */
+  --handle-ink: #64748B;                       /* grip icon on the white compare handle */
+  --overlay: rgb(0 0 0 / .35);                 /* dialog backdrop, with --blur-overlay */
+  --overlay-media: rgb(2 6 23 / .8);           /* video and media backdrop */
+  --hint: rgb(0 0 0 / .75);                    /* hint pill over the canvas */
+  --glass-dark: rgb(0 0 0 / .5);               /* tag over an image */
+  --glass-dark-soft: rgb(0 0 0 / .3);          /* icon button over an image */
+  --badge-dark: rgb(15 23 42 / .8);            /* delete / favourite circle */
+  --badge-dark-hover: #0F172A;
+  --card-veil: linear-gradient(0deg, rgb(0 0 0 / .7) 0, rgb(0 0 0 / .5) 30%, transparent);
+  --stage-dark: #0A0A0B;                       /* presentation stage, image letterbox */
+  --cover-gradient: linear-gradient(135deg, #F0F9FF, #FAF5FF);
+  --menu-ink: #334155;                         /* export menu option */
+  --menu-label: #64748B;                       /* export menu switch label */
+  --menu-hint: #94A3B8;                        /* export menu help */
+
+  /* Shadows (unchanged in dark mode, as in the reference) */
+  --shadow-float: 0 8px 32px rgb(0 0 0 / .08), 0 2px 8px rgb(0 0 0 / .03);
+  --shadow-card: 0 4px 16px rgb(0 0 0 / .07);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / .05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / .1), 0 2px 4px -2px rgb(0 0 0 / .1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1);
+  --shadow-dialog: 0 20px 25px -5px rgb(0 0 0 / .1), 0 8px 10px -6px rgb(0 0 0 / .1);
+  --shadow-popover: 0 25px 50px -12px rgb(0 0 0 / .1);
+  --shadow-popover-strong: 0 25px 50px -12px rgb(0 0 0 / .25);
+  --shadow-note: 0 25px 50px -12px rgb(0 0 0 / .2);
+  --shadow-thumb: 0 1px 3px rgb(0 0 0 / .08);
+  --shadow-cover: 0 4px 24px rgb(0 0 0 / .05), 0 1px 4px rgb(0 0 0 / .03);
+  --shadow-add: 0 2px 16px rgb(0 0 0 / .04);
+  --shadow-badge: 0 2px 6px rgb(0 0 0 / .25);
+  --shadow-avatar: 0 2px 4px rgb(0 0 0 / .1);
+  --shadow-primary: 0 10px 15px -3px rgb(23 30 43 / .2), 0 4px 6px -4px rgb(23 30 43 / .2);
+  --shadow-handle: 0 0 4px rgb(0 0 0 / .4);   /* white divider line of the compare slider */
+
+  /* Radii */
+  --radius-xs: 4px;        /* image inside a thumbnail */
+  --radius-sm: 6px;        /* theme button, tags, tooltips */
+  --radius-version: 7px;   /* version card */
+  --radius-md: 8px;        /* tabs, icon buttons, menu options */
+  --radius-mode: 10px;     /* toolbar mode button, version rail */
+  --radius-lg: 12px;       /* menus, chips, thumbnails, main button */
+  --radius-toolbar: 14px;  /* bottom toolbar, image card on the canvas */
+  --radius-xl: 16px;       /* view strip, popovers, guide cards */
+  --radius-2xl: 20px;      /* project card, dialogs */
+  --radius-3xl: 24px;      /* media dialog, floating note */
+  --radius-pill: 9999px;
+
+  /* Sizes */
+  --nav-height: 52px;
+  --nav-offset: 4px;
+  --nav-padding: 20px;
+  --content-max: 1280px;
+  --content-padding: 40px;
+  --grid-min: 240px;
+  --grid-gap: 24px;
+  --edge: 16px;               /* floating panels to the viewport edge */
+  --toolbar-bottom: 24px;
+  --toolbar-padding: 5px 6px;
+  --mode-padding: 8px 14px;
+  --tab-padding: 7px 14px;
+  --icon-button: 34px;
+  --theme-button: 36px;
+  --avatar: 36px;
+  --pill-height: 28px;
+  --menu-button: 28px;
+  --main-button: 44px;
+  --strip-width: 108px;
+  --thumb-width: 90.4px;      /* 3:2 */
+  --rail-width: 64px;
+  --version-width: 50.4px;
+  --version-height: 28px;
+  --popover-gap: 10px;
+  --popover-sm: 300px;
+  --popover-md: 320px;
+  --popover-lg: 340px;
+  --popover-xl: 384px;
+  --icon-sm: 12px;
+  --icon-md: 16px;
+  --dot-gap: 24px;
+  --dot-radius: 1.2px;
+  --blur-overlay: 4px;
+  --blur-glass: 8px;
+  --blur-rail: 12px;
+  --blur-strip: 16px;
+  --blur-toolbar: 20px;
+  --blur-popover: 24px;
+  --z-float: 30;
+  --z-toolbar: 40;
+  --z-nav: 50;
+  --z-dialog: 100;
+  --z-menu: 9999;
+
+  /* Type: the system stack (Segoe UI on Windows). Use as `font: var(--type-…)`. */
+  --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --type-logo: 700 22px/22px var(--font-sans);
+  --type-page-title: 700 22px/33px var(--font-sans);
+  --type-project-title: 800 20px/30px var(--font-sans);
+  --type-section-title: 700 20px/28px var(--font-sans);
+  --type-cover-title: 700 32px/38.4px var(--font-sans);
+  --type-card-title: 700 16px/24px var(--font-sans);
+  --type-dialog-title: 700 16px/22px var(--font-sans);
+  --type-lead: 400 15px/23.25px var(--font-sans);
+  --type-body: 400 14px/20px var(--font-sans);
+  --type-body-relaxed: 400 14px/22.75px var(--font-sans);
+  --type-title-sm: 600 14px/19.25px var(--font-sans);
+  --type-ui: 500 13px/19.5px var(--font-sans);
+  --type-tab: 600 13px/19.5px var(--font-sans);
+  --type-description: 400 13px/21.1px var(--font-sans);
+  --type-label: 600 12px/16px var(--font-sans);
+  --type-hint: 500 12px/16px var(--font-sans);
+  --type-caption: 400 11px/16.5px var(--font-sans);
+  --type-mode: 700 11px/16.5px var(--font-sans);        /* uppercase toolbar mode button */
+  --type-version: 700 11px/16.5px var(--font-sans);
+  --type-panel-title: 900 11px/16.5px var(--font-sans); /* uppercase */
+  --type-pill: 700 10px/15px var(--font-sans);          /* uppercase header pills */
+  --type-section-label: 900 10px/15px var(--font-sans); /* uppercase */
+  --type-chip: 700 10px/15px var(--font-sans);          /* uppercase */
+  --type-overline: 600 10px/15px var(--font-sans);      /* uppercase */
+  --type-main-button: 900 12px/16px var(--font-sans);   /* uppercase */
+  --type-monogram: 800 80px/1 var(--font-sans);
+  --tracking-logo: -.01em;
+  --tracking-page: -.02em;
+  --tracking-section: -.5px;
+  --tracking-caps: .5px;
+  --tracking-chip: .25px;
+  --tracking-label: 1px;
+  --tracking-panel: 1.1px;
+  --tracking-button: 1.2px;
+  --tracking-version: .02em;
+  --tracking-monogram: -.04em;
+
+  /* Motion */
+  --ease-standard: cubic-bezier(.4, 0, .2, 1);
+  --ease-pop: cubic-bezier(.34, 1.56, .64, 1);   /* toolbar entrance */
+  --ease-slide: cubic-bezier(.22, 1, .36, 1);     /* presentation slides */
+  --ease-pulse: cubic-bezier(.4, 0, .6, 1);       /* skeleton pulse, 2 s */
+  --duration-fast: .12s;
+  --duration-base: .15s;
+  --duration-card: .2s;
+  --duration-panel: .25s;
+  --duration-fade: .35s;
+}
+
+/* Dark palette, written twice: chosen explicitly, or following the system. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1D2026;
+  --bg-app: #16181D;
+  --surface: #21242C;
+  --surface-float: rgb(33 36 44 / .95);
+  --surface-rail: rgb(33 36 44 / .94);
+  --surface-strip: rgb(33 36 44 / .92);
+  --surface-ghost: rgb(33 36 44 / .45);
+  --surface-ghost-hover: rgb(33 36 44 / .7);
+  --field: #16181D;
+  --ink: #F1F2F3;
+  --muted: #A8AFBD;
+  --border: #545D6D;
+  --border-soft: rgb(84 93 109 / .7);
+  --border-faint: rgb(84 93 109 / .4);
+  --border-strong: #7C8597;                    /* derived */
+  --hover: #282C34;
+  --secondary: #303540;
+  --secondary-soft: rgb(48 53 64 / .3);
+  --primary: #F1F2F3;
+  --on-primary: #040506;
+  --primary-hover: rgb(241 242 243 / .9);
+  --ring: #F1F2F3;
+  --brand: #79D2C9;
+  --on-brand: #040506;
+  --brand-ink: #79D2C9;
+  --brand-soft: rgb(121 210 201 / .12);
+  --brand-tint: rgb(121 210 201 / .12);
+  --brand-edge: rgb(121 210 201 / .7);
+  --brand-dashed: rgb(121 210 201 / .35);
+  --brand-on-primary: #047857;                 /* derived: accent text on the light --primary */
+  --error: hsl(0 72% 65%);                     /* derived */
+  --on-error: #040506;                         /* derived */
+  --cover-gradient: linear-gradient(135deg, #1E2A36, #2A2536); /* derived: the reference does not adapt it */
+  --menu-ink: #E2E5EA;                         /* derived */
+  --menu-label: #A8AFBD;                       /* derived */
+  --menu-hint: #7C8597;                        /* derived */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"],
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #1D2026;
+    --bg-app: #16181D;
+    --surface: #21242C;
+    --surface-float: rgb(33 36 44 / .95);
+    --surface-rail: rgb(33 36 44 / .94);
+    --surface-strip: rgb(33 36 44 / .92);
+    --surface-ghost: rgb(33 36 44 / .45);
+    --surface-ghost-hover: rgb(33 36 44 / .7);
+    --field: #16181D;
+    --ink: #F1F2F3;
+    --muted: #A8AFBD;
+    --border: #545D6D;
+    --border-soft: rgb(84 93 109 / .7);
+    --border-faint: rgb(84 93 109 / .4);
+    --border-strong: #7C8597;
+    --hover: #282C34;
+    --secondary: #303540;
+    --secondary-soft: rgb(48 53 64 / .3);
+    --primary: #F1F2F3;
+    --on-primary: #040506;
+    --primary-hover: rgb(241 242 243 / .9);
+    --ring: #F1F2F3;
+    --brand: #79D2C9;
+    --on-brand: #040506;
+    --brand-ink: #79D2C9;
+    --brand-soft: rgb(121 210 201 / .12);
+    --brand-tint: rgb(121 210 201 / .12);
+    --brand-edge: rgb(121 210 201 / .7);
+    --brand-dashed: rgb(121 210 201 / .35);
+    --brand-on-primary: #047857;
+    --error: hsl(0 72% 65%);
+    --on-error: #040506;
+    --cover-gradient: linear-gradient(135deg, #1E2A36, #2A2536);
+    --menu-ink: #E2E5EA;
+    --menu-label: #A8AFBD;
+    --menu-hint: #7C8597;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0s;
+    --duration-base: 0s;
+    --duration-card: 0s;
+    --duration-panel: 0s;
+    --duration-fade: 0s;
+  }
+}
