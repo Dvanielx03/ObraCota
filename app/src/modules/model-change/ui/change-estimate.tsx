@@ -34,12 +34,14 @@ export function ChangeEstimate({change,labels}:{change:ModelChange;labels:Record
     {estimate && !estimate.lines.length && <p>Sin costo directo. Si la propiedad cambia el producto, registra su precio por unidad.</p>}
     {estimate && !!estimate.lines.length && <ul className="change-lines">{estimate.lines.map((line,index)=><li key={(line.operation??"")+index}>
       <p><strong>{line.operation?labels[line.operation]??line.operation:"Línea "+(index+1)}</strong></p>
-      <p>{line.kind==="ADDITIONAL_COST"?"Costo adicional":"Cantidad"} · {quantity(line)} · {sourceLabel(line.quantitySource)}
+      <p>{line.kind==="ADDITIONAL_COST"?"Costo adicional":line.kind==="MATERIAL_FINISH"?"Acabado":"Cantidad"} · {quantity(line)} · {sourceLabel(line.quantitySource)}
         {line.basis && <small className="change-basis"> · {line.basis}</small>}</p>
       {line.kind==="TYPE_CHANGE"?<>
         <p>Antes · <PriceText price={line.before} missing="Falta el precio del tipo actual."/></p>
         <p>Después · <PriceText price={line.after} missing="Falta el precio del tipo propuesto."/></p>
-      </>:<p>Precio · <PriceText price={line.after??line.before} missing={"Falta el precio de "+(line.afterKey??line.beforeKey??"la clave")+"."}/></p>}
+      </>:line.kind==="MATERIAL_FINISH"?<p>Precio por m² · <PriceText price={line.after} missing={"No hay precio registrado para "+(line.afterKey?.replace(/^item:/,"«")??"este material")+(line.afterKey?"»":"")+": la estimación no lo inventa. Regístralo por m² en los precios de la versión."}/>
+        {line.after && line.after.unit!=="M2" && <small className="change-missing"> · El precio está por {units[line.after.unit]?.[0]??line.after.unit}, no por m²: no se usa.</small>}</p>
+      :<p>Precio · <PriceText price={line.after??line.before} missing={"Falta el precio de "+(line.afterKey??line.beforeKey??"la clave")+"."}/></p>}
       <p>Diferencia de la línea · {line.difference===null?"sin calcular":amount(line.difference)}</p>
     </li>)}</ul>}
     {estimate && !!estimate.lines.length && (estimate.complete

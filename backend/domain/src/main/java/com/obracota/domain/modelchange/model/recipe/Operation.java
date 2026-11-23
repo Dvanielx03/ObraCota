@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
  * One typed step of a recipe. Every record validates its own shape in the constructor and throws
  * {@link IllegalArgumentException}; the engine decides later whether the model accepts it.
  */
-public sealed interface Operation permits ChangeType, SetProperty {
+public sealed interface Operation permits ChangeType, SetProperty, SetMaterial {
     Pattern ID = Pattern.compile("op-[0-9]{1,3}");
 
     /** Stable id inside the recipe ({@code op-1}, {@code op-2}…); {@code null} until the server assigns it. */

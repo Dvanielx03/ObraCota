@@ -5,7 +5,7 @@ import com.obracota.application.common.port.Transactions;
 import com.obracota.application.modelchange.rules.ChangeFindings;
 import com.obracota.application.modelversion.usecase.ProjectVersions;
 import com.obracota.application.rulefinding.DoorRules;
-import com.obracota.domain.designchange.BimEditPort;
+import com.obracota.domain.designchange.DoorInspectionPort;
 import com.obracota.domain.modelchange.model.ChangeStateException;
 import com.obracota.domain.modelchange.model.ChangeStatus;
 import com.obracota.domain.modelchange.model.ModelChange;
@@ -16,6 +16,7 @@ import com.obracota.domain.modelchange.model.recipe.ChangeType;
 import com.obracota.domain.modelchange.model.recipe.GlobalId;
 import com.obracota.domain.modelchange.model.recipe.Operation;
 import com.obracota.domain.modelchange.model.recipe.Recipe;
+import com.obracota.domain.modelchange.model.recipe.SetMaterial;
 import com.obracota.domain.modelchange.model.recipe.SetProperty;
 import com.obracota.domain.modelchange.model.report.PreviewReport;
 import com.obracota.domain.modelchange.port.*;
@@ -41,7 +42,7 @@ import java.util.function.Function;
  */
 public final class ModelChanges {
     /** Operations the backend lets through (§5.4): the door of equal size and, since step 11 of H1 (H2.1), typed properties. */
-    public static final Set<String> ENABLED_OPERATIONS = Set.of(ChangeType.OP, SetProperty.OP);
+    public static final Set<String> ENABLED_OPERATIONS = Set.of(ChangeType.OP, SetProperty.OP, SetMaterial.OP);
     public static final int LIST_LIMIT = 100;
     public static final int REASON_LIMIT = 500;
     static final String PREVIEW_MISSING = "La vista previa no está disponible.";
@@ -59,19 +60,19 @@ public final class ModelChanges {
     private final PriceBook prices;
     private final PreviewStorage previews;
     private final ModelEnginePort engine;
-    private final BimEditPort doors;
+    private final DoorInspectionPort doors;
     private final Transactions tx;
     private final Clock clock;
     private final ChangeViews views;
     private final Duration budget;
 
     public ModelChanges(ProjectVersions versions, ModelChangeRepository changes, PriceBook prices, PreviewStorage previews,
-                        ModelEnginePort engine, BimEditPort doors, RecipeCodec codec, Transactions tx, Clock clock) {
+                        ModelEnginePort engine, DoorInspectionPort doors, RecipeCodec codec, Transactions tx, Clock clock) {
         this(versions, changes, prices, previews, engine, doors, codec, tx, clock, REQUEST_BUDGET);
     }
 
     public ModelChanges(ProjectVersions versions, ModelChangeRepository changes, PriceBook prices, PreviewStorage previews,
-                        ModelEnginePort engine, BimEditPort doors, RecipeCodec codec, Transactions tx, Clock clock, Duration budget) {
+                        ModelEnginePort engine, DoorInspectionPort doors, RecipeCodec codec, Transactions tx, Clock clock, Duration budget) {
         if (budget == null || budget.isNegative() || budget.isZero()) throw new IllegalArgumentException("budget must be positive");
         this.budget = budget;
         this.versions = versions;
@@ -262,7 +263,7 @@ public final class ModelChanges {
     // Door facade (/design-changes) ---------------------------------------------------------------------------------
 
     /** {@code /inspect} of a door, as {@code GET /design-changes/door} returns it today. */
-    public BimEditPort.Door door(Actor actor, UUID project, UUID version, String element) throws IOException {
+    public DoorInspectionPort.Door door(Actor actor, UUID project, UUID version, String element) throws IOException {
         Guards.reach(actor, project);
         Guards.ifc(versions, actor, project, version);
         return doors.inspect(project, version, GlobalId.require(element));

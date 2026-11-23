@@ -26,6 +26,7 @@ public final class JacksonRecipeCodec implements RecipeCodec {
     static final String REMOVE = "ifc.remove_element";
     private static final Set<String> CHANGE_TYPE_FIELDS = Set.of("id", "op", "element", "type_id");
     private static final Set<String> SET_PROPERTY_FIELDS = Set.of("id", "op", "element", "scope", "pset", "property", "value", "price_key");
+    private static final Set<String> SET_MATERIAL_FIELDS = Set.of("id", "op", "element", "elements", "material", "category", "color", "price_key");
     private static final Set<String> RECIPE_FIELDS = Set.of("format", "operations");
     private static final int JSON_LIMIT = 64 * 1024;
 
@@ -92,6 +93,13 @@ public final class JacksonRecipeCodec implements RecipeCodec {
                 node.put("value", property.value().raw());
                 node.put("price_key", property.priceKey() == null ? null : property.priceKey().value());
             }
+            case SetMaterial finish -> {
+                node.put("elements", finish.elements());
+                node.put("material", finish.material());
+                node.put("category", finish.category());
+                node.put("color", finish.color());
+                node.put("price_key", finish.priceKey() == null ? null : finish.priceKey().value());
+            }
         }
         return node;
     }
@@ -113,6 +121,16 @@ public final class JacksonRecipeCodec implements RecipeCodec {
                     text(node, "pset", position), text(node, "property", position), value(node.get("value"), position),
                     priceKey == null ? null : new PriceKey(priceKey)));
             }
+            case SetMaterial.OP -> {
+                fields(node, SET_MATERIAL_FIELDS, "la operación " + position);
+                var priceKey = optionalText(node, "price_key", position);
+                var elements = elements(node, position);
+                var element = optionalText(node, "element", position);
+                if (element != null && (elements.isEmpty() || !element.equals(elements.getFirst())))
+                    throw invalid("En la operación " + position + ", element tiene que ser la primera pieza de elements.");
+                yield guarded(() -> new SetMaterial(id, elements, text(node, "material", position), text(node, "category", position),
+                    text(node, "color", position), priceKey == null ? null : new PriceKey(priceKey)));
+            }
             case REMOVE -> throw new UnprocessableApplicationException("OPERATION_NOT_ENABLED", "Eliminar elementos llega en H5.");
             default -> throw invalid("La operación " + position + " no es una operación conocida.");
         };
@@ -125,6 +143,17 @@ public final class JacksonRecipeCodec implements RecipeCodec {
         if (node.isBoolean()) return new PropertyValue.Bool(node.asBoolean());
         if (node.isNumber()) return new PropertyValue.Number(node.decimalValue());
         throw invalid("El valor de la operación " + position + " es texto, un booleano o un número.");
+    }
+
+    private static List<String> elements(JsonNode node, int position) {
+        var value = node.get("elements");
+        if (value == null || !value.isArray()) throw invalid("Falta la lista elements en la operación " + position + ".");
+        var list = new ArrayList<String>();
+        for (var item : value) {
+            if (!item.isTextual()) throw invalid("Cada pieza de elements es un GlobalId en la operación " + position + ".");
+            list.add(item.asText());
+        }
+        return list;
     }
 
     private static String text(JsonNode node, String field, int position) {

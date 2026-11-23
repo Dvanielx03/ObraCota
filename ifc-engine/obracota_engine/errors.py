@@ -1,9 +1,9 @@
 """Engine errors with a stable code (H1-ESPECIFICACION §5.2).
 
 The body is ``{"detail": "<Spanish message>", "code": "<CODE>"}``. ``detail`` stays a plain string, so the
-backend reads it the same way it reads the errors of /inspect and /apply.
+backend reads it the same way it reads the errors of /inspect.
 
-The pre-H1 routes (/inspect, /apply) keep their exact contract: they turn an ``EngineError`` back into
+The pre-H1 route /inspect keeps their exact contract: they turn an ``EngineError`` back into
 a FastAPI ``HTTPException`` with the same status and message, without ``code``.
 """
 import logging

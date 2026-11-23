@@ -6,7 +6,7 @@ import com.obracota.application.modelchange.usecase.ModelReading;
 import com.obracota.application.modelchange.usecase.PublishModelChange;
 import com.obracota.application.modelchange.usecase.VersionPrices;
 import com.obracota.application.modelversion.usecase.ProjectVersions;
-import com.obracota.domain.designchange.BimEditPort;
+import com.obracota.domain.designchange.DoorInspectionPort;
 import com.obracota.domain.modelchange.port.*;
 import com.obracota.domain.modelversion.port.VersionRepository;
 import com.obracota.infrastructure.modelchange.adapters.out.json.JacksonRecipeCodec;
@@ -24,7 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Beans of the model change module. The use cases live outside the scanned packages and are registered here; the
- * engine adapter ({@code IfcEngineHttpAdapter}) is a package-private {@code @Component}, like {@code HttpBimEdit}.
+ * engine adapter ({@code IfcEngineHttpAdapter}) is a package-private {@code @Component}, like {@code HttpDoorInspection}.
  */
 @Configuration
 public class ModelChangeConfiguration {
@@ -46,7 +46,7 @@ public class ModelChangeConfiguration {
     }
 
     @Bean ModelChanges modelChanges(ProjectVersions versions, ModelChangeRepository changes, PriceBook prices, PreviewStorage previews,
-                                    ModelEnginePort engine, BimEditPort doors, RecipeCodec recipes, Transactions tx, Clock clock,
+                                    ModelEnginePort engine, DoorInspectionPort doors, RecipeCodec recipes, Transactions tx, Clock clock,
                                     @Value("${ifc.engine.request-budget:PT200S}") Duration budget) {
         return new ModelChanges(versions, changes, prices, previews, engine, doors, recipes, tx, clock, budget);
     }

@@ -8,7 +8,10 @@ export type IfcText={text:string}|null;
 export type ChangeTypeOperation={id:string;op:"ifc.change_type";element:string;type_id:string};
 export type SetPropertyOperation={id:string;op:"ifc.set_property";element:string;scope:"occurrence"|"type";pset:string;property:string;
   value:string|number|boolean;price_key?:string|null};
-export type Operation=ChangeTypeOperation|SetPropertyOperation;
+/** H2 material: one exterior finish for a list of pieces; `element` is the first of `elements`. */
+export type SetMaterialOperation={id:string;op:"ifc.set_material";element:string;elements:string[];material:string;category:string;color:string;
+  price_key?:string|null};
+export type Operation=ChangeTypeOperation|SetPropertyOperation|SetMaterialOperation;
 export type Recipe={format:"obracota.recipe/1";operations:Operation[]};
 
 export type FindingStatus="WARNING"|"OK"|"UNKNOWN";
@@ -26,7 +29,7 @@ export type Layer={layer:number;name:string;status:"PASS"|"FAIL"|"NOT_RUN";reaso
   output_issues?:number;new_issues?:unknown[];unexpected?:string[];truncated?:boolean};
 export type Validation={layers:Layer[];skipped:{layer:number;reason:string}[]};
 export type Price={key:string;unit:string;currency:string;amount:number;source:string;date:string;copiedFrom:string|null};
-export type EstimateLine={operation:string|null;kind:"TYPE_CHANGE"|"ADDITIONAL_COST";element:string|null;quantity:number|null;unit:string|null;
+export type EstimateLine={operation:string|null;kind:"TYPE_CHANGE"|"ADDITIONAL_COST"|"MATERIAL_FINISH";element:string|null;quantity:number|null;unit:string|null;
   quantitySource:QuantitySource|null;basis:string|null;beforeKey:string|null;before:Price|null;afterKey:string|null;after:Price|null;
   difference:number|null};
 export type Estimate={currency:string;total:number;complete:boolean;lines:EstimateLine[]};
@@ -47,7 +50,7 @@ export interface ModelChangeRepository{
   list(project:string,signal?:AbortSignal):Promise<ModelChange[]>;
   get(project:string,change:string,signal?:AbortSignal):Promise<ModelChange>;
   create(project:string,baseVersion:string,description:string):Promise<ModelChange>;
-  addOperation(project:string,change:string,operation:Omit<ChangeTypeOperation,"id">|Omit<SetPropertyOperation,"id">):Promise<ModelChange>;
+  addOperation(project:string,change:string,operation:Omit<ChangeTypeOperation,"id">|Omit<SetPropertyOperation,"id">|Omit<SetMaterialOperation,"id">):Promise<ModelChange>;
   preview(project:string,change:string):Promise<ModelChange>;
   submit(project:string,change:string,summary?:string):Promise<ModelChange>;
   discard(project:string,change:string,reason?:string):Promise<ModelChange>;
@@ -85,6 +88,12 @@ export function operationLabel(operation:Operation,result?:OperationResult,legac
     const fit=option?(option.compatible?" (Compatible)":" (No compatible)"):"";
     return "Cambiar tipo · "+door+" → "+type+fit;
   }
+  if(operation.op==="ifc.set_material"){
+    const pieces=operation.elements.length===1?"1 pieza":operation.elements.length+" piezas";
+    const previous=Array.isArray(before?.materials)?(before.materials as {material:string;pieces:number}[]).map(item=>item.material):[];
+    const from=previous.length===1?previous[0]+" → ":previous.length>1?previous.length+" materiales → ":"";
+    return "Acabado exterior · "+pieces+": "+from+operation.material;
+  }
   const scope=operation.scope==="type"?"Propiedad del tipo":"Propiedad de la pieza";
   const from=after&&"value_before" in after?shownValue(after.value_before)+" → ":before&&"value_before" in before?shownValue(before.value_before)+" → ":"";
   return scope+" · "+operation.pset+"."+operation.property+": "+from+shownValue(operation.value);
@@ -97,7 +106,7 @@ export const sourceLabel=(source:QuantitySource|null)=>source?sources[source]:"F
 /** GlobalIds the change touches: what the engine reported as affected, or the recipe's targets before a preview. */
 export function affectedGuids(change:Pick<ModelChange,"report"|"recipe">):string[]{
   const listed=change.report?.affected?.map(item=>item.guid)??[];
-  return [...new Set(listed.length?listed:change.recipe.operations.map(operation=>operation.element))];
+  return [...new Set(listed.length?listed:change.recipe.operations.flatMap(operation=>operation.op==="ifc.set_material"?operation.elements:[operation.element]))];
 }
 
 /** Changed, added and deleted elements of the diff against the base. */

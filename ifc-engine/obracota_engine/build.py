@@ -125,6 +125,16 @@ class Built:
         return bool(self.report["ok"])
 
 
+# Operations that never touch an element's shape: its quantity before and after is the same.
+GEOMETRY_FREE = frozenset({"ifc.set_material", "ifc.set_property"})
+
+
+def geometry_free(recipe: Recipe, owners: dict) -> frozenset:
+    """GlobalIds whose every declaring operation leaves the geometry as it was."""
+    kinds = {op.id: op.op for op in recipe.operations}
+    return frozenset(guid for guid, ids in owners.items() if ids and all(kinds.get(i) in GEOMETRY_FREE for i in ids))
+
+
 def engine_versions() -> dict:
     return {"version": ENGINE_VERSION, "ifcopenshell": ifcopenshell.version,
             "ifcdiff": importlib.metadata.version("ifcdiff")}
@@ -237,7 +247,9 @@ def build_and_verify(ref, recipe: Recipe, workdir: Path, deadline: Deadline) -> 
         with timer.phase("diff"):
             diff = scope.diff(base, revised, declared)
         with timer.phase("quantities"):
-            lines, notices = quantities.lines(base, revised, sorted(declared))
+            unchanged = geometry_free(recipe, owners)
+            lines, notices = quantities.lines(base, revised, sorted(declared), lambda: deadline.check("quantities"),
+                                              unchanged)
 
         layers = [_layer1(issues), schema, scope.layer(diff)]
         report.update(

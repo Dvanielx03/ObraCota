@@ -61,9 +61,23 @@ def _measure_of(element):
     return VOLUME
 
 
-def _shape(element):
+FAST_BASIS = "; sin restar vanos ni recortes: el cambio no altera la geometría, se mide una vez"
+
+
+def _fast_settings():
+    settings = ifcopenshell.geom.settings()
+    # Boolean clippings and opening subtractions are what make a heritage wall take 25 s to mesh (Rame Tower).
+    for name in ("disable-opening-subtractions", "disable-boolean-result"):
+        try:
+            settings.set(name, True)
+        except (RuntimeError, ValueError, AttributeError, TypeError):
+            pass
+    return settings
+
+
+def _shape(element, fast: bool = False):
     try:
-        shape = ifcopenshell.geom.create_shape(ifcopenshell.geom.settings(), element)
+        shape = ifcopenshell.geom.create_shape(_fast_settings() if fast else ifcopenshell.geom.settings(), element)
     except (RuntimeError, ValueError, AttributeError):
         return None
     return shape.geometry if shape.geometry.verts else None
@@ -107,13 +121,15 @@ def _line(element, phase: str, quantity, unit: str, source: str, basis: str, rel
             "basis": basis, "reliable": reliable}
 
 
-def measure(model, element, phase: str, findings: list) -> dict:
-    """The quantity line of one element in one model (``phase`` is ``before`` or ``after``)."""
+def measure(model, element, phase: str, findings: list, fast: bool = False) -> dict:
+    """The quantity line of one element in one model (``phase`` is ``before`` or ``after``).
+
+    ``fast`` meshes without openings and booleans: for operations that leave the geometry as it was."""
     for ifc_class, basis in UNIT_BASIS.items():
         if element.is_a(ifc_class):
             return _line(element, phase, 1, "UNIT", "UNIT", basis, True)
     unit, names, kind, words = _measure_of(element)
-    geometry = _shape(element)
+    geometry = _shape(element, fast)
     reliable = geometry is not None and _closed(geometry)
     computed = None
     if geometry is not None:
@@ -134,13 +150,27 @@ def measure(model, element, phase: str, findings: list) -> dict:
                 f"geometría ({computed}).", SOURCE, element.GlobalId))
         return _line(element, phase, value, unit, "QTO", bounded(f"{quoted} exportado en el IFC"), reliable)
     basis = words if reliable else words + "; la malla no está cerrada: no confiable"
-    return _line(element, phase, computed, unit, "GEOMETRY", basis, reliable)
+    if fast:
+        basis += FAST_BASIS
+    return _line(element, phase, computed, unit, "GEOMETRY", bounded(basis), reliable)
 
 
-def lines(base, revised, guids) -> tuple[list, list]:
-    """Quantity lines of every affected GlobalId, before (base) and after (revision), plus their notices."""
+def lines(base, revised, guids, check=None, unchanged=frozenset()) -> tuple[list, list]:
+    """Quantity lines of every affected GlobalId, before (base) and after (revision), plus their notices.
+
+    ``check`` runs before each element: the preview's deadline. Meshing one wall of a heritage model with many
+    boolean clippings can take 25 s (Rame Tower), so a long list must stop at the deadline, not after it."""
     found, findings = [], []
     for guid in guids:
+        if check is not None:
+            check()
+        if guid in unchanged:
+            # Same geometry before and after (a material or a property): measure once, fast, and reuse it.
+            element = by_guid(base, guid)
+            if element is not None and element.is_a("IfcElement"):
+                before = measure(base, element, "before", findings, fast=True)
+                found += [before, {**before, "phase": "after"}]
+            continue
         for phase, model in (("before", base), ("after", revised)):
             element = by_guid(model, guid)
             if element is not None and element.is_a("IfcElement"):

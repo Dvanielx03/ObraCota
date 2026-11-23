@@ -10,6 +10,9 @@ or a finite number. ``null`` passes the shape check on purpose: the operation re
 ``VALUE_REQUIRED`` (§5.5, §5.10), because ``edit_pset`` would delete the property. Lists and objects are
 a 400.
 
+``ifc.set_material`` (H2) carries the list of pieces (``elements``, 1 to 500, ``element`` being the first), the
+material name and category of the chosen finish, its approximate colour (``#rrggbb``) and an optional price key.
+
 ``ifc.remove_element`` exists only in the engine, as the guard of §5.5; the backend never enables it.
 
 ``recipe_sha256`` ties an artifact to its recipe: the SHA-256 of the normalised recipe serialised with
@@ -23,7 +26,7 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from . import reading
 from .errors import EngineError
@@ -35,6 +38,8 @@ VALUE_MAX = 255
 CHANGE_TYPE = "ifc.change_type"
 SET_PROPERTY = "ifc.set_property"
 REMOVE_ELEMENT = "ifc.remove_element"
+SET_MATERIAL = "ifc.set_material"
+MATERIAL_PIECES_MAX = 500
 
 OperationId = Annotated[str, StringConstraints(pattern=r"^op-[0-9]{1,3}$")]
 GlobalId = Annotated[str, StringConstraints(pattern=r"^[0-9A-Za-z_$]{22}$")]
@@ -84,6 +89,39 @@ class SetProperty(_Operation):
         return (SET_PROPERTY, self.element, self.scope, self.pset, self.property)
 
 
+def _plain_text(value: str) -> str:
+    if any(unicodedata.category(ch) == "Cc" for ch in value) or not value.strip():
+        raise ValueError("text must not be blank or contain control characters")
+    return value
+
+
+class SetMaterial(_Operation):
+    """``ifc.set_material``: one finish for a list of pieces (H2 material). ``element`` is the first piece of
+    ``elements``, so every report that names one piece per operation keeps working."""
+    op: Literal["ifc.set_material"]
+    elements: list[GlobalId] = Field(min_length=1, max_length=MATERIAL_PIECES_MAX)
+    material: Annotated[str, StringConstraints(min_length=1, max_length=60)]
+    category: Annotated[str, StringConstraints(min_length=1, max_length=40)]
+    color: Annotated[str, StringConstraints(pattern=r"^#[0-9a-fA-F]{6}$")]
+    price_key: Optional[PriceKey] = None
+
+    @field_validator("material", "category")
+    @classmethod
+    def _text(cls, value):
+        return _plain_text(value)
+
+    @model_validator(mode="after")
+    def _pieces(self):
+        if self.elements[0] != self.element:
+            raise ValueError("element must be the first of elements")
+        if len(set(self.elements)) != len(self.elements):
+            raise ValueError("elements must not repeat")
+        return self
+
+    def target(self) -> tuple:
+        return (SET_MATERIAL, *sorted(self.elements))
+
+
 class RemoveElement(_Operation):
     op: Literal["ifc.remove_element"]
 
@@ -91,8 +129,8 @@ class RemoveElement(_Operation):
         return (REMOVE_ELEMENT, self.element)
 
 
-Operation = Union[ChangeType, SetProperty, RemoveElement]
-_MODELS = {CHANGE_TYPE: ChangeType, SET_PROPERTY: SetProperty, REMOVE_ELEMENT: RemoveElement}
+Operation = Union[ChangeType, SetProperty, SetMaterial, RemoveElement]
+_MODELS = {CHANGE_TYPE: ChangeType, SET_PROPERTY: SetProperty, SET_MATERIAL: SetMaterial, REMOVE_ELEMENT: RemoveElement}
 
 
 @dataclass(frozen=True)
@@ -125,6 +163,10 @@ _REASONS = {
     "string_pattern_mismatch": "no tiene el formato esperado",
     "literal_error": "no es un valor admitido",
     "string_type": "tiene que ser texto",
+    "too_short": "no puede estar vacío",
+    "too_long": "tiene demasiados elementos",
+    "string_too_long": "es demasiado largo",
+    "string_too_short": "no puede estar vacío",
 }
 
 

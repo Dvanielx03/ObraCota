@@ -4,6 +4,7 @@ import com.obracota.domain.modelchange.model.price.PriceKey;
 import com.obracota.domain.modelchange.model.price.UnitPrice;
 import com.obracota.domain.modelchange.model.recipe.ChangeType;
 import com.obracota.domain.modelchange.model.recipe.Recipe;
+import com.obracota.domain.modelchange.model.recipe.SetMaterial;
 import com.obracota.domain.modelchange.model.recipe.SetProperty;
 import com.obracota.domain.modelchange.model.report.Estimate;
 import com.obracota.domain.modelchange.model.report.EstimateLine;
@@ -21,6 +22,9 @@ import java.util.stream.Collectors;
  *       report's {@code before}); after, the price of {@code type:<proposed type>}; difference, after minus before.</li>
  *   <li>{@code ifc.set_property} with {@code price_key}: «Costo adicional», 1 {@code UNIT} × the price of the key.</li>
  *   <li>{@code ifc.set_property} without {@code price_key}: no line.</li>
+ *   <li>{@code ifc.set_material}: «Acabado», the area in m² the engine measured after the change for the pieces of the
+ *       list (walls by one face, roofs and slabs in plan) × the price per {@code M2} of its key ({@code item:<material>}
+ *       by default). Without that price, or with a price in another unit, the difference stays empty.</li>
  * </ul>
  * A price only enters a difference when it is in {@code COP} and per {@code UNIT}, the unit of these lines;
  * otherwise it is shown but the difference stays empty.
@@ -55,9 +59,36 @@ public final class ChangeEstimate {
                         UnitPrice.Unit.UNIT, "UNIT", EXTRA_BASIS, null, null, property.priceKey(), after, difference));
                 }
                 case SetProperty ignored -> { }
+                case SetMaterial finish -> lines.add(finish(finish, report, book));
             }
         }
         return Estimate.of(CURRENCY, lines);
+    }
+
+    private static EstimateLine finish(SetMaterial finish, PreviewReport report, Map<PriceKey, UnitPrice> book) {
+        var key = finish.effectivePriceKey();
+        var price = book.get(key);
+        var pieces = new HashSet<>(finish.elements());
+        BigDecimal area = null;
+        int measured = 0;
+        if (report != null) {
+            for (var line : report.quantities()) {
+                if (line.element() == null || !pieces.contains(line.element()) || !"after".equals(line.phase())
+                    || !"M2".equals(line.unit()) || line.quantity() == null) continue;
+                area = (area == null ? BigDecimal.ZERO : area).add(line.quantity());
+                measured++;
+            }
+        }
+        var basis = area == null ? "Previsualiza el cambio para medir el área de las " + pieces.size() + " piezas"
+            : "Área de " + measured + " de " + pieces.size() + " piezas: muros por una cara, cubiertas y losas en planta";
+        var source = report == null ? null : report.quantities().stream()
+            .filter(line -> line.element() != null && pieces.contains(line.element()) && "after".equals(line.phase()))
+            .map(QuantityLine::source).filter(Objects::nonNull).findFirst().orElse(null);
+        BigDecimal difference = area != null && price != null && CURRENCY.equals(price.currency()) && price.unit() == UnitPrice.Unit.M2
+            ? area.multiply(price.amount()).setScale(2, java.math.RoundingMode.HALF_UP) : null;
+        return new EstimateLine(finish.id(), EstimateLine.Kind.MATERIAL_FINISH, finish.element(),
+            area == null ? null : area.setScale(2, java.math.RoundingMode.HALF_UP), UnitPrice.Unit.M2, source, basis,
+            null, null, key, price, difference);
     }
 
     private static boolean usable(UnitPrice price) {
