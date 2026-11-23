@@ -85,6 +85,19 @@ class VolumeHeaderTest {
         assertFalse(VolumeStorage.compatible("IFC",ascii("v 0 0 0\n")));
     }
 
+    @Test void recognisesARevitOleContainerOnly() {
+        byte[] rvt=new byte[600];
+        byte[] ole={(byte)0xD0,(byte)0xCF,0x11,(byte)0xE0,(byte)0xA1,(byte)0xB1,0x1A,(byte)0xE1};
+        System.arraycopy(ole,0,rvt,0,ole.length);
+        assertTrue(VolumeStorage.compatible("RVT",rvt));
+        assertFalse(VolumeStorage.compatible("RVT",Arrays.copyOf(ole,7)));
+        assertFalse(VolumeStorage.compatible("RVT",ascii("PK\u0003\u0004 zip")));
+        assertFalse(VolumeStorage.compatible("RVT",ascii("Format: 2025\nBuild: 20240715")));
+        assertFalse(VolumeStorage.compatible("RVT",ascii("AC1032\0\0\0")));
+        assertFalse(VolumeStorage.compatible("DWG",rvt));
+        assertFalse(VolumeStorage.compatible("IFC",rvt));
+    }
+
     @Test void storesAnFbxByteForByteAndRefusesAMismatchedOne() throws Exception {
         var storage=new VolumeStorage(root);
         UUID project=UUID.randomUUID(),fbx=UUID.randomUUID(),obj=UUID.randomUUID(),wrong=UUID.randomUUID();

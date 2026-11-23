@@ -20,7 +20,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * J5 (§3.5): the history of {@code door_change} is still readable after V15, without Spring. It runs on its own H2
+ * J5 (§3.5): the history of {@code door_change} is still readable after V15 and after V18 drops the legacy tables, without Spring. It runs on its own H2
  * database and, when {@code -Dmigration.postgres-url} is given, again on a throwaway PostgreSQL 17.
  */
 class ModelChangeMigrationTest {
@@ -108,6 +108,19 @@ class ModelChangeMigrationTest {
         assertEquals(1, prices.size());
         assertEquals("Cotización de prueba", prices.getFirst().source());
         assertEquals(TYPE, prices.getFirst().key().typeId().orElseThrow());
+
+        // R4 (V18): the legacy door tables go away; the migrated history and prices stay readable.
+        flyway(data, "latest", locations).migrate();
+        assertFalse(table(db, "door_change"));
+        assertFalse(table(db, "door_unit_price"));
+        assertTrue(table(db, "door_project_minimum"));
+        assertEquals(3, changes.list(project, Set.of(), null, 100).size());
+        assertEquals("{\"door\":{}}", changes.find(project, pending).orElseThrow().legacyReview());
+        assertEquals(1, new PriceBookAdapter(db).prices(project, base).size());
+    }
+
+    private static boolean table(JdbcTemplate db, String name) {
+        return db.queryForObject("select count(*) from information_schema.tables where lower(table_name)=?", Integer.class, name) > 0;
     }
 
     private static Flyway flyway(DataSource data, String target, String... locations) {

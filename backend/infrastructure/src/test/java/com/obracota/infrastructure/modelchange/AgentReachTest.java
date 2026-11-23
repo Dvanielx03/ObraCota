@@ -1,5 +1,6 @@
 package com.obracota.infrastructure.modelchange;
 
+import com.obracota.application.agenttools.DesignAgentTools;
 import com.obracota.application.modelchange.usecase.ModelChanges;
 import com.obracota.application.modelchange.usecase.ModelReading;
 import com.obracota.application.modelchange.usecase.PublishModelChange;
@@ -24,7 +25,7 @@ class AgentReachTest {
         ProjectFileCatalog.class, PublishModelChange.class, VersionPrices.class);
 
     @ParameterizedTest
-    @ValueSource(classes = {ModelChanges.class, ModelReading.class})
+    @ValueSource(classes = {ModelChanges.class, ModelReading.class, DesignAgentTools.class})
     void catalogClassesAreClosed(Class<?> type) {
         assertTrue(Modifier.isFinal(type.getModifiers()), type + " is final");
         assertFalse(type.isRecord(), type + " is not a record");
@@ -40,7 +41,7 @@ class AgentReachTest {
     }
 
     @ParameterizedTest
-    @ValueSource(classes = {ModelChanges.class, ModelReading.class})
+    @ValueSource(classes = {ModelChanges.class, ModelReading.class, DesignAgentTools.class})
     void noPublicMethodReturnsWhatPublishes(Class<?> type) {
         for (var method : type.getMethods()) {
             if (method.getDeclaringClass() == Object.class) continue;

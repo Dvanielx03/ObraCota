@@ -1,6 +1,6 @@
 package com.obracota.infrastructure.modelchange;
 
-import com.obracota.domain.designchange.BimEditPort;
+import com.obracota.domain.designchange.DoorInspectionPort;
 import com.obracota.domain.modelchange.model.recipe.ChangeType;
 import com.obracota.domain.modelchange.model.recipe.Recipe;
 import com.obracota.domain.modelchange.model.report.PreviewReport;
@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Stubs of the engine for the Spring tests (§8.2): {@code ModelEnginePort} answers an ok report whose artifact is
- * minimal IFC with a revision comment and its real SHA-256, and {@code BimEditPort} answers the Duplex door.
+ * minimal IFC with a revision comment and its real SHA-256, and {@code DoorInspectionPort} answers the Duplex door.
  * A change to {@link #INCOMPATIBLE} previews with {@code ok=false}. {@link Mode#CUT} cuts the {@code /build} stream halfway.
  */
 public final class ModelChangeStubs {
@@ -38,7 +38,7 @@ public final class ModelChangeStubs {
     @TestConfiguration
     public static class Beans {
         @Bean @Primary public Engine stubEngine() { return new Engine(); }
-        @Bean @Primary public BimEditPort stubDoors() { return new Doors(); }
+        @Bean @Primary public DoorInspectionPort stubDoors() { return new Doors(); }
         @Bean @Primary public MutableClock stubClock() { return new MutableClock(Instant.now()); }
     }
 
@@ -58,21 +58,17 @@ public final class ModelChangeStubs {
         @Override public Instant instant() { return now.get(); }
     }
 
-    public static final class Doors implements BimEditPort {
+    public static final class Doors implements DoorInspectionPort {
         @Override public Door inspect(UUID project, UUID version, String element) { return door(element); }
-
-        @Override public InputStream apply(UUID project, UUID version, String element, String typeId) {
-            throw new AssertionError("H1 never calls the engine's /apply");
-        }
     }
 
-    static BimEditPort.Door door(String element) {
+    static DoorInspectionPort.Door door(String element) {
         var width = new BigDecimal("0.762");
         var height = new BigDecimal("2.032");
-        return new BimEditPort.Door(element, "Puerta P80", CURRENT, "P80", width, height, "2opening000000000000000",
+        return new DoorInspectionPort.Door(element, "Puerta P80", CURRENT, "P80", width, height, "2opening000000000000000",
             List.of(new BigDecimal("0.81"), new BigDecimal("2.06")), "3host0000000000000000a", null,
-            List.of(new BimEditPort.DoorType(ALTERNATE, "P80B", width, height, true),
-                new BimEditPort.DoorType(INCOMPATIBLE, "P100", new BigDecimal("1.0"), height, false)));
+            List.of(new DoorInspectionPort.DoorType(ALTERNATE, "P80B", width, height, true),
+                new DoorInspectionPort.DoorType(INCOMPATIBLE, "P100", new BigDecimal("1.0"), height, false)));
     }
 
     static Map<String, Object> inspectTree(String element) {

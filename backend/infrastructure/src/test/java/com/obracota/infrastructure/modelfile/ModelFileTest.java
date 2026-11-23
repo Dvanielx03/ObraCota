@@ -12,7 +12,11 @@ class ModelFileTest {
         assertEquals("DWG",file.format());
         assertEquals(file,new ModelFileJpaEntity(file).toDomain());
         assertThrows(IllegalArgumentException.class,()->ModelFile.formatOf("../Plano.dwg"));
-        assertThrows(IllegalArgumentException.class,()->ModelFile.formatOf("Plano.rvt"));
+        assertThrows(IllegalArgumentException.class,()->ModelFile.formatOf("Plano.dxf"));
+    }
+    @Test void acceptsRevitOriginals() {
+        assertEquals("RVT",ModelFile.formatOf("22.10.2026  - ZONA ACCESO - LUMION.rvt"));
+        assertEquals("RVT",ModelFile.formatOf("Pabellon.RVT"));
     }
     @Test void acceptsManufacturerMeshesAndKeepsOtherExchangeFormatsOut() {
         assertEquals("FBX",ModelFile.formatOf("PK60.FBX"));

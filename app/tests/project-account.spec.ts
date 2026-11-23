@@ -11,6 +11,9 @@ test("La cuenta conserva su proyecto y renueva la sesión", async ({ page }) => 
   await page.getByLabel("Correo electrónico").fill(email);
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Crear cuenta" }).click();
+  // Toda cuenta nueva pasa por la bienvenida; se omite para llegar al panel.
+  await expect(page).toHaveURL(/\/bienvenida$/);
+  await page.getByRole("button", { name: "Omitir por ahora" }).click();
   await expect(page.getByRole("heading", { name: "Mis proyectos" })).toBeVisible();
   // «Nuevo proyecto» crea «Proyecto sin título» y abre sus archivos (DU-07 = B); el nombre se cambia en
   // la barra del proyecto, donde se llega.

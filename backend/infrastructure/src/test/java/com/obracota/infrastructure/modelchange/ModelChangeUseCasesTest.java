@@ -5,7 +5,7 @@ import com.obracota.application.common.port.Transactions;
 import com.obracota.application.modelchange.usecase.*;
 import com.obracota.application.modelfile.usecase.ProjectFileCatalog;
 import com.obracota.application.modelversion.usecase.ProjectVersions;
-import com.obracota.domain.designchange.BimEditPort;
+import com.obracota.domain.designchange.DoorInspectionPort;
 import com.obracota.domain.modelchange.model.ChangeOrigin;
 import com.obracota.domain.modelchange.model.ChangeStateException;
 import com.obracota.domain.modelchange.model.ChangeStatus;
@@ -412,19 +412,20 @@ class ModelChangeUseCasesTest {
             public Optional<SecurityUser> byId(UUID id) {
                 return id.equals(owner) ? Optional.of(new SecurityUser(owner, "ingeniera@example.test", "x", Role.DESIGNER)) : Optional.empty();
             }
+            public Optional<SecurityUser> byGoogleSubject(String subject) { throw new UnsupportedOperationException(); }
+            public boolean linkGoogle(UUID userId, String subject) { throw new UnsupportedOperationException(); }
             public void start(RefreshToken token) { throw new UnsupportedOperationException(); }
             public boolean rotate(RefreshToken current, UUID next) { throw new UnsupportedOperationException(); }
             public void revoke(RefreshToken current) { throw new UnsupportedOperationException(); }
             public boolean active(UUID sessionId, UUID userId) { return true; }
         };
 
-        final BimEditPort doors = new BimEditPort() {
+        final DoorInspectionPort doors = new DoorInspectionPort() {
             public Door inspect(UUID p, UUID version, String element) {
                 return new Door(element, "Puerta 1", CURRENT, "P76", new BigDecimal("0.762"), new BigDecimal("2.032"),
                     "0000000000000000000009", List.of(new BigDecimal("0.81"), new BigDecimal("2.06")), null, null,
                     List.of(new DoorType(PROPOSED, "P76B", new BigDecimal("0.762"), new BigDecimal("2.032"), true)));
             }
-            public InputStream apply(UUID p, UUID version, String element, String typeId) { throw new UnsupportedOperationException(); }
         };
     }
 

@@ -11,6 +11,9 @@ test("Los proyectos se crean, se archivan y se restauran desde el tablero", asyn
   await page.getByLabel("Correo electrónico").fill("tablero-" + randomUUID() + "@example.test");
   await page.getByLabel("Contraseña").fill(randomUUID());
   await page.getByRole("button", { name: "Crear cuenta" }).click();
+  // Toda cuenta nueva pasa por la bienvenida; se omite para llegar al panel.
+  await expect(page).toHaveURL(/\/bienvenida$/);
+  await page.getByRole("button", { name: "Omitir por ahora" }).click();
   await expect(page.getByRole("heading", { name: "Mis proyectos" })).toBeVisible();
 
   const active = page.getByRole("tab", { name: /^Activos/ });

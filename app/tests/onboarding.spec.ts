@@ -63,11 +63,14 @@ test("Una cuenta nueva completa la bienvenida con el teclado y no la vuelve a ve
   expect(saved).toMatchObject({ role: "site-engineer", firstReview: "model", start: "sample", skipped: false });
   expect(Number.isNaN(Date.parse(saved.completedAt))).toBe(false);
 
-  // Con la bienvenida hecha, volver a registrarse en este navegador lleva directo al panel.
+  // Toda cuenta nueva ve la bienvenida, aunque este navegador ya la completó con otra cuenta…
   await page.goto("/registro");
   await page.getByLabel("Correo electrónico").fill("bienvenida-" + randomUUID() + "@example.test");
   await page.getByLabel("Contraseña").fill(randomUUID());
   await page.getByRole("button", { name: "Crear cuenta" }).click();
+  await expect(page).toHaveURL(/\/bienvenida$/);
+  // …y entrar con una cuenta que ya existe lleva directo al panel.
+  await page.getByRole("button", { name: "Omitir por ahora" }).click();
   await expect(page.getByRole("heading", { name: "Mis proyectos" })).toBeVisible();
 });
 

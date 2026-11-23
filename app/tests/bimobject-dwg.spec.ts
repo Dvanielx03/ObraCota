@@ -11,16 +11,16 @@ import { MODEL_ONLY, modelShown } from "./support/visor";
  */
 const folder = process.env.BIMOBJECT_DIR;
 // 2D plans are drawn as plans; 3D models made of polyface meshes (read from the raw objects, as
-// libredwg-web's converter leaves them out) are drawn in 3D. ACIS solids need a geometry kernel
-// ObraCota does not have: the viewer must say so, not hang.
+// libredwg-web's converter leaves them out) are drawn in 3D. ACIS solids of a stored version are tessellated
+// by the server (GET …/versions/{id}/solids, ACIS-LECTOR §5) and drawn as faces per layer.
 // When nothing can be drawn, the thumbnail AutoCAD saved in the DWG (if any) is shown under the reason.
-const DRAWINGS: { file: string; version: string; note: string; mode?: "Plano 2D" | "Vista 3D"; reason?: RegExp; preview?: boolean }[] = [
+const DRAWINGS: { file: string; version: string; note: string; mode?: "Plano 2D" | "Vista 3D"; reason?: RegExp; preview?: boolean; solids?: number }[] = [
   { file: "Basket/Furniture_Other-Furniture_Fritz-Hansen_Basket 2D.dwg", version: "AC1027", note: "2D, AutoCAD 2013" },
   { file: "Essay™ Table CM21/2D_CM21 - Essay Table.DWG", version: "AC1032", note: "2D, AutoCAD 2018" },
   { file: "Hven Bar Stool Low/1067 Hven Bar Stool Low 2d.DWG", version: "AC1015", note: "2D, AutoCAD 2000" },
   { file: "Night Owl™ Table lamp/Lighting_Desk-Table_Fritz-Hansen_Night-OwlT 2D.dwg", version: "AC1024", note: "2D, AutoCAD 2010" },
-  { file: "Basket/Furniture_Other-Furniture_Fritz-Hansen_Basket.dwg", version: "AC1027", note: "3D, sólidos ACIS, sin miniatura", reason: /modelo 3D con 2 sólidos ACIS/, preview: false },
-  { file: "Night Owl™ Table lamp/Lighting_Desk-Table-Lighting_Fritz-Hansen_Night-OwlT.dwg", version: "AC1027", note: "3D, sólidos ACIS, miniatura PNG", reason: /modelo 3D con \d+ sólidos? ACIS/, preview: true },
+  { file: "Basket/Furniture_Other-Furniture_Fritz-Hansen_Basket.dwg", version: "AC1027", note: "3D, sólidos ACIS del servidor", mode: "Vista 3D", solids: 2 },
+  { file: "Night Owl™ Table lamp/Lighting_Desk-Table-Lighting_Fritz-Hansen_Night-OwlT.dwg", version: "AC1027", note: "3D, sólidos ACIS del servidor", mode: "Vista 3D", solids: 1 },
   { file: "PK60™ Table/3D_PK60.DWG", version: "AC1021", note: "3D, 10 mallas", mode: "Vista 3D" },
   { file: "Essay™ Table CM21/3D_CM21 - Essay Table.DWG", version: "AC1021", note: "3D, mallas", mode: "Vista 3D" },
 ];
@@ -87,6 +87,12 @@ for (const drawing of DRAWINGS) test(`DWG de fabricante · ${basename(drawing.fi
     await expect(page.locator(".stagebar")).toContainText(drawing.mode ?? "Plano 2D");
     await expect(page.locator("#explorer .level, #explorer .entry").first()).toBeVisible();
     const groups = await page.locator("#explorer .level").count();
+    if (drawing.solids) {
+      // One «Sólidos · <capa>» entry per layer, with its number of bodies, inside the layer's group.
+      for (const level of await page.locator("#explorer .level").all()) await level.click();
+      await expect(page.locator("#explorer").getByText(/^Sólidos · /).first()).toBeVisible();
+      await expect(page.locator(".stage")).not.toContainText("No se pudo abrir");
+    }
     const view = page.locator(".stage > .view");
     const drawn = await view.screenshot({ style: MODEL_ONLY });
     const empty = await view.screenshot({ style: MODEL_ONLY + " .stage > .view canvas{visibility:hidden!important}" });

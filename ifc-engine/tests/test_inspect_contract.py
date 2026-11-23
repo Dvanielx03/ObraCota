@@ -1,25 +1,20 @@
-"""H1-10: /health, /inspect and the deprecated /apply keep exactly the contract they had before H1 (§5.1).
+"""H1-10: /health and /inspect keep exactly the contract they had before H1 (§5.1).
 
 The reference is tests/fixtures/inspect-duplex.json, captured in step 0 with obracota-ifc-engine:latest
 (``json.dumps(engine.inspect(*engine.load(...)), sort_keys=True)``). The error bodies stay
-``{"detail": ...}`` without ``code``: the backend's HttpBimEdit reads them that way.
+``{"detail": ...}`` without ``code``: the backend's HttpDoorInspection reads them that way.
 """
 import json
 import uuid
 from pathlib import Path
 
-import ifcopenshell
-import ifcopenshell.util.element
 import pytest
 from fastapi.testclient import TestClient
 
 import engine
-from conftest import DUPLEX_DOOR, DUPLEX_TYPE
-from obracota_engine import store
-from obracota_engine.operations import change_type
+from conftest import DUPLEX_DOOR
 
 REFERENCE = Path(__file__).parent / "fixtures" / "inspect-duplex.json"
-DUPLEX_INCOMPATIBLE_TYPE = "0pB8AT2hfEtQhuGzBhCesc"
 
 
 @pytest.fixture(scope="module")
@@ -34,11 +29,6 @@ def synthetic_version(originals, synthetic):
 
 def inspect(client, ref, element):
     return client.get("/inspect", params={"project": ref.project, "version": ref.version, "element": element})
-
-
-def apply(client, ref, element, type_id):
-    return client.post("/apply", params={"project": ref.project, "version": ref.version,
-                                         "element": element, "type_id": type_id})
 
 
 def test_health(client):
@@ -108,95 +98,9 @@ def test_inspect_without_a_length_unit(client, originals, synthetic):
     assert response.json() == {"detail": "El IFC necesita una unidad de longitud definida."}
 
 
-def reopen(tmp_path, content: bytes) -> ifcopenshell.file:
-    path = tmp_path / "revision.ifc"
-    path.write_bytes(content)
-    return ifcopenshell.open(str(path))
-
-
-def test_duplex_apply_exports_the_checked_revision(client, duplex, tmp_path, no_temporaries):
-    """The current /apply on the Playwright door: same opening and host, 0.762 x 2.032 m, original intact."""
-    before = inspect(client, duplex, DUPLEX_DOOR).json()
-
-    response = apply(client, duplex, DUPLEX_DOOR, DUPLEX_TYPE)
-
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "application/octet-stream"
-    revision = reopen(tmp_path, response.content)
-    door = revision.by_guid(DUPLEX_DOOR)
-    assert ifcopenshell.util.element.get_type(door).GlobalId == DUPLEX_TYPE
-    opening, host = change_type.opening_and_host(door)
-    assert (opening.GlobalId, host.GlobalId) == (before["opening"], before["host"])
-    assert change_type.size(door, 1.0) == [0.762, 2.032]
-    assert store.sha_of(duplex.path) == duplex.sha256
-
-
-def test_synthetic_apply_exports_the_checked_revision(client, synthetic_version, tmp_path, no_temporaries):
+def test_the_retired_apply_route_is_gone(client, synthetic_version):
+    """R4: the pre-H1 /apply was removed; revisions only come from /preview and /build."""
     s, ref = synthetic_version
-
-    response = apply(client, ref, s["D1"].GlobalId, s["P90B"].GlobalId)
-
-    assert response.status_code == 200
-    revision = reopen(tmp_path, response.content)  # keep the file alive while its entities are read
-    door = revision.by_guid(s["D1"].GlobalId)
-    assert ifcopenshell.util.element.get_type(door).GlobalId == s["P90B"].GlobalId
-    assert (door.OverallWidth, door.OverallHeight) == pytest.approx((0.9, 2.1))
-    assert store.sha_of(ref.path) == ref.sha256
-
-
-@pytest.mark.parametrize("case, status, detail", [
-    ("incompatible type", 422, "El motor solo aplica tipos compatibles con el hueco existente."),
-    ("type not offered", 422, "El motor solo aplica tipos compatibles con el hueco existente."),
-    ("missing version", 404, "Versión IFC no disponible."),
-    ("not a door", 422, "La edición se habilita para puertas IFC."),
-], ids=["incompatible-type", "type-not-offered", "missing-version", "not-a-door"])
-def test_apply_errors_keep_their_body(client, synthetic_version, no_temporaries, case, status, detail):
-    s, ref = synthetic_version
-    if case == "missing version":
-        ref = type(ref)(ref.project, str(uuid.uuid4()), ref.sha256, ref.path)
-    element = s["W1"].GlobalId if case == "not a door" else s["D1"].GlobalId
-    type_id = s["P90"].GlobalId if case == "type not offered" else s["P100"].GlobalId
-
-    response = apply(client, ref, element, type_id)
-
-    assert response.status_code == status
-    assert response.json() == {"detail": detail}
-
-
-def test_duplex_apply_rejects_an_incompatible_type(client, duplex, no_temporaries):
-    response = apply(client, duplex, DUPLEX_DOOR, DUPLEX_INCOMPATIBLE_TYPE)
-
-    assert response.status_code == 422
-    assert response.json() == {"detail": "El motor solo aplica tipos compatibles con el hueco existente."}
-
-
-def test_apply_reports_a_failed_check_of_the_written_revision(client, synthetic_version, monkeypatch, no_temporaries):
-    """If the reopened door lost its opening, /apply refuses the revision with the message of today."""
-    s, ref = synthetic_version
-    real, calls = change_type.opening_and_host, []
-
-    def lose_opening_after_writing(door):
-        calls.append(door)
-        return real(door) if len(calls) == 1 else (None, None)
-
-    monkeypatch.setattr(change_type, "opening_and_host", lose_opening_after_writing)
-
-    response = apply(client, ref, s["D1"].GlobalId, s["P90B"].GlobalId)
-
-    assert response.status_code == 422
-    assert response.json() == {"detail": "La revisión exportada no superó las comprobaciones de la pieza."}
-
-
-def test_apply_turns_an_unexpected_failure_into_the_generic_message(client, synthetic_version, monkeypatch,
-                                                                   no_temporaries):
-    s, ref = synthetic_version
-
-    def broken(*_args, **_kwargs):
-        raise RuntimeError("simulated library failure")
-
-    monkeypatch.setattr(change_type, "assign_type", broken)
-
-    response = apply(client, ref, s["D1"].GlobalId, s["P90B"].GlobalId)
-
-    assert response.status_code == 422
-    assert response.json() == {"detail": "No se pudo exportar y comprobar la revisión IFC."}
+    response = client.post("/apply", params={"project": ref.project, "version": ref.version,
+                                              "element": s["D1"].GlobalId, "type_id": s["P90B"].GlobalId})
+    assert response.status_code in (404, 405)

@@ -46,9 +46,11 @@ for (const [width, height] of [[1366, 768], [1920, 1080]]) {
     await capture("landing");
     const enterLink = page.getByRole("link", { name: "Entrar al panel" });
     const enter = new URL((await enterLink.getAttribute("href"))!, landing);
-    // The app's root redirects to /proyectos.
-    expect(["/", "/proyectos"]).toContain(enter.pathname);
+    // «Entrar al panel» opens the sign-in screen; a guest goes on to the projects from there.
+    expect(enter.pathname).toBe("/ingresar");
     await follow(page, baseURL, () => enterLink.click(), enter);
+    await expect(page.getByRole("tab", { name: "Iniciar sesión" })).toHaveAttribute("aria-selected", "true");
+    await page.goto(new URL("/proyectos", page.url()).href);
     await expect(page.getByRole("heading", { name: "Proyectos", exact: true })).toBeVisible();
     await expect(brand).toHaveAttribute("aria-current", "page");
     await expect(top.getByRole("link", { name: "Guías", exact: true })).toHaveAttribute("href", "/guias");
@@ -58,7 +60,8 @@ for (const [width, height] of [[1366, 768], [1920, 1080]]) {
     // página de la cuenta sigue mostrando el estado de invitado.
     await expect(top.getByRole("link", { name: "Cuenta", exact: true })).toHaveCount(0);
     await top.getByRole("link", { name: "Iniciar sesión", exact: true }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Iniciar sesión" })).toBeVisible();
+    await expect(page).toHaveURL(/\/ingresar$/);
+    await expect(page.getByRole("tab", { name: "Iniciar sesión" })).toHaveAttribute("aria-selected", "true");
     await page.goto(new URL("/cuenta", page.url()).href);
     await expect(page.getByRole("heading", { name: "Sesión de invitado" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Entrar con tu cuenta" })).toHaveAttribute("href", "/ingresar");

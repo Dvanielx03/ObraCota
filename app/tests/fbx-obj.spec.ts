@@ -98,7 +98,7 @@ for (const mesh of MESHES) test(`Malla de fabricante · ${basename(mesh.file)} (
     // Upload through the project's form, as a person would.
     await page.goto("/proyectos/" + project + "/archivos");
     const picker = page.getByTestId("model-upload");
-    expect(await picker.getAttribute("accept")).toBe(".ifc,.dwg,.fbx,.obj");
+    expect(await picker.getAttribute("accept")).toBe(".ifc,.dwg,.rvt,.fbx,.obj");
     await picker.setInputFiles(source);
     const uploading = page.waitForResponse(r => r.url().includes("/uploads?"), { timeout: 180_000 });
     await page.getByRole("button", { name: "Guardar versión" }).click();

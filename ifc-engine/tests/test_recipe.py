@@ -245,4 +245,5 @@ def test_remove_guard(client, originals, synthetic):
 def test_registry_flags():
     from obracota_engine.operations import REGISTRY
     assert {name: entry.enabled for name, entry in REGISTRY.items()} == {
-        "ifc.change_type": True, "ifc.set_property": True, "ifc.remove_element": False}
+        "ifc.change_type": True, "ifc.set_property": True, "ifc.set_material": True,
+        "ifc.remove_element": False}

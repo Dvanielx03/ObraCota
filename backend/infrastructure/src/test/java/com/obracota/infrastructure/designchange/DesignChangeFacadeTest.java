@@ -121,7 +121,9 @@ class DesignChangeFacadeTest {
         assertEquals("DRAFT", db.queryForObject("select status from model_change where id=?", String.class, draftId));
         assertEquals(false, json.readTree(db.queryForObject("select report from model_change where id=?", String.class, draftId)).get("ok").asBoolean());
         assertNull(db.queryForObject("select preview_id from model_change where id=?", UUID.class, draftId));
-        mvc.perform(post(changes + "/" + draftId + "/apply").header("Authorization", user))
+        // R4: the facade no longer publishes; a door change is approved through /model-changes/{id}/apply.
+        mvc.perform(post(changes + "/" + draftId + "/apply").header("Authorization", user)).andExpect(status().is4xxClientError());
+        mvc.perform(post(base + "/model-changes/" + draftId + "/apply").header("Authorization", user))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("Previsualiza el cambio para aprobarlo."));
 
         // GET keeps today's list shape, most recent first; the picture route is unchanged.
@@ -137,14 +139,13 @@ class DesignChangeFacadeTest {
         // The facade hands its resolved actor to the use cases: an agent cannot publish or price through it.
         var userId = db.queryForObject("select owner_id from project where id=?", UUID.class, UUID.fromString(project));
         var agent = Actor.agent(userId, UUID.fromString(project), UUID.randomUUID());
-        assertThrows(ForbiddenApplicationException.class, () -> facade.apply(UUID.fromString(project), readyId, agent));
         assertThrows(ForbiddenApplicationException.class, () -> facade.restore(UUID.fromString(project), readyId, agent));
         assertThrows(ForbiddenApplicationException.class, () -> facade.savePricing(UUID.fromString(project), agent, UUID.fromString(version),
             new DesignChangeController.Pricing(null, List.of())));
 
         // Apply creates revision 2 with the preview's bytes, copies the prices and is idempotent.
-        var applied = read(mvc.perform(post(changes + "/" + readyId + "/apply").header("Authorization", user)).andExpect(status().isOk()));
-        var v2 = applied.get("applied").asText();
+        mvc.perform(post(base + "/model-changes/" + readyId + "/apply").header("Authorization", user)).andExpect(status().isOk());
+        var v2 = applied(read(mvc.perform(get(changes).header("Authorization", user)).andExpect(status().isOk())), readyId);
         var revision = read(mvc.perform(get(base + "/versions/" + v2).header("Authorization", user)).andExpect(status().isOk()));
         assertEquals(2, revision.get("revision").asInt());
         var stored = db.queryForObject("select preview_sha256 from model_change where id=?", String.class, readyId);
@@ -153,8 +154,8 @@ class DesignChangeFacadeTest {
         assertEquals(2, db.queryForObject("select count(*) from unit_price where version_id=? and copied_from=?", Integer.class,
             UUID.fromString(v2), UUID.fromString(version)));
         assertFalse(Files.exists(root.resolve(".previews").resolve(project).resolve(readyId.toString()).resolve(previewId + ".ifc")));
-        mvc.perform(post(changes + "/" + readyId + "/apply").header("Authorization", user))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.applied").value(v2));
+        mvc.perform(post(base + "/model-changes/" + readyId + "/apply").header("Authorization", user)).andExpect(status().isOk());
+        assertEquals(v2, applied(read(mvc.perform(get(changes).header("Authorization", user))), readyId));
 
         // Proposing on a base that is no longer the latest is a 409 now (it used to fail on apply).
         mvc.perform(post(changes).header("Authorization", user).contentType("application/json").content(json.writeValueAsBytes(proposal)))
@@ -172,7 +173,12 @@ class DesignChangeFacadeTest {
             .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("Todavía no se aplicó el cambio."));
         assertEquals(List.of("CREATE", "EDIT", "PREVIEW", "SUBMIT", "APPLY", "RESTORE"),
             db.queryForList("select action from model_change_event where change_id=? order by id", String.class, readyId));
-        assertEquals(0, db.queryForObject("select count(*) from door_change where project_id=?", Integer.class, UUID.fromString(project)));
+    }
+
+    /** The {@code applied} version of one row of the facade's list. */
+    static String applied(JsonNode list, UUID id) {
+        for (var row : list) if (row.get("id").asText().equals(id.toString())) return row.get("applied").asText();
+        throw new AssertionError("Missing change " + id);
     }
 
     static Set<String> names(JsonNode node) {

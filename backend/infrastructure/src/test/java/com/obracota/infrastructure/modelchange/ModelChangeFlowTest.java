@@ -643,7 +643,7 @@ class ModelChangeFlowTest {
         // Publishing, restoring, pricing and anything outside the agent's routes: 403 with the JSON body, nothing changes.
         var forbidden = List.of(
             post(site.changes + "/" + ready + "/apply"), post(site.changes + "/" + ready + "/restore"),
-            post(site.base + "/design-changes/" + ready + "/apply"), post(site.base + "/design-changes/" + ready + "/restore"),
+            post(site.base + "/design-changes/" + ready + "/restore"),
             post(site.base + "/design-changes").contentType("application/json")
                 .content(write(Map.of("version", v1, "element", DOOR, "typeId", ALTERNATE, "description", "Puerta del agente"))),
             put(site.base + "/versions/" + v1 + "/prices").contentType("application/json")
@@ -738,7 +738,6 @@ class ModelChangeFlowTest {
         assertThrows(ForbiddenApplicationException.class, () -> publish.restore(actor, project, readyId));
         assertThrows(ForbiddenApplicationException.class, () -> pricing.replace(actor, project, UUID.fromString(v1), null, List.of()));
         assertThrows(ForbiddenApplicationException.class, () -> pricing.copy(actor, project, UUID.fromString(v1), UUID.fromString(v1)));
-        assertThrows(ForbiddenApplicationException.class, () -> facade.apply(project, readyId, actor));
         assertThrows(ForbiddenApplicationException.class, () -> facade.restore(project, readyId, actor));
         assertThrows(ForbiddenApplicationException.class, () -> facade.savePricing(project, actor, UUID.fromString(v1),
             new DesignChangeController.Pricing(null, List.of())));

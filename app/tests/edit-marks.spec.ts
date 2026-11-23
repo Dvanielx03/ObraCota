@@ -1,6 +1,6 @@
 import {expect,test} from "@playwright/test";
 import {EDIT_MARK_LIMIT,addEditMark,areaMark,canAddEditMark,editRequestText,hasEditText,markedPieces,marksToSend,nudgeArea,pieceStillMarked,pointMark,removeEditMark,setEditMarkText,type EditMark} from "../src/modules/design-option/domain/edit-marks";
-import {GLOBAL_TOOLS,GRAPHIC_STYLES,TIMES,chooseGlobal,globalEditText,globalSummary,globalValue,isApplicable,withPeoplePrompt} from "../src/modules/design-option/domain/edit-globals";
+import {GRAPHIC_STYLES,SCENE_CATEGORIES,SCENE_PRESETS,TIMES,applyPreset,chooseScene,clearCategory,globalEditText,globalSummary,isApplicable,matchingPreset,sceneValue,withPeoplePrompt} from "../src/modules/design-option/domain/edit-globals";
 import {TOOL_KEYS,shortcutFor} from "../src/modules/model-file/domain/shortcuts";
 
 const wall={element:"m-12",guid:"2O2Fr$t4X7Zf8NOew3FLR9",name:"Muro exterior"};
@@ -46,36 +46,73 @@ test("Las marcas de Editar se anclan a piezas, se numeran y componen el texto de
   expect(nudgeArea(zone,.02,.02,true).area).toEqual({x:.2,y:.2,w:.22,h:.32});
 });
 
-test("Las ediciones globales son excluyentes, sin opción por defecto, y escriben su texto en español",()=>{
-  expect(GLOBAL_TOOLS.map(tool=>tool.label)).toEqual(["Cambiar el momento del día","Cambiar la atmósfera","Cambiar el entorno","Añadir personas","Cambiar de estilo"]);
+test("La escena combina las ediciones globales, sin opción por defecto, en una sola petición en español",()=>{
+  expect(SCENE_CATEGORIES.map(category=>category.title)).toEqual(["Momento del día","Clima y estación","Entorno","Personas","Estilo"]);
+  expect(SCENE_PRESETS.map(preset=>preset.label)).toEqual(["Presentación al cliente","Concurso","Revisión técnica","Ambiente nocturno"]);
   expect(TIMES).toHaveLength(8);
-  expect(GRAPHIC_STYLES.map(style=>style.slug)).toEqual(["maqueta-blanca","maqueta","color-plano","acuarela","rotulador","pastel","collage","ilustracion","boceto-lapiz","dibujo-tinta"]);
+  // The existing style pictures stay; photorealistic is added first.
+  expect(GRAPHIC_STYLES.map(style=>style.slug)).toEqual(["fotorrealista","maqueta-blanca","maqueta","color-plano","acuarela","rotulador","pastel","collage","ilustracion","boceto-lapiz","dibujo-tinta"]);
   expect(isApplicable(null)).toBe(false);
   expect(globalEditText(null)).toBe("");
 
-  let edit=chooseGlobal(null,"time","time","golden");
-  expect(globalValue(edit,"time")).toBe("golden");
-  expect(globalSummary(edit)).toBe("Hora dorada");
-  expect(globalEditText(edit)).toBe("Muestra la escena en la hora dorada, con luz cálida y rasante. Conserva la geometría, las proporciones, los materiales y el encuadre del modelo.");
-  // Choosing in another tool replaces the pending edit.
-  edit=chooseGlobal(edit,"people","crowd","few");
-  expect(globalValue(edit,"time")).toBeNull();
-  expect(globalValue(edit,"people","style")).toBe("natural");
-  edit=withPeoplePrompt(chooseGlobal(edit,"people","style","silhouette"),"arquitectos revisando planos");
-  expect(globalEditText(edit)).toContain("Añade unas pocas personas a la escena, como siluetas, a escala con el edificio. Indicaciones: arquitectos revisando planos.");
-  // A style for people means nothing before a quantity.
-  expect(chooseGlobal(null,"people","style","motion")).toBeNull();
-  // Atmosphere adds weather and season; one of them is enough.
-  edit=chooseGlobal(edit,"atmosphere","season","autumn");
-  expect(isApplicable(edit)).toBe(true);
-  edit=chooseGlobal(edit,"atmosphere","weather","fog");
-  expect(globalSummary(edit)).toBe("Niebla · Otoño");
-  expect(globalEditText(edit).startsWith("Cambia la atmósfera de la escena: niebla y vegetación de otoño.")).toBe(true);
-  // Unknown values leave the pending edit as it was; choosing the chosen one again keeps it.
-  expect(chooseGlobal(edit,"style","style","oro")).toBe(edit);
-  const style=chooseGlobal(edit,"style","style","watercolor");
-  expect(chooseGlobal(style,"style","style","watercolor")).toEqual(style);
-  expect(globalEditText(style)).not.toMatch(/Vibe|Fidelity|Lumen|HyperReal|Prisma/);
+  // One category alone still reads as before.
+  let scene=chooseScene(null,"time","golden");
+  expect(sceneValue(scene,"time")).toBe("golden");
+  expect(globalSummary(scene)).toBe("Hora dorada");
+  expect(globalEditText(scene)).toBe("Muestra la escena en la hora dorada, con luz cálida y rasante. Conserva la geometría, las proporciones, los materiales y el encuadre del modelo.");
+  // Choosing in another category adds to the scene instead of replacing it (they used to be exclusive).
+  scene=chooseScene(scene,"crowd","few");
+  expect(sceneValue(scene,"time")).toBe("golden");
+  expect(sceneValue(scene,"peopleStyle")).toBe("natural");
+  scene=withPeoplePrompt(chooseScene(scene,"peopleStyle","silhouette"),"arquitectos revisando planos");
+  scene=chooseScene(chooseScene(scene,"season","autumn"),"weather","fog");
+  scene=chooseScene(chooseScene(scene,"environment","forest"),"style","watercolor");
+  expect(globalSummary(scene)).toBe("Hora dorada · Niebla · Otoño · Bosque · Pocas · Silueta · Acuarela");
+  expect(globalEditText(scene)).toBe("Muestra la escena en la hora dorada, con luz cálida y rasante, con niebla y vegetación de otoño."
+    +" Sitúa la edificación en un bosque."
+    +" Añade unas pocas personas a la escena, como siluetas, a escala con el edificio. Indicaciones para las personas: arquitectos revisando planos."
+    +" Representa la imagen como una acuarela."
+    +" Conserva la geometría, las proporciones, los materiales y el encuadre del modelo.");
+  // One value per category: a new time replaces the time only.
+  const later=chooseScene(scene,"time","night");
+  expect(sceneValue(later,"time")).toBe("night");
+  expect(sceneValue(later,"style")).toBe("watercolor");
+  // Weather or season alone is enough.
+  expect(globalEditText(chooseScene(null,"season","winter")).startsWith("Muestra la escena con vegetación de invierno.")).toBe(true);
+  // A people style means nothing before people; «Ninguna» asks for an empty scene and drops the prompt.
+  expect(chooseScene(null,"peopleStyle","motion")).toBeNull();
+  const empty=withPeoplePrompt(chooseScene(scene,"crowd","none"),"no se usa");
+  expect(sceneValue(empty,"peopleStyle")).toBeNull();
+  expect(globalEditText(empty)).toContain("No incluyas personas en la escena.");
+  expect(globalEditText(empty)).not.toContain("Indicaciones");
+  // Clearing one category keeps the others; clearing the last leaves nothing to apply.
+  const noStyle=clearCategory(scene,"style");
+  expect(sceneValue(noStyle,"style")).toBeNull();
+  expect(sceneValue(noStyle,"environment")).toBe("forest");
+  expect(clearCategory(chooseScene(null,"style","ink"),"style")).toBeNull();
+  // Unknown values leave the scene as it was.
+  expect(chooseScene(scene,"style","oro")).toBe(scene);
+  expect(globalEditText(scene)).not.toMatch(/Vibe|Fidelity|Lumen|HyperReal|Prisma/);
+});
+
+test("Los accesos rápidos por objetivo rellenan la escena y se pueden ajustar después",()=>{
+  const client=applyPreset(null,"client");
+  expect(matchingPreset(client)).toBe("client");
+  expect(globalSummary(client)).toBe("Tarde · Despejado · Ciudad · Pocas · Natural · Fotorrealista");
+  expect(globalEditText(client)).toBe("Muestra la escena por la tarde, con cielo despejado. Sitúa la edificación en la ciudad, entre otros edificios."
+    +" Añade unas pocas personas a la escena, con aspecto natural, a escala con el edificio. Representa la imagen como una fotografía de arquitectura fotorrealista."
+    +" Conserva la geometría, las proporciones, los materiales y el encuadre del modelo.");
+  // A shortcut replaces the whole combination, including what it does not name.
+  const review=applyPreset(chooseScene(client,"season","autumn"),"review");
+  expect(globalSummary(review)).toBe("Mediodía · Despejado · Sin entorno · Sin personas · Maqueta blanca");
+  expect(globalEditText(review)).toContain("Sitúa la edificación sobre un fondo neutro, sin entorno alrededor. No incluyas personas en la escena. Representa la imagen como una maqueta blanca");
+  expect(globalSummary(applyPreset(null,"contest"))).toBe("Atardecer · Campo · Sin personas · Maqueta blanca");
+  expect(globalSummary(applyPreset(null,"night"))).toBe("Noche · Ciudad · Pocas · Natural");
+  // Adjusting after a shortcut keeps the rest and the shortcut stops being the current one.
+  const adjusted=chooseScene(applyPreset(null,"contest"),"style","watercolor");
+  expect(matchingPreset(adjusted)).toBeNull();
+  expect(sceneValue(adjusted,"time")).toBe("sunset");
+  expect(applyPreset(adjusted,"desconocido")).toBe(adjusted);
 });
 
 test("Los atajos de DU-16 nombran las herramientas de la barra",()=>{

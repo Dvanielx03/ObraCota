@@ -7,6 +7,7 @@ import {fitText,pdfString,storedPdf} from "../src/modules/scene-view/domain/stor
 import {CURRENT_FRAMING,archiveName,documentName,documentPages,exportIndex,exportShots,pictureName,samePose,slug} from "../src/modules/scene-view/domain/view-export";
 import {clampSlide,counterLabel,coverFacts,dotSize,slideCount,startSlide} from "../src/modules/scene-view/domain/presentation";
 import {exportViews,exportViewsDocument} from "../src/modules/scene-view/application/export-views";
+import {exportReviewPackage} from "../src/modules/scene-view/application/review-package";
 import {shortcutFor,shortcutTitle,toolNotice} from "../src/modules/model-file/domain/shortcuts";
 
 const bytes=(text:string)=>new TextEncoder().encode(text);
@@ -242,6 +243,68 @@ test("Exportar › Documento (PDF) descarga la portada y una página por vista g
     expect(pdf.text).toContain("\xff\xd8\xff");
     await expect(page.getByRole("status").filter({hasText:"Descargado obracota-duplex-a-vistas.pdf · portada y 2 páginas de vistas."})).toBeAttached();
     if(process.env.KEEP_EXPORT)await download.saveAs(process.env.KEEP_EXPORT);
+  }finally{
+    await page.request.delete(base,{headers});
+  }
+});
+
+test("El paquete de revisión reúne el original, las vistas y los cambios aplicados a la versión",async()=>{
+  const views=[pose(0,"Vista 1"),pose(5,"Acceso")];
+  let camera=pose(9,"pantalla") as {position:[number,number,number]};
+  const change=(id:string,status:string,baseVersion:string,appliedVersion:string|null)=>({id,status,baseVersion,appliedVersion,baseRevision:1,
+    description:"Cambiar puerta "+id,summary:null,origin:"PERSON",author:{id:"u",email:"a@example.test"},createdAt:"2026-11-20T10:00:00Z",
+    appliedAt:appliedVersion?"2026-11-21T10:00:00Z":null,appliedBy:null,legacyReview:null,
+    recipe:{format:"obracota.recipe/1",operations:[{id:"op1",op:"ifc.set_property",element:"G1",scope:"occurrence",pset:"Pset_DoorCommon",property:"FireRating",value:"EI 60"}]},
+    report:{ok:true,operations:[],findings:[{rule:"r",status:"WARNING",explanation:"Revisar la evacuación",source:null,element:null}],quantities:[],
+      estimate:{currency:"COP",total:1250000,complete:true,lines:[]}}});
+  const changes=[change("a","APPLIED","v1-id","v2-id"),change("b","DISCARDED","v2-id",null),change("c","APPLIED","v0-id","v1-id")];
+  const result=await exportReviewPackage(views,{project:"Dúplex Arrayán",version:"v2-id"},{
+    pose:()=>({...pose(9,"pantalla"),position:camera.position}),apply:next=>{camera=next;},
+    picture:async()=>bytes("png@"+camera.position[0]),settle:async()=>undefined,
+    version:async()=>({id:"v2-id",fileId:"f",revision:2,name:"Duplex_A.ifc",format:"IFC",byteSize:3,sha256:"abc",uploadedAt:"2026-11-21T10:00:00Z",uploadedBy:"u",uploaderEmail:"a@example.test"}),
+    original:async()=>new File([bytes("IFC")],"Duplex_A.ifc"),
+    changes:async()=>changes as never,
+  },()=>undefined,undefined,()=>new Date(2026,10,22,9,0));
+  expect(result.name).toBe("ObraCota-paquete-duplex-arrayan-v2.zip");
+  expect(result.changes).toBe(1);
+  const files=unzipSync(result.bytes);
+  expect(Object.keys(files)).toEqual(["original/Duplex_A.ifc","vistas/01-vista-1.png","vistas/02-acceso.png","vistas/indice.txt",
+    "cambios/01-cambiar-puerta-a.json","RESUMEN.md"]);
+  expect(strFromU8(files["original/Duplex_A.ifc"])).toBe("IFC");
+  const record=JSON.parse(strFromU8(files["cambios/01-cambiar-puerta-a.json"]));
+  expect(record).toMatchObject({id:"a",relacion:"produjo esta versión",receta:{format:"obracota.recipe/1"},costo:{total:1250000}});
+  expect(record.informe.estimate).toBeUndefined();
+  const summary=strFromU8(files["RESUMEN.md"]);
+  expect(summary).toContain("# Paquete de revisión · Dúplex Arrayán · v2");
+  expect(summary).toContain("Propiedad de la pieza · Pset_DoorCommon.FireRating: EI 60");
+  expect(summary).toContain("Revisar la evacuación");
+  expect(summary).toMatch(/Costo estimado:\*\* \$\s?1\.250\.000/);
+});
+
+test("Exportar › Paquete de revisión (ZIP) descarga el original, las vistas y el resumen",async({page})=>{
+  const ifc=process.env.DUPLEX_IFC;
+  test.skip(!ifc,"Indica el IFC Duplex original con DUPLEX_IFC.");
+  test.setTimeout(240_000);
+  await page.setViewportSize({width:1366,height:768});
+  const {id,base,headers,version}=await storedIfc(page,ifc!,"Paquete de revisión");
+  try{
+    expect((await page.request.post(base+"/versions/"+version+"/views",{headers,data:{name:"Fachada sur",position:[20,15,25],target:[0,3,0],span:12}})).status()).toBe(201);
+    await page.goto("/proyectos/"+id+"/visor/"+version);
+    await expect(page.locator(".view[data-ready]")).toBeVisible({timeout:180_000});
+    // The disabled «Compartir» left the header (R6/P-09).
+    await expect(page.locator(".viewer-header").getByRole("button",{name:"Compartir"})).toHaveCount(0);
+    await page.getByRole("button",{name:"Exportar",exact:true}).click();
+    const item=page.getByRole("menuitem",{name:"Paquete de revisión (ZIP)"});
+    await expect(item).not.toHaveAttribute("aria-disabled","true");
+    const downloading=page.waitForEvent("download");
+    await item.click();
+    const download=await downloading;
+    expect(download.suggestedFilename()).toBe("ObraCota-paquete-paquete-de-revision-v1.zip");
+    const files=unzipSync(new Uint8Array(readFileSync(await download.path())));
+    expect(Object.keys(files)).toEqual(["original/Duplex_A.ifc","vistas/01-fachada-sur.png","vistas/indice.txt","RESUMEN.md"]);
+    expect(files["original/Duplex_A.ifc"].length).toBe(readFileSync(ifc!).length);
+    expect([...files["vistas/01-fachada-sur.png"].subarray(0,4)]).toEqual([137,80,78,71]);
+    expect(strFromU8(files["RESUMEN.md"])).toContain("Ninguna propuesta de cambio aplicada");
   }finally{
     await page.request.delete(base,{headers});
   }
