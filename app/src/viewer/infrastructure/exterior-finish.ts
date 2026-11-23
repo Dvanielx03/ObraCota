@@ -181,7 +181,7 @@ function findShell(root: T.Object3D, renderer: T.WebGLRenderer): Shell {
       if (!measured && !declared) measured = classify(meshes, false);
     } else measured = classify(meshes, false);
   }
-  const source: ExteriorPreview["source"] = !walls.size && !roofs.size ? "none" : measured ? "perimeter" : "pset";
+  const source: ExteriorPreview["source"] = !walls.size && !roofs.size ? "none" : measured ? "perimeter" : tagged ? "sample" : "pset";
   return { walls: [...walls], roofs: [...roofs], source };
 }
 

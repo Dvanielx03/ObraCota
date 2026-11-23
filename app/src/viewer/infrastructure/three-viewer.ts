@@ -56,7 +56,8 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   let activeModel:SceneModel|undefined, originalFile:File|null=null;
   let walk:ReturnType<typeof walking>|undefined, markFloor:((result:string|null)=>void)|undefined;
   let selectedForWalk:string|null=null;
-  const walkModels=new Map<File,{model:SceneModel;world:WalkWorld}>();
+  // Keyed by the file on screen; null is the ReStage sample, which is opened without one.
+  const walkModels=new Map<File|null,{model:SceneModel;world:WalkWorld}>();
   const originals = new Map<T.Mesh|T.LineSegments|T.Points,T.Material|T.Material[]>();
   const highlightedLines=new T.LineBasicMaterial({color:0xff6900});
   const highlightedPoints=new T.PointsMaterial({color:0xff6900,size:4,sizeAttenuation:false});
@@ -502,7 +503,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   };
   function walkAt(x:number,y:number){
     const notify=markFloor;
-    if(!notify || !activeModel || !originalFile)return;
+    if(!notify || !activeModel)return;
     // With a scene around the model its ground counts as floor too: the walk can start outside and go around.
     const hit=hitAt(x,y)??groundAt(x,y);
     if(!hit){notify("Selecciona un punto visible en el piso.");return;}
@@ -671,7 +672,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     },
     captureGroup,
     enterWalk(mark){
-      if(!activeModel?.coordination || !originalFile || plan){mark("Abre un modelo 3D con unidades verificables: IFC, DWG 3D o FBX.");return;}
+      if(!activeModel?.coordination || plan){mark("Abre un modelo 3D con unidades verificables: IFC, DWG 3D o FBX.");return;}
       // A manufacturer piece in metres without a floor at its base (a lamp, a chair) has nowhere to stand,
       // unless a scene around it («Recorrer esta escena en 3D») gives it a ground.
       if(activeModel.walk===false && environment.groundLevel()===null){mark("Este modelo no tiene un piso para recorrer.");return;}

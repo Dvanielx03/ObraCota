@@ -132,4 +132,4 @@ export interface ExteriorFinish { material: ExteriorMaterial | null; tone: Exter
  * How many pieces took the finish and how they were found (declared IsExternal, rays from outside, none). `ids` are
  * their viewer ids, so «Guardar en el modelo» can name the same pieces in a model change.
  */
-export interface ExteriorPreview { pieces: number; source: "pset" | "perimeter" | "none"; ids?: string[] }
+export interface ExteriorPreview { pieces: number; source: "pset" | "perimeter" | "sample" | "none"; ids?: string[] }

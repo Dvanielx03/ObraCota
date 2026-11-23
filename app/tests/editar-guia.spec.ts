@@ -18,7 +18,8 @@ for(const {name,width,reducedMotion} of variants)test("Guía de Editar · práct
   await page.setViewportSize({width,height:768});
   if(reducedMotion)await page.emulateMedia({reducedMotion:"reduce"});
   const requests:string[]=[];
-  page.on("request",request=>{if(request.method()==="POST")requests.push(request.url());});
+  // The sample checks the session (POST /api/auth/refresh) to know whether Renderizar can use the server; nothing else is sent.
+  page.on("request",request=>{if(request.method()==="POST" && !request.url().endsWith("/api/auth/refresh"))requests.push(request.url());});
   await page.goto("/proyectos/restage/visor");
   const launch=editButton(page);
   await expect(launch).toBeVisible();

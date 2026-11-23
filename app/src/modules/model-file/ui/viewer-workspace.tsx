@@ -26,6 +26,7 @@ import { WorkspaceTools, type WorkspaceToolsHandle } from "./workspace-tools";
 import { SceneWalkBar, type WalkScene } from "@/modules/design-option/ui/scene-walk";
 import { readScene } from "@/modules/design-option/domain/scene-environment";
 import { optionsPath } from "@/modules/design-option/infrastructure/option-http";
+import { SAMPLE_SIGN_IN, useSampleScope } from "@/modules/model-version/infrastructure/sample-scope-http";
 import { IconTool, ModeButton, RovingToolbar, ToolSeparator } from "./tool-bar";
 import { ShortcutSheet } from "./shortcut-sheet";
 import { TOOL_KEYS, shortcutFor, toolNotice, type ShortcutAction } from "../domain/shortcuts";
@@ -63,6 +64,10 @@ function shortcutAllowed(target: EventTarget | null, action: ShortcutAction): bo
   return true;
 }
 
+/** The ReStage sample is a GLB made for viewing: the agent and «Guardar en el modelo» change an IFC. */
+const SAMPLE_EDIT="ReStage es un ejemplo en GLB, no un IFC editable: sube tu IFC a un proyecto para cambiar el modelo";
+/** Saved views (Presentar, Exportar) live in the versions of a project. */
+const SAMPLE_VIEWS="Las vistas guardadas son de los modelos de tus proyectos: sube el tuyo para presentarlas y exportarlas";
 /** Why Editar and Renderizar are off over an unpublished preview (H1 §7.4). */
 const PROPOSAL_EDIT="Pendiente: Editar trabaja sobre versiones guardadas; esto es una vista previa";
 const PROPOSAL_RENDER="Pendiente: renderizar una vista previa llega en H6";
@@ -336,6 +341,14 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   // notes and the walk comparison only make sense over it.
   const showingInitial = !!initialFile && last.current === initialFile;
   const serverNotes = showingInitial ? storedNotes : undefined;
+  // The ReStage sample (a public GLB): with a session the server keeps a project of its own for it, so Renderizar
+  // and the panorama work and persist as on a saved version; without one they ask to sign in.
+  const sampleOpen = !!model?.sample;
+  const sampleScope = useSampleScope(sampleOpen);
+  const toolScope = plan ? undefined : serverNotes && storedVersion ? storedVersion : sampleScope.state === "ready" ? sampleScope.scope : undefined;
+  const sampleSignIn = sampleScope.state === "signed-out" ? SAMPLE_SIGN_IN : undefined;
+  const sampleReason = sampleScope.state === "checking" ? "Preparando el ejemplo en el servidor…"
+    : sampleScope.state === "error" ? "No se pudo preparar el ejemplo en el servidor: " + sampleScope.message : undefined;
   const readPose=useCallback(()=>viewer.current?.pose()??null,[]);
   const applyPose=useCallback((next:CameraPose,duration?:number)=>viewer.current?.applyPose(next,duration),[]);
   const capturePicture=useCallback(()=>viewer.current?.capture("jpeg")??null,[]);
@@ -422,10 +435,10 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   },[model,assistant,ids,chosen]);
   const touring=walk!=="idle";
   const stripShown=ready && !plan && !touring && !!serverNotes && !!storedVersion;
-  const presentReason=!stripShown?(touring?"No disponible durante el recorrido":"Disponible en una versión guardada de un modelo 3D")
+  const presentReason=!stripShown?(touring?"No disponible durante el recorrido":sampleOpen?SAMPLE_VIEWS:"Disponible en una versión guardada de un modelo 3D")
     :viewCount?"Presentar las vistas guardadas a pantalla completa":"Guarda una vista para presentarla";
   const exportReason=touring?"No disponible durante el recorrido":!ready?"Abre un modelo para exportar sus vistas"
-    :plan?"Las vistas se exportan desde un modelo 3D":!stripShown?"Disponible en una versión guardada de un modelo 3D":undefined;
+    :plan?"Las vistas se exportan desde un modelo 3D":!stripShown?(sampleOpen?SAMPLE_VIEWS:"Disponible en una versión guardada de un modelo 3D"):undefined;
   function present(){
     // Guides point at controls the presentation hides: they end here.
     if(guide!=="off")stopTour();
@@ -482,7 +495,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
         </div>}
         <div className="view" style={{visibility:ready?"visible":"hidden"}} data-ready={ready || undefined} ref={container}/>
         {ready && !plan && walkScene && <SceneWalkBar scene={walkScene} onReset={resetScene}
-          base={serverNotes && storedVersion?optionsPath(storedVersion.project,storedVersion.version):undefined}
+          base={toolScope?optionsPath(toolScope.project,toolScope.version):undefined} offReason={sampleReason} signIn={sampleSignIn}
           capture={()=>viewer.current?.capture("jpeg")??null}/>}
         {status || settling ? <ModelPreparing phase={status || ENTRY_SETTLING_PHASE} stage={entered && engine?"model":"viewer"} detail={opening}>
             {engine && status && <button type="button" onClick={()=>{request.current?.abort();setStatus("");setHolding(false);}}>Cancelar</button>}
@@ -531,16 +544,16 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           onPointerUp={()=>viewer.current?.walkMove(direction,false)}
           onLostPointerCapture={()=>viewer.current?.walkMove(direction,false)}>{icon}</button>)}</div>}
         {ready && !touring && model && <WorkspaceTools key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} control={tools} viewer={readViewer} plan={plan}
-          scope={!plan && serverNotes && storedVersion ? storedVersion : undefined} pieces={optionPieces} onWorking={setOptionsWorking}
+          scope={toolScope} scopeReason={sampleReason} signIn={sampleSignIn} pieces={optionPieces} onWorking={setOptionsWorking}
           proposal={proposal && showingInitial?{renderReason:PROPOSAL_RENDER,compare:proposal.compare({elements:model.elements,viewer:readViewer,selected})}:undefined}
-          edit={{on:assistant,grouping,nonIfc:model.sample || /^IFC/i.test(model.schema)?undefined:model.schema.split(" ")[0],changeLimit:changeLimitReason(openedBytes),reason:proposal && showingInitial?PROPOSAL_EDIT:prismaAvailable?undefined:"Editar necesita un modelo 3D (IFC, DWG 3D, FBX, OBJ o el ejemplo GLB); las propuestas de cambio solo funcionan con IFC",
+          edit={{on:assistant,grouping,sample:model.sample?SAMPLE_EDIT:undefined,nonIfc:model.sample || /^IFC/i.test(model.schema)?undefined:model.schema.split(" ")[0],changeLimit:changeLimitReason(openedBytes),reason:proposal && showingInitial?PROPOSAL_EDIT:prismaAvailable?undefined:"Editar necesita un modelo 3D (IFC, DWG 3D, FBX, OBJ o el ejemplo GLB); las propuestas de cambio solo funcionan con IFC",
             selection:ids,onSelection:next=>{setIds(next);setColor(null);},piece:findElement,onFocusPiece:setEditFocus,
             onEnter:enterEdit,onExit:exitEdit,onUngroup:()=>setGrouping(false)}}
           reviewOpen={reviewOpen} onCloseReview={()=>review.current?.close()}
           review={<DeliveryReview server={serverNotes && storedVersion?storedVersion:proposal && showingInitial?proposal.scope:undefined} control={review} onOpenChange={setReviewOpen} guided={guide==="review"&&!paused} onDownloaded={()=>{if(guide==="review"&&!paused){setGuide("done");rememberGuide();}}} key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} model={model} locate={id=>{setPanel(true);pick(id);viewer.current?.locate(id);}}
             trigger={(toggle,anchor,open)=><ModeButton ref={anchor} icon={ListChecks} label="Revisar" aria-label="Revisar entrega" aria-haspopup="dialog" aria-expanded={open} aria-controls="tool-review" className="review-trigger" shortcut={TOOL_KEYS.review} onClick={toggle}/>}/>}
           walk={{reason:model.walk && prismaAvailable?undefined:model.sceneWalk && prismaAvailable?"Este modelo no tiene un piso propio: aplica una escena en Editar › Escena y recórrela sobre su suelo"
-            :"Disponible al abrir un modelo 3D con unidades verificables (IFC, DWG 3D o FBX) guardado en uno de tus proyectos",
+            :"Disponible en un modelo 3D con unidades verificables (IFC, DWG 3D o FBX)",
             sceneReason:model.sceneWalk && prismaAvailable?undefined:"Necesita un modelo 3D con unidades verificables (IFC, DWG 3D con unidad declarada o FBX); un OBJ no declara unidades",
             onStart:startWalk,onScene:showScene}}
           camera={<RovingToolbar label="Controles de la cámara" className="tools">

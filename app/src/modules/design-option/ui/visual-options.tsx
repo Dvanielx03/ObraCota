@@ -154,6 +154,7 @@ export function VisualOptions({ base, optionKey, name, state, open, group, choic
       <p className="options-note" role="status">{!preview.on ? "Las fichas solo se usan para la imagen de IA."
         : !preview.result ? "Elige una ficha para verla en el exterior del modelo. Es una vista previa local: el archivo no cambia."
         : !choices.finish && !preview.result.pieces ? "Luz aplicada al modelo. Elige un acabado para el exterior."
+        : preview.result.source === "sample" ? "Acabado en la fachada y la cubierta del ejemplo. El archivo no cambia."
         : preview.result.pieces ? "Acabado en " + preview.result.pieces + (preview.result.pieces === 1 ? " pieza exterior" : " piezas exteriores")
           + (preview.result.source === "pset" ? " (marcadas como exteriores en el IFC)." : " (detectadas por el contorno del modelo).") + " El archivo no cambia."
         : "No se encontraron muros o cubiertas exteriores en este modelo."}</p>

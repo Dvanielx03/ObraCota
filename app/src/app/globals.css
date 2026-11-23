@@ -787,6 +787,13 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .scene-walk-button{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 10px;border-radius:var(--radius-md);background:transparent;color:var(--ink);font:inherit;white-space:nowrap}
 .scene-walk-button:hover{background:var(--hover)}
 .scene-walk-button:focus-visible{outline:2px solid var(--ring);outline-offset:-2px}
+.scene-walk-button[href]{text-decoration:none}
+/* Renderizar on the sample without a session: why, and the way to sign in (workspace-tools.tsx). */
+.tool-sign-in{display:flex;flex-direction:column;gap:8px;padding:16px}
+.tool-sign-in p{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
+.tool-sign-in p strong{color:var(--ink);font-weight:600}
+.tool-sign-in-link{align-self:flex-start;display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:var(--radius-md);background:var(--primary);color:var(--on-primary);font-weight:500;text-decoration:none}
+.tool-sign-in-link:hover{opacity:.9}
 .scene-walk-button[aria-disabled=true]{opacity:.45;cursor:not-allowed;background:transparent}
 .scene-walk-error{flex-basis:100%;margin:0;padding:2px 8px 4px;color:var(--error);text-align:center}
 .scene-walk-launch{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-pill);background:transparent;color:var(--ink);font:var(--type-hint);white-space:nowrap}

@@ -87,7 +87,8 @@ for(const piece of ["Pieza posterior","Pieza interior"])test("Guía y captura de
 
 test("Exporta el encuadre con instrucciones y protege la imagen que devuelve Gemini",async({page},info)=>{
   const posts:string[]=[];
-  page.on("request",r=>{if(r.method()==="POST")posts.push(r.url());});
+  // The sample checks the session (POST /api/auth/refresh) to know whether Renderizar can use the server; nothing else is sent.
+  page.on("request",r=>{if(r.method()==="POST" && !r.url().endsWith("/api/auth/refresh"))posts.push(r.url());});
   await page.goto("/proyectos/restage/visor?panel=asistente");
   const panel=selectionPanel(page);
   await panel.getByRole("textbox",{name:"Buscar pieza para la propuesta"}).fill("fachada");

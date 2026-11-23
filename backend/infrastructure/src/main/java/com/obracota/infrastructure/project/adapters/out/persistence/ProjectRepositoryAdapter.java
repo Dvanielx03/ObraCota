@@ -21,7 +21,7 @@ public class ProjectRepositoryAdapter implements ProjectRepository {
         return rows.findByIdAndOwnerId(id.value(),owner.value()).map(mapper::toDomain);
     }
     public List<Project> findAll(UserId owner) {
-        return rows.findAllByOwnerIdOrderByCreatedAtDescIdAsc(owner.value()).stream().map(mapper::toDomain).toList();
+        return rows.findAllByOwnerIdAndSampleIsNullOrderByCreatedAtDescIdAsc(owner.value()).stream().map(mapper::toDomain).toList();
     }
     @Transactional public Optional<Project> findForUpdate(ProjectId id, UserId owner) {
         return rows.lockOwned(id.value(),owner.value()).map(mapper::toDomain);

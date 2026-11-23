@@ -23,8 +23,9 @@ const MODES: readonly { mode: Mode; label: string; path: string; title: string }
  * will not use Google. The two tabs switch between signing in and creating an account without leaving the page;
  * the address follows the tab so a reload keeps it. The picture on the right is acceso.webp (see CREDITOS.txt).
  */
-export function CredentialsForm({ registration = false, assistant = false, siteUrl }: {
-  registration?: boolean; assistant?: boolean; siteUrl?: string;
+export function CredentialsForm({ registration = false, from, siteUrl }: {
+  /** `desde` of the address: "asistente" or "visor" (the ReStage sample) go back there instead of the panel. */
+  registration?: boolean; from?: string; siteUrl?: string;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(registration ? "register" : "login");
@@ -36,7 +37,8 @@ export function CredentialsForm({ registration = false, assistant = false, siteU
   const signingUp = mode === "register";
   const current = MODES.find(m => m.mode === mode)!;
 
-  const usual = assistant ? "/proyectos/restage/asistente" : "/proyectos";
+  const back = from === "asistente" ? "/proyectos/restage/asistente" : from === "visor" ? "/proyectos/restage/visor" : undefined;
+  const usual = back ?? "/proyectos";
   // Someone already signed in who opens /ingresar (the landing's «Entrar al panel», a bookmark) goes straight to
   // the panel. /registro stays open so a signed-in person can still create another account.
   const skipSignedIn = useRef(!registration);
@@ -45,7 +47,7 @@ export function CredentialsForm({ registration = false, assistant = false, siteU
   function enter(created: boolean) {
     // A new account always meets the onboarding (even if this browser finished it for another account);
     // signing in to an existing account keeps the usual destination.
-    if (created && !assistant) { localUserProfileRepository.clear(); router.replace("/bienvenida"); return; }
+    if (created && !back) { localUserProfileRepository.clear(); router.replace("/bienvenida"); return; }
     router.replace(usual);
   }
   function choose(next: Mode, focus = false) {

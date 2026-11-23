@@ -9,8 +9,8 @@ test("Medición del IFC original de ReStage",async({page},info)=>{
   await page.setViewportSize({width:1366,height:768});
   await page.goto("/proyectos/restage/visor");
   await expect(page.locator(".project")).toHaveText("ReStage");
-  // El ejemplo no se puede recorrer: RECORRIDO está en la barra, pero deshabilitado.
-  await expect(walkButton(page)).toHaveAttribute("aria-disabled","true");
+  // El ejemplo (GLB en metros) también se recorre: RECORRIDO ya está habilitado antes de abrir el IFC.
+  await expect(walkButton(page)).not.toHaveAttribute("aria-disabled","true");
   const opened=Date.now();
   await page.locator("header input").setInputFiles(ifc!);
   await expect(page.locator(".project")).toHaveText(/\.ifc$/i,{timeout:180_000});

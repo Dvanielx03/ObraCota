@@ -15,10 +15,14 @@ export interface WalkScene { environment: SceneEnvironment; request: string }
  * Line over the 3D view while a scene is built around the model (and during the walk): what it shows,
  * «Panorama 360° con IA» and «Restablecer», which returns to the neutral viewer.
  */
-export function SceneWalkBar({ scene, base, capture, onReset }: {
+export function SceneWalkBar({ scene, base, offReason, signIn, capture, onReset }: {
   scene: WalkScene;
   /** Options path of the saved version; without it the panorama explains why it is off. */
   base?: string;
+  /** Why there is no options path (the sample being prepared); a saved version by default. */
+  offReason?: string;
+  /** Sign-in page when the sample is open without a session: the panorama becomes that link. */
+  signIn?: string;
   /** JPEG data URL of the current view (the walk's own when walking), sent as the reference picture. */
   capture: () => string | null;
   onReset: () => void;
@@ -45,11 +49,13 @@ export function SceneWalkBar({ scene, base, capture, onReset }: {
   return <>
     <div className="scene-walk" role="group" aria-label="Escena en 3D">
       <span className="scene-walk-label" title={label}><Trees size={14} strokeWidth={2} aria-hidden="true" /><span>Escena 3D · {label}</span></span>
-      <button type="button" className="scene-walk-button" aria-busy={busy || undefined} aria-disabled={!base || busy ? true : undefined}
-        title={!base ? "Disponible en una versión guardada de un proyecto" : "Genera con IA una imagen de 360° de esta escena para mirar alrededor (sin costo con el proveedor gratuito)"}
+      {!base && signIn ? <a className="scene-walk-button" href={signIn} title="El panorama se genera en el servidor: inicia sesión para crearlo">
+        <Globe size={14} strokeWidth={2} aria-hidden="true" />Inicia sesión para el panorama 360°</a>
+      : <button type="button" className="scene-walk-button" aria-busy={busy || undefined} aria-disabled={!base || busy ? true : undefined}
+        title={!base ? offReason ?? "Disponible en una versión guardada de un proyecto" : "Genera con IA una imagen de 360° de esta escena para mirar alrededor (sin costo con el proveedor gratuito)"}
         onClick={() => void generate()}>
         {busy ? <Spinner size={12} /> : <Globe size={14} strokeWidth={2} aria-hidden="true" />}{busy ? "Generando panorama…" : "Panorama 360° con IA"}
-      </button>
+      </button>}
       <button type="button" className="scene-walk-button" title="Quita la escena y vuelve al visor neutro" onClick={onReset}>
         <RotateCcw size={14} strokeWidth={2} aria-hidden="true" />Restablecer</button>
       {error && <p className="scene-walk-error" role="alert">{error}</p>}

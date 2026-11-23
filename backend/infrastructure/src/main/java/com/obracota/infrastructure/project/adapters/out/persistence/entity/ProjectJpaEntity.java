@@ -10,6 +10,8 @@ public class ProjectJpaEntity {
     @Column(nullable=false,updatable=false) public UUID ownerId;
     @Column(nullable=false,length=120) public String name;
     @Column(nullable=false) public boolean archived;
+    /** Set only on the hidden project of a public sample (SampleProjectAdapter); never written through JPA. */
+    @Column(insertable=false,updatable=false) public String sample;
     private Instant createdAt;
     private Instant updatedAt;
     protected ProjectJpaEntity() {}

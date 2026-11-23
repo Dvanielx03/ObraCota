@@ -47,7 +47,12 @@ async function readSample(signal: AbortSignal): Promise<SceneModel> {
       if (child instanceof T.LineSegments) child.material = edges;
     });
   });
-  return {root, elements, name:"ReStage", schema:index.fuente.esquema, sample:true,versionId:"restage-sample-v1"};
+  // The GLB was converted from the IFC in metres (Y up): it is walked on its own floor, and a scene's ground goes
+  // around it, as with an IFC. No coordination offset: the walk works in the GLB's own coordinates.
+  const meshes:T.Mesh[]=[];
+  root.traverse(node=>{if(node instanceof T.Mesh)meshes.push(node);});
+  return {root, elements, name:"ReStage", schema:index.fuente.esquema, sample:true,versionId:"restage-sample-v1",
+    walk:walkableFloor(root,meshes),coordination:Array.from(new T.Matrix4().elements)};
 }
 
 interface Part {key:number; matrix:number[]; color:number[]}

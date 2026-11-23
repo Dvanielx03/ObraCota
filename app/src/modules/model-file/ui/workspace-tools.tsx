@@ -70,6 +70,8 @@ export interface EditControl {
   nonIfc?: string;
   /** Why the IFC on screen cannot take model changes (too large for the engine to verify), or undefined. */
   changeLimit?: string;
+  /** The public sample (a GLB, not an editable IFC): why the agent and «Guardar en el modelo» are off on it. */
+  sample?: string;
 }
 
 const pieceName = (piece: ElementInfo) => piece.name || piece.type;
@@ -80,7 +82,7 @@ const pieceName = (piece: ElementInfo) => piece.name || piece.type;
  * the bottom right, the tool panels that open above their buttons, and Editar: its floating sub-bar,
  * the numbered marks anchored to the model and the global edits.
  */
-export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, reviewOpen = false, onCloseReview, walk, camera, onWorking, control, proposal }: {
+export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, pieces, edit, review, reviewOpen = false, onCloseReview, walk, camera, onWorking, control, proposal }: {
   /**
    * An unpublished preview is open (H1 §7.4, §7.5): Renderizar explains why it is off, and Comparar opens
    * «Comparar con la base» with `compare` instead of the image options.
@@ -92,6 +94,13 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   plan: boolean;
   /** Saved version the options belong to; without it Renderizar and the edits explain why they are off. */
   scope?: { project: string; version: string };
+  /** Why there is no scope yet (the sample being prepared on the server, or its error); a saved version by default. */
+  scopeReason?: string;
+  /**
+   * Sign-in page for a person without a session on the sample: Renderizar stays clickable and its panel says to sign
+   * in, with the link, instead of a disabled button that cannot carry one.
+   */
+  signIn?: string;
   /** The Editar selection, or the piece chosen in the dock; empty means the whole framing. */
   pieces: ElementInfo[];
   edit: EditControl;
@@ -147,13 +156,13 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   const state = useOptionHistory(!plan && base ? base : null, !plan && base ? historyKey : null);
   const selectionName = pieces.map(pieceName).join(", ");
   const name = viewScope ? VIEW_NAME : selectionName;
-  const noScope = "Disponible en una versión guardada de un modelo 3D";
-  const unavailable = proposal ? proposal.renderReason : !scope ? noScope : !viewScope && tooLong ? "Reduce la selección: hay demasiadas piezas para una petición" : undefined;
+  const noScope = signIn && !scope ? "Inicia sesión para renderizar" : scopeReason ?? "Disponible en una versión guardada de un modelo 3D";
+  const unavailable = proposal ? proposal.renderReason : !scope ? (signIn ? undefined : noScope) : !viewScope && tooLong ? "Reduce la selección: hay demasiadas piezas para una petición" : undefined;
   const [wanted, setWanted] = useState<OptionTarget | null>(null);
   useEffect(() => setWanted(null), [key]);
   const target = resolveTarget(state.history, wanted);
   const batch = targetBatch(state.history, target);
-  const optionReason = unavailable ?? (state.loading ? "Consultando las opciones…"
+  const optionReason = unavailable ?? (!scope ? noScope : state.loading ? "Consultando las opciones…"
     : !target ? (viewScope ? "Genera opciones primero: la vista aún no tiene ninguna lista" : "Genera opciones primero: esta pieza aún no tiene ninguna lista") : undefined);
   // Over a preview, Comparar lists the differences with the base and does not depend on image options.
   const comparing = !!proposal;
@@ -180,7 +189,7 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   const resetExterior = useCallback(() => { viewer()?.previewExteriorFinish(null); setExterior(null); setShown(null); }, [viewer]);
   // «Guardar en el modelo» (H2 material): the GlobalIds of the exterior pieces under the preview.
   const exteriorGuids = exterior?.ids?.map((id) => edit.piece(id)?.guid).filter((guid): guid is string => !!guid) ?? [];
-  const saveReason = !scope ? "Guarda primero una versión del modelo" : !shown || !exterior?.pieces ? "Elige un acabado y míralo en el modelo 3D"
+  const saveReason = edit.sample ? edit.sample : !scope ? "Guarda primero una versión del modelo" : !shown || !exterior?.pieces ? "Elige un acabado y míralo en el modelo 3D"
     : edit.changeLimit ? edit.changeLimit : !exteriorGuids.length ? "Solo un IFC guarda materiales en el modelo" + (edit.nonIfc ? " (este es " + edit.nonIfc + "); la vista previa sí se ve aquí" : "") : exteriorGuids.length > FINISH_PIECES_LIMIT ? "Hay más de " + FINISH_PIECES_LIMIT + " piezas exteriores"
     : undefined;
   const saveFinish = useCallback(async () => {
@@ -373,7 +382,7 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   const [agentRun, setAgentRun] = useState<AgentRunState | null>(null);
   const agentRequest = useRef<AbortController | null>(null);
   useEffect(() => () => agentRequest.current?.abort(), []);
-  const agentProject = edit.on && !plan ? scope?.project : undefined;
+  const agentProject = edit.on && !plan && !edit.sample ? scope?.project : undefined;
   useEffect(() => {
     if (!agentProject) return;
     const abort = new AbortController();
@@ -382,7 +391,7 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   }, [agentProject]);
   const notes = agentNotes(marks);
   const running = agentRun?.state === "running";
-  const proposeOff = !scope ? noScope : edit.nonIfc ? "El agente cambia solo modelos IFC (este es " + edit.nonIfc + "): sube su exportación IFC para proponer cambios" : edit.changeLimit ? edit.changeLimit : agentReason(notes)
+  const proposeOff = edit.sample ? edit.sample : !scope ? noScope : edit.nonIfc ? "El agente cambia solo modelos IFC (este es " + edit.nonIfc + "): sube su exportación IFC para proponer cambios" : edit.changeLimit ? edit.changeLimit : agentReason(notes)
     ?? (agentInfo && !agentInfo.available ? "Falta configurar el modelo de IA del agente en el servidor" : undefined)
     ?? (agentInfo && agentInfo.reserveCents > agentInfo.remainingCents ? "Se agotó el presupuesto mensual de IA" : undefined)
     ?? (running ? "El agente está preparando el cambio…" : sending ? "Enviando la edición…" : undefined);
@@ -555,6 +564,11 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
       walk={walk.onScene ? { reason: isApplicable(globalEdit) ? undefined : "Elige al menos una categoría de la escena o un acceso rápido", note: walk.sceneReason, run: () => walkScene(globalEditText(globalEdit)) } : undefined} />}
     <ToolPopover open={tool === "render"} anchor={renderButton} id="tool-render" label="Renderizar opciones visuales" title="Renderizar"
       closeLabel="Cerrar Renderizar" width={340} keepMounted bare onClose={() => setTool(null)}>
+      {signIn && !scope && <div className="tool-sign-in" role="note">
+        <p><strong>Inicia sesión para renderizar</strong></p>
+        <p>Las opciones visuales se generan en el servidor y se guardan en tu cuenta, también las de este ejemplo.</p>
+        <a className="tool-sign-in-link" href={signIn}>Iniciar sesión</a>
+      </div>}
       {base && key && !unavailable && <VisualOptions key={key} base={base} optionKey={key} name={name} state={state} open={tool === "render"} group={edit.on && !viewScope}
         choices={choices} onChoices={setChoices}
         preview={plan ? undefined : { on: livePreview, result: exterior, onToggle: toggleLivePreview, onReset: resetExterior, save: { reason: saveReason, run: saveFinish } }}

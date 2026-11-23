@@ -12,5 +12,6 @@ public interface ProjectJpaRepository extends JpaRepository<ProjectJpaEntity,UUI
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from ProjectJpaEntity p where p.id=:id and p.ownerId=:ownerId")
     Optional<ProjectJpaEntity> lockOwned(UUID id, UUID ownerId);
-    List<ProjectJpaEntity> findAllByOwnerIdOrderByCreatedAtDescIdAsc(UUID ownerId);
+    /** The person's projects, without the hidden ones that hold a public sample (V19). */
+    List<ProjectJpaEntity> findAllByOwnerIdAndSampleIsNullOrderByCreatedAtDescIdAsc(UUID ownerId);
 }
