@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Box, DraftingCompass } from "lucide-react";
 import { byRevision, revisionLabel, revisionSummary, type ModelVersion } from "../domain/model-version";
 import { versionRepository } from "../infrastructure/version-http";
-import { LoadingStatus, Skeleton } from "@/shared/ui/loading";
+import { EmptyArt, LoadingStatus, Skeleton } from "@/shared/ui/loading";
 
 /** Keys 1–9 of the workspace (DU-12) open the n-th revision of the rail. */
 export interface VersionRailHandle {
@@ -49,7 +49,8 @@ export function VersionRail({ project, version, control, compare }: { project: s
   return <nav className="version-rail" aria-label="Versiones del archivo" aria-busy={!versions}>
     {versions === undefined
       ? <><LoadingStatus hidden>Cargando versiones…</LoadingStatus>
-        <div className="version-skeleton" aria-hidden="true"><Skeleton/><Skeleton/><Skeleton/></div></>
+        <div className="version-skeleton" aria-hidden="true"><Skeleton/><Skeleton/><Skeleton/></div>
+        <div className="version-rail-empty"><EmptyArt kind="revisions" width={56}/></div></>
       : <ol>{versions.map((item, index) => {
           const open = item.id === version;
           const Icon = item.format === "DWG" ? DraftingCompass : Box;
@@ -64,6 +65,10 @@ export function VersionRail({ project, version, control, compare }: { project: s
             </Link>
           </li>;
         })}</ol>}
+    {versions && versions.length < 2 && <div className="version-rail-empty">
+      <EmptyArt kind="revisions" width={56}/>
+      <p>{versions.length === 1 ? "Primera versión" : "Sin versiones"}</p>
+    </div>}
     {versions && versions.length > 1 && compare && <div className="version-rail-foot">{compare(versions)}</div>}
   </nav>;
 }

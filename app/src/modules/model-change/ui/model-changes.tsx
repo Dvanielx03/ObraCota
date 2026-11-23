@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import {useEffect,useState} from "react";
-import {PanelView} from "@/shared/ui/panel-view";
-import {LoadingStatus} from "@/shared/ui/loading";
+import {EmptyState,PanelView} from "@/shared/ui/panel-view";
+import {EmptyArt,LoadingStatus} from "@/shared/ui/loading";
 import {approvedBudget,type ModelChange} from "../domain/model-change";
 import {modelChangeRepository} from "../infrastructure/model-change-http";
 import {ChangeCard,ChangeHeader,useOperationLabels} from "./change-card";
@@ -52,8 +52,16 @@ export function ModelChanges({project,budget=false}:{project:string;budget?:bool
   }
   return <PanelView title={budget?"Presupuesto":"Cambios de diseño"} project={false}>
     {error && <p role="alert">{error}</p>}
-    {!rows && !error && <LoadingStatus>Cargando revisiones…</LoadingStatus>}
-    {rows?.length===0 && <p>Selecciona una puerta de una <Link href={"/proyectos/"+project+"/archivos"}>versión IFC guardada</Link> para registrar una propuesta.</p>}
+    {!rows && !error && (budget ? <LoadingStatus>Cargando revisiones…</LoadingStatus> :
+      <div className="changes-loading">
+        <EmptyArt kind="changes" width={132}/>
+        <LoadingStatus>Cargando revisiones…</LoadingStatus>
+      </div>)}
+    {rows?.length===0 && (budget ?
+      <p>Selecciona una puerta de una <Link href={"/proyectos/"+project+"/archivos"}>versión IFC guardada</Link> para registrar una propuesta.</p> :
+      <EmptyState heading="Sin cambios registrados" icon={<EmptyArt kind="changes" width={184}/>}>
+        Abre una <Link href={"/proyectos/"+project+"/archivos"}>versión IFC guardada</Link> para registrar una propuesta.
+      </EmptyState>)}
     {budget && !!rows?.length && <BudgetTotal rows={rows}/>}
     <div className="estimate-sheet">{rows?.map(change=>budget?<BudgetCard key={change.id} change={change}/>
       :<ChangeCard key={change.id} change={change} onChange={next=>void changed(next)} locked={busy>0}

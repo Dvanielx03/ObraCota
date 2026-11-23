@@ -4,7 +4,15 @@
  * cropped to the drawing and coloured with the theme (lines in --muted, the building in --brand),
  * with strokes that keep their width at any size. Decorative.
  */
-export function EmptyArt({ width = 200, className }: { width?: number; className?: string }) {
+export function EmptyArt({ width = 200, className, kind }: {
+  width?: number;
+  className?: string;
+  kind?: "changes" | "revisions";
+}) {
+  if (kind) return <figure className={"empty-illustration" + (className ? " " + className : "")} data-kind={kind} style={{width}}>
+    <span className="empty-illustration-image" aria-hidden="true"/>
+    <figcaption>Ilustración generada con IA</figcaption>
+  </figure>;
   return <svg className={"empty-art" + (className ? " " + className : "")} viewBox="226 396 612 440" width={width} height={Math.round(width * 440 / 612)}
     aria-hidden="true" focusable="false" fill="none" strokeLinecap="round" strokeLinejoin="round">
     <g className="empty-art-desk">

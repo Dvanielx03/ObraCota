@@ -22,3 +22,8 @@ Lectura y subida (22 de noviembre de 2026), mismo tratamiento que entrada.webm (
 - edificio-pisos.webm (job a699a069-c406-425d-96bd-742aba8a8a5b): el edificio se arma por pisos. Sustituye a edificio-arma.webm.
 - plano-volumen.webm (job 6859e288-d998-42ab-bdac-1498162b7217): el plano sube a volumen. Sustituye a plano-a-volumen.webm.
 - *-poster.webp: primer cuadro; *-quieto.webp: cuadro de 3,0 s. Los archivos anteriores se conservan fuera de la aplicacion.
+
+Estados vacíos (lote Higgsfield 720, 22 de noviembre de 2026):
+- sin-cambios-*.webp: s1-sin-cambios.png, ilustración generada con IA en Higgsfield.
+- sin-revisiones-*.webp: s2-sin-revisiones.png, ilustración generada con IA en Higgsfield.
+Los derivados recortan el papel y separan las máscaras de tinta y acento. El tema da color a las dos capas.
