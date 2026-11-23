@@ -516,7 +516,18 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
         target.getCenter(heading).sub(hit.point).setY(0);
         if(heading.lengthSq()<.001)heading.set(0,0,-1);
       }
-      walk=walking(canvas,entry.world,hit.point,heading.normalize(),view=>renderer.render(scene,view),()=>environment.groundLevel());
+      // A click a few centimetres off a free spot (next to a column, a railing, a stud) still starts the walk:
+      // try the point, then rings around it up to 0.9 m on the same floor height.
+      const start=(point:T.Vector3)=>walking(canvas,entry!.world,point,heading.clone().normalize(),view=>renderer.render(scene,view),()=>environment.groundLevel());
+      let failure:unknown;
+      outer: for(const radius of [0,.2,.4,.6,.9]){
+        for(let k=0;k<(radius?8:1);k++){
+          const angle=k*Math.PI/4;
+          const point=hit.point.clone().add(new T.Vector3(Math.cos(angle)*radius,0,Math.sin(angle)*radius));
+          try{walk=start(point);failure=undefined;break outer;}catch(error){failure=error;}
+        }
+      }
+      if(failure)throw failure;
     }catch(error){
       notify(error instanceof Error?error.message:"No se pudo iniciar el recorrido.");
       return;
