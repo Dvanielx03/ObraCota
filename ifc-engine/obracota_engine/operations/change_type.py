@@ -1,7 +1,7 @@
 """ifc.change_type: door of equal measure (H1-ESPECIFICACION §5.5).
 
 Step 1 moves here, without changing its result, the door logic that engine.py had before H1: ``load``,
-``inspect`` and the export with checks of the deprecated /apply. tests/test_inspect_contract.py pins the
+``inspect`` and the export with checks of the pre-H1 /apply (retired in R4). tests/test_inspect_contract.py pins the
 result against the /inspect captured with the pre-H1 image. Step 3 builds check/apply/declare/verify
 on top of these functions.
 
@@ -9,12 +9,11 @@ Errors are ``EngineError`` with the code that §5.5 gives them; the pre-H1 route
 the exact status and message they had.
 
 Step 3 adds the recipe operation on top (``check``, ``apply``, ``declare``, ``verify`` and ``OPERATION``).
-Its checks are the ones of the deprecated /apply, in this order: the piece is an IfcDoor, the project has
+Its checks are the ones of the retired /apply, in this order: the piece is an IfcDoor, the project has
 exactly one length unit, the door has a type and a placement, and ``type_id`` is one of the options of
 ``inspect()`` and is compatible (equal measure within 1 mm, and it fits the opening).
 """
 import math
-from pathlib import Path
 
 import ifcopenshell
 import ifcopenshell.geom
@@ -147,36 +146,6 @@ def inspect(model, door):
             "options": sorted(options, key=lambda option: (not option["compatible"], option["name"], option["id"]))}
 
 
-def export_revision(project, version, element, type_id, workdir) -> Path:
-    """The deprecated /apply: change the door to a compatible type, write it to ``workdir`` and check it.
-
-    Returns the path of the written revision. The caller owns ``workdir`` and removes it.
-    """
-    model, door = load(project, version, element)
-    before = inspect(model, door)
-    chosen = next((item for item in before["options"] if item["id"] == type_id), None)
-    if not chosen or not chosen["compatible"]:
-        raise EngineError(422, "TYPE_NOT_COMPATIBLE" if chosen else "TYPE_NOT_AVAILABLE",
-                          "El motor solo aplica tipos compatibles con el hueco existente.")
-    if door.ObjectPlacement is None:
-        raise EngineError(422, "NO_PLACEMENT", "Falta la colocación de la puerta.")
-    placement = get_local_placement(door.ObjectPlacement)
-    assign_type(model, related_objects=[door], relating_type=model.by_guid(type_id))
-    scale = calculate_unit_scale(model)
-    door.OverallWidth, door.OverallHeight = chosen["width"]/scale, chosen["height"]/scale
-    path = Path(workdir) / "revision.ifc"
-    model.write(path)
-    reopened = ifcopenshell.open(path)
-    door = reopened.by_guid(element)
-    opening, host = opening_and_host(door)
-    if (get_type(door).GlobalId != type_id or (opening and opening.GlobalId) != before["opening"]
-            or (host and host.GlobalId) != before["host"] or not len(mesh(door))
-            or size(door, scale) != [chosen["width"], chosen["height"]]
-            or not np.allclose(placement, get_local_placement(door.ObjectPlacement))):
-        raise EngineError(422, "VERIFICATION_FAILED", "La revisión exportada no superó las comprobaciones de la pieza.")
-    return path
-
-
 # --- Recipe operation (§5.5) -------------------------------------------------------------------------
 
 def _length_units(model) -> int:
@@ -254,7 +223,7 @@ def declare(model_before, op) -> dict:
 
 
 def verify(base, revised, op, operations=()) -> list:
-    """The checks of the deprecated /apply on the reopened file: the requested type, the same opening and
+    """The checks of the retired /apply on the reopened file: the requested type, the same opening and
     host, a non-empty mesh, the exact measure and the same placement."""
     try:
         base_door, before, chosen = _chosen(base, op)

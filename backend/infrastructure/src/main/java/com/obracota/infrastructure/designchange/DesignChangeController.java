@@ -9,7 +9,7 @@ import com.obracota.application.modelchange.usecase.ModelChanges;
 import com.obracota.application.modelchange.usecase.PublishModelChange;
 import com.obracota.application.modelchange.usecase.VersionPrices;
 import com.obracota.application.modelversion.usecase.ProjectVersions;
-import com.obracota.domain.designchange.BimEditPort;
+import com.obracota.domain.designchange.DoorInspectionPort;
 import com.obracota.domain.modelchange.model.price.PriceKey;
 import com.obracota.domain.modelchange.model.price.UnitPrice;
 import com.obracota.domain.modelchange.model.recipe.GlobalId;
@@ -25,6 +25,8 @@ import java.util.*;
 
 /**
  * The door routes of before H1, kept as a facade over {@code model_change} (§3.4): same paths, bodies and answers.
+ * {@code POST /{id}/apply} was retired in R4: a door change is approved and published through
+ * {@code /model-changes/{id}/apply}, which publishes the verified preview.
  * Every method receives the {@link Actor} resolved by {@code ActorArgumentResolver} and hands it to the use case, which
  * owns the transactions; nothing here opens one, so the preview of {@code POST /} never holds a connection.
  */
@@ -51,14 +53,14 @@ public class DesignChangeController {
     public record Proposal(UUID version, String element, String typeId, String description, String picture) {}
     public record Change(UUID id, UUID version, String description, DoorReview review, UUID applied, UUID restored, boolean picture) {}
 
-    /** {@code HttpBimEdit} (behind {@code /door} and {@code /review}) still speaks {@link ResponseStatusException}. */
+    /** {@code HttpDoorInspection} (behind {@code /door} and {@code /review}) still speaks {@link ResponseStatusException}. */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String,String>> conflict(ResponseStatusException error) {
         return ResponseEntity.status(error.getStatusCode()).body(Map.of("message", Objects.requireNonNullElse(error.getReason(),"No se pudo completar el cambio.")));
     }
 
     @GetMapping("/door")
-    public BimEditPort.Door door(@PathVariable UUID project, Actor actor, @RequestParam UUID version, @RequestParam String element) throws IOException {
+    public DoorInspectionPort.Door door(@PathVariable UUID project, Actor actor, @RequestParam UUID version, @RequestParam String element) throws IOException {
         return changes.door(actor, project, version, element);
     }
 
@@ -107,11 +109,6 @@ public class DesignChangeController {
     @GetMapping("/{id}/picture")
     public ResponseEntity<byte[]> illustration(@PathVariable UUID project, @PathVariable UUID id, Actor actor) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.IMAGE_PNG).body(changes.picture(actor, project, id));
-    }
-
-    @PostMapping("/{id}/apply")
-    public Change apply(@PathVariable UUID project, @PathVariable UUID id, Actor actor) throws IOException {
-        return change(publish.apply(actor, project, id));
     }
 
     @PostMapping("/{id}/restore")

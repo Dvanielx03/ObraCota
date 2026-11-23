@@ -1,7 +1,7 @@
 package com.obracota.application.modelchange.rules;
 
 import com.obracota.application.rulefinding.DoorRules;
-import com.obracota.domain.designchange.BimEditPort;
+import com.obracota.domain.designchange.DoorInspectionPort;
 import com.obracota.domain.modelchange.model.recipe.ChangeType;
 import com.obracota.domain.modelchange.model.recipe.Recipe;
 import com.obracota.domain.modelchange.model.report.Finding;
@@ -32,14 +32,14 @@ public final class ChangeFindings {
         return report.withFindings(extra);
     }
 
-    /** {@link BimEditPort.Door} from the {@code /inspect} dictionary; empty when it is not one. */
-    static Optional<BimEditPort.Door> door(Map<String, Object> before) {
+    /** {@link DoorInspectionPort.Door} from the {@code /inspect} dictionary; empty when it is not one. */
+    static Optional<DoorInspectionPort.Door> door(Map<String, Object> before) {
         if (before == null || !(before.get("element") instanceof String element)) return Optional.empty();
-        var options = new ArrayList<BimEditPort.DoorType>();
+        var options = new ArrayList<DoorInspectionPort.DoorType>();
         if (before.get("options") instanceof List<?> list) {
             for (var item : list) {
                 if (!(item instanceof Map<?, ?> option) || !(option.get("id") instanceof String id)) continue;
-                options.add(new BimEditPort.DoorType(id, text(option.get("name")), decimal(option.get("width")),
+                options.add(new DoorInspectionPort.DoorType(id, text(option.get("name")), decimal(option.get("width")),
                     decimal(option.get("height")), Boolean.TRUE.equals(option.get("compatible"))));
             }
         }
@@ -48,7 +48,7 @@ public final class ChangeFindings {
             var values = size.stream().map(ChangeFindings::decimal).toList();
             if (values.stream().noneMatch(Objects::isNull)) openingSize = values;
         }
-        return Optional.of(new BimEditPort.Door(element, text(before.get("name")), text(before.get("typeId")),
+        return Optional.of(new DoorInspectionPort.Door(element, text(before.get("name")), text(before.get("typeId")),
             text(before.get("typeName")), decimal(before.get("width")), decimal(before.get("height")), text(before.get("opening")),
             openingSize, text(before.get("host")), before.get("loadBearing") instanceof Boolean bearing ? bearing : null,
             List.copyOf(options)));

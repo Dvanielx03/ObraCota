@@ -1,6 +1,6 @@
 package com.obracota.application.rulefinding;
 
-import com.obracota.domain.designchange.BimEditPort.*;
+import com.obracota.domain.designchange.DoorInspectionPort.*;
 import java.math.BigDecimal;
 import java.util.List;
 

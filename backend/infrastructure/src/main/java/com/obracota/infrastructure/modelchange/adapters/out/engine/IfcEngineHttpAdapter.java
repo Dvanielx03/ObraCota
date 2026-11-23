@@ -23,7 +23,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 /**
  * {@link ModelEnginePort} over the IFC engine's HTTP API (§5). Every answer outside the contract becomes an
  * {@link EngineContractException} (502), never «unavailable»: only a failed connection, a timeout or a 503 of the
- * engine are an {@link EngineUnavailableException}. That is the trap of {@code HttpBimEdit}, where a 500 without JSON
+ * engine are an {@link EngineUnavailableException}. That is the trap of {@code HttpDoorInspection}, where a 500 without JSON
  * became a 503 because {@code readTree} throws an {@link IOException} (§5.10).
  */
 @Component

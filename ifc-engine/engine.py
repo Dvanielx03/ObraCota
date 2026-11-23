@@ -1,9 +1,9 @@
 """HTTP routes of the IFC engine (H1-ESPECIFICACION §5.1). The logic lives in ``obracota_engine``.
 
-/health, /inspect and /apply keep exactly the contract they had before H1: Compose's healthcheck,
-the backend's HttpBimEdit and design-change.spec.ts depend on it, and tests/test_inspect_contract.py
-pins it. Their errors stay ``{"detail": ...}`` without ``code``. /apply is deprecated and is removed
-in step 12, once the backend publishes the verified preview instead.
+/health and /inspect keep exactly the contract they had before H1: Compose's healthcheck, the
+backend's HttpDoorInspection and design-change.spec.ts depend on it, and tests/test_inspect_contract.py
+pins it. Their errors stay ``{"detail": ...}`` without ``code``. The pre-H1 /apply was retired in R4:
+the backend publishes the verified artifact of /preview through /build instead.
 
 The H1 routes answer errors as ``{"detail": ..., "code": ...}`` (§5.2). The reading ones (/summary,
 /elements, /element) take every parameter as optional text and let ``reading`` validate it, so a missing
@@ -40,7 +40,7 @@ from obracota_engine.dwg import meshfile, solids as dwg_solids
 from obracota_engine.errors import EngineError
 # load and inspect stay importable from here: the step 0 capture of tests/fixtures/inspect-duplex.json
 # calls engine.inspect(*engine.load(...)) and can be repeated against any image.
-from obracota_engine.operations.change_type import export_revision, inspect, load
+from obracota_engine.operations.change_type import inspect, load
 
 
 @asynccontextmanager
@@ -196,17 +196,3 @@ def inspect_door(project: UUID, version: UUID, element: str):
         log.info("Incompatible IFC for inspection: %s", type(exc).__name__)
         raise HTTPException(422, "El IFC no contiene datos suficientes para revisar esta puerta.")
 
-
-@app.post("/apply")
-def apply(project: UUID, version: UUID, element: str, type_id: str):
-    tmp = tempfile.TemporaryDirectory()
-    try:
-        path = export_revision(project, version, element, type_id, Path(tmp.name))
-        return FileResponse(path, media_type="application/octet-stream", background=BackgroundTask(tmp.cleanup))
-    except EngineError as exc:
-        tmp.cleanup()
-        raise HTTPException(exc.status, exc.detail)
-    except Exception:
-        tmp.cleanup()
-        log.exception("IFC export failed")
-        raise HTTPException(422, "No se pudo exportar y comprobar la revisión IFC.")
