@@ -113,7 +113,7 @@ function Board({ examples, guides }: { examples: readonly Project[]; guides: Rea
           : <li className={"project-state" + (tab === "archived" ? " project-state-wide" : " project-state-art")}>
               {tab === "active" ? <EmptyArt width={176}/> : <FolderOpen size={48} strokeWidth={1.5} aria-hidden="true"/>}
               {tab === "active"
-                ? <><h3>Todavía no has creado proyectos.</h3><p>Pulsa «Nuevo proyecto» y sube tu primer IFC, DWG, FBX u OBJ.</p></>
+                ? <><h3>Todavía no has creado proyectos.</h3><p>Pulsa «Nuevo proyecto» y sube tu primer IFC, DWG, RVT, FBX u OBJ.</p></>
                 : <><h3>No hay proyectos archivados.</h3><p>Lo que archives se guarda aquí y se puede restaurar.</p></>}
             </li>}
       </ul>

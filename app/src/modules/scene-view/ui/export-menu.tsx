@@ -1,30 +1,38 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { ChevronDown, FileArchive, FileDown, FileText } from "lucide-react";
+import { ChevronDown, FileArchive, FileDown, FileText, PackageCheck } from "lucide-react";
 import { Spinner } from "@/shared/ui/loading";
 import { useDisabledReason } from "@/shared/ui/disabled-reason";
 import type { CameraPose } from "@/viewer/domain/viewer.port";
 import type { SceneView } from "../domain/scene-view";
 import { exportViews, exportViewsDocument } from "../application/export-views";
+import { exportReviewPackage } from "../application/review-package";
+import { versionRepository } from "@/modules/model-version/infrastructure/version-http";
+import { modelChangeRepository } from "@/modules/model-change/infrastructure/model-change-http";
 import { nextPaint, pictureBytes, pictureJpeg, saveFile } from "../infrastructure/export-files";
 import { screenRoom } from "../infrastructure/thumbnail-canvas";
 
 /** What an export is about, read when it starts. */
-export interface ExportContext { views: readonly SceneView[]; project?: string; file: string; version?: string }
+export interface ExportContext { views: readonly SceneView[]; project?: string; file: string; version?: string;
+  /** The stored version on the server, for «Paquete de revisión (ZIP)». */
+  stored?: { project: string; version: string } }
 
 type Notice = (text: string, tone?: "info" | "error") => void;
 
 /**
  * "Exportar" pill of the workspace header and its menu (V-12, F5-04, H7): a switch to keep only the
  * framing on screen, "Documento (PDF)", a cover with the list of views and one page per view, and
- * "Imágenes (ZIP)", a stored ZIP with one PNG per saved view and an index. Both are built in the browser. ARIA menu button: Enter, Space or ↓ open it on the
+ * "Imágenes (ZIP)", a stored ZIP with one PNG per saved view and an index, and "Paquete de revisión (ZIP)" (R6/P-09):
+ * the original of the version, its views and the design changes applied to it. All are built in the browser. ARIA menu button: Enter, Space or ↓ open it on the
  * first option and ↑ on the last; the arrows, Inicio and Fin move; Escape closes it and gives the
  * focus back to the pill; Tab or a click outside close it.
  */
-export function ExportMenu({ disabledReason, viewCount, context, camera, stage, onNotice }: {
+export function ExportMenu({ disabledReason, viewCount, context, camera, stage, onNotice, stored }: {
   /** Why nothing can be exported here (2D plan, file outside a project, walking…). */
   disabledReason?: string;
   viewCount: number;
+  /** Whether the open file is a stored version (enables «Paquete de revisión (ZIP)»). */
+  stored?: boolean;
   context: () => ExportContext | null;
   camera: { pose(): CameraPose | null; apply(pose: CameraPose): void; capture(): string | null };
   stage: () => HTMLElement | null;
@@ -40,6 +48,7 @@ export function ExportMenu({ disabledReason, viewCount, context, camera, stage, 
   useEffect(() => () => job.current?.abort(), []);
   const unavailable = disabledReason ?? (busy ? "Exportación en curso" : undefined);
   const zipReason = !onlyCurrent && !viewCount ? "Guarda una vista o activa «Solo la vista actual»" : undefined;
+  const packageReason = stored ? undefined : "Disponible en una versión guardada en un proyecto";
   const items = () => [...(menu.current?.querySelectorAll<HTMLElement>("[role^=menuitem]") ?? [])];
   const focusItem = useCallback((at: number) => {
     const list = [...(menu.current?.querySelectorAll<HTMLElement>("[role^=menuitem]") ?? [])];
@@ -80,9 +89,10 @@ export function ExportMenu({ disabledReason, viewCount, context, camera, stage, 
     if (event.key === "Tab") setOpen(false);
   }
 
-  async function run(kind: "zip" | "pdf") {
+  async function run(kind: "zip" | "pdf" | "package") {
     const subject = context();
-    if (zipReason || !subject || busy) return;
+    if ((kind !== "package" && zipReason) || !subject || busy) return;
+    if (kind === "package") { await runPackage(subject); return; }
     close(true);
     const controller = new AbortController();
     job.current = controller;
@@ -112,7 +122,41 @@ export function ExportMenu({ disabledReason, viewCount, context, camera, stage, 
     }
   }
 
-  const exportOff = useDisabledReason(busy ? undefined : unavailable), zipOff = useDisabledReason(zipReason);
+  async function runPackage(subject: ExportContext) {
+    const stored = subject.stored;
+    if (!stored) return;
+    close(true);
+    const controller = new AbortController();
+    job.current = controller;
+    const host = stage();
+    const room = host ? screenRoom(host) : undefined;
+    const views = onlyCurrent ? [] : subject.views;
+    setBusy({ done: 0, total: Math.max(1, views.length) });
+    try {
+      const result = await exportReviewPackage(views, { project: subject.project, version: stored.version }, {
+        pose: camera.pose, apply: camera.apply, settle: nextPaint,
+        picture: async () => {
+          const capture = camera.capture();
+          if (!capture) throw new Error("El visor no está disponible.");
+          return pictureBytes(capture, room);
+        },
+        version: () => versionRepository.get(stored.project, stored.version, controller.signal),
+        original: () => versionRepository.open(stored.project, stored.version, controller.signal),
+        changes: () => modelChangeRepository.list(stored.project, controller.signal),
+      }, (done, total) => setBusy({ done, total }), controller.signal);
+      if (controller.signal.aborted) return;
+      saveFile(result.name, result.bytes, "application/zip");
+      const pictures = result.count === 1 ? "1 vista" : result.count + " vistas";
+      const changes = result.changes === 1 ? "1 cambio aplicado" : result.changes ? result.changes + " cambios aplicados" : "sin cambios aplicados";
+      onNotice("Descargado " + result.name + " · original, " + pictures + ", " + changes + " y resumen.");
+    } catch (error) {
+      if (!controller.signal.aborted) onNotice("No se pudo exportar el paquete: " + (error instanceof Error ? error.message : "error desconocido") + ".", "error");
+    } finally {
+      if (job.current === controller) { job.current = null; setBusy(null); }
+    }
+  }
+
+  const exportOff = useDisabledReason(busy ? undefined : unavailable), zipOff = useDisabledReason(zipReason), packageOff = useDisabledReason(packageReason);
   const label = busy ? "Exportando " + Math.max(1, busy.done) + " de " + busy.total + "…" : "Exportar";
   return <div className="export-anchor" ref={anchor}>
     <button ref={button} type="button" className="header-pill header-export" aria-haspopup="menu" aria-expanded={open}
@@ -140,6 +184,12 @@ export function ExportMenu({ disabledReason, viewCount, context, camera, stage, 
         onClick={() => void run("zip")}>
         <FileArchive size={16} strokeWidth={1.8} aria-hidden="true"/>Imágenes (ZIP)</button>
       {zipOff.note}
+      <hr className="export-separator"/>
+      <button type="button" role="menuitem" tabIndex={-1} className="export-item" aria-disabled={packageReason ? true : undefined} aria-describedby={packageOff.describedBy}
+        title={packageReason ?? "Un ZIP con el original de la versión, sus vistas en PNG y los cambios de diseño aplicados (receta, informe y costo)"}
+        onClick={() => { if (!packageReason) void run("package"); }}>
+        <PackageCheck size={16} strokeWidth={1.8} aria-hidden="true"/>Paquete de revisión (ZIP)</button>
+      {packageOff.note}
     </div>}
   </div>;
 }

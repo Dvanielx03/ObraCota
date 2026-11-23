@@ -21,7 +21,7 @@ export interface ExportResult { name: string; bytes: Uint8Array; count: number }
  * Applies each saved view (or keeps the framing on screen) and takes its picture with `take`, then gives the camera
  * back the framing it had. `progress(done, total)` is called before each picture, starting at 1.
  */
-async function shoot<T>(
+export async function shoot<T>(
   views: readonly (CameraPose & { name: string })[],
   onlyCurrent: boolean,
   ports: Omit<ExportPorts, "picture">,
