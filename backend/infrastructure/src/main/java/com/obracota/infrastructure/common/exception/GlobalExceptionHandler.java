@@ -2,11 +2,13 @@ package com.obracota.infrastructure.common.exception;
 
 import com.obracota.application.common.exception.*;
 import com.obracota.domain.modelchange.model.ChangeStateException;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
@@ -34,7 +36,10 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(EngineContractException.USER_MESSAGE);
     }
     @ExceptionHandler(EngineUnavailableException.class) @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    ErrorResponse unavailable(EngineUnavailableException error) { return new ErrorResponse(error.getMessage(), error.code()); }
+    ErrorResponse unavailable(EngineUnavailableException error, HttpServletResponse response) {
+        if ("ENGINE_BUSY".equals(error.code())) response.setHeader(HttpHeaders.RETRY_AFTER, "5");
+        return new ErrorResponse(error.getMessage(), error.code());
+    }
     @ExceptionHandler(DataIntegrityViolationException.class) @ResponseStatus(HttpStatus.CONFLICT)
     ErrorResponse conflict() { return new ErrorResponse("El registro entra en conflicto con uno existente."); }
 }

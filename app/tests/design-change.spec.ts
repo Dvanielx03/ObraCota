@@ -8,7 +8,7 @@ import {backendReady} from "./support/backend";
 const door="1hOSvn6df7F8_7GcBWlS8Z",alternate="2klOFZffH6WQFlV10uM1wF";
 
 test("Revisión real de puerta, avisos, precio, aplicación y restauración",async({page},info)=>{
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const ifc=process.env.DUPLEX_IFC;
   test.skip(!ifc,"Indica el IFC Duplex original con DUPLEX_IFC.");
   await backendReady(page.request);

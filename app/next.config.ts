@@ -4,7 +4,7 @@ const config: NextConfig = {
   // A second build next to a running server (a test battery against another backend) goes to its own folder, e.g.
   // NEXT_DIST_DIR=.next/bateria; `next start` needs the same variable.
   distDir: process.env.NEXT_DIST_DIR || ".next",
-  // The /api rewrite cuts at 30 s by default; a verified IFC preview may take longer (engine 150 s < backend 180 s < proxy 240 s).
+  // A verified IFC preview can queue for 60 s and run for 150 s. Keep time for the backend to store the result.
   experimental: {proxyTimeout: 240_000},
   async rewrites() {
     const upstream = process.env.API_INTERNAL_URL || "http://127.0.0.1:8080";

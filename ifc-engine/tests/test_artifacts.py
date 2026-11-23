@@ -5,10 +5,13 @@
   (``Rebuilt: true``) with the full verification.
 - When the engine starts, ``ENGINE_ARTIFACTS`` is emptied.
 - With the slot held longer than ``ENGINE_BUSY_WAIT_S``, /preview, a rebuilding /build and /diff answer
-  503 ``ENGINE_BUSY``. A deadline exceeded is 503 ``DEADLINE_EXCEEDED``, leaves no temporary directory and
+  503 ``ENGINE_BUSY``. Full previews can wait longer in a bounded FIFO queue. A deadline exceeded is 503 ``DEADLINE_EXCEEDED``, leaves no temporary directory and
   releases the slot.
 """
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+from time import monotonic, sleep
 
 import pytest
 from fastapi.testclient import TestClient
@@ -34,6 +37,7 @@ def client():
 def slot_taken(monkeypatch):
     """The geometry slot held by someone else, and a wait of 0 s for it."""
     monkeypatch.setattr(settings, "ENGINE_BUSY_WAIT_S", 0)
+    monkeypatch.setattr(settings, "ENGINE_PREVIEW_WAIT_S", 0)
     assert build._slot.acquire(timeout=1)
     yield
     build._slot.release()
@@ -164,6 +168,45 @@ def test_busy_slot(client, originals, synthetic, slot_taken, no_temporaries):
     checks = client.post("/preview", json={**ref.params(), "checks_only": True,
                                            "recipe": {"format": "obracota.recipe/1", "operations": []}})
     assert checks.status_code == 200  # checks_only does not take the slot (R3)
+
+
+def test_full_previews_queue_in_order_and_reject_an_excess_request(client, originals, synthetic, monkeypatch):
+    ref = originals.add_model(synthetic.file)
+    queue = build.GeometryQueue(max_waiters=1)
+    monkeypatch.setattr(build, "_slot", queue)
+    monkeypatch.setattr(settings, "ENGINE_PREVIEW_WAIT_S", 5)
+    entered, proceed = Event(), Event()
+    calls = []
+    verify = build.build_and_verify
+
+    def tracked(ref, recipe, directory, deadline):
+        calls.append(recipe.operations[0].id)
+        if len(calls) == 1:
+            entered.set()
+            assert proceed.wait(10)
+        return verify(ref, recipe, directory, deadline)
+
+    def send(op_id):
+        operations = [{**door_change(synthetic)[0], "id": op_id}]
+        return client.post("/preview", json={**ref.params(), "recipe": {"format": "obracota.recipe/1", "operations": operations}})
+
+    monkeypatch.setattr(build, "build_and_verify", tracked)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(send, "op-1")
+        try:
+            assert entered.wait(5)
+            second = pool.submit(send, "op-2")
+            until = monotonic() + 3
+            while not queue.waiters and monotonic() < until:
+                sleep(.005)
+            assert len(queue.waiters) == 1
+            overflow = send("op-3")
+            assert (overflow.status_code, overflow.json()["code"]) == (503, "ENGINE_BUSY")
+            assert calls == ["op-1"]
+        finally:
+            proceed.set()
+        assert all(response.status_code == 200 and response.json()["ok"] for response in (first.result(), second.result()))
+    assert calls == ["op-1", "op-2"]
 
 
 def test_deadline_exceeded(client, originals, synthetic, artifact_store, monkeypatch, no_temporaries):

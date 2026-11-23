@@ -47,7 +47,7 @@ public class ModelChangeConfiguration {
 
     @Bean ModelChanges modelChanges(ProjectVersions versions, ModelChangeRepository changes, PriceBook prices, PreviewStorage previews,
                                     ModelEnginePort engine, DoorInspectionPort doors, RecipeCodec recipes, Transactions tx, Clock clock,
-                                    @Value("${ifc.engine.request-budget:PT200S}") Duration budget) {
+                                    @Value("${ifc.engine.request-budget:PT225S}") Duration budget) {
         return new ModelChanges(versions, changes, prices, previews, engine, doors, recipes, tx, clock, budget);
     }
 

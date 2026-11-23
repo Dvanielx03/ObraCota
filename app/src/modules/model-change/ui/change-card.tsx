@@ -13,7 +13,7 @@ import {ChangeAffected,ChangeDiff,ChangeFindings,ChangeRecipe,ChangeValidation,p
 
 type Work="preview"|"submit"|"discard"|"apply"|"restore";
 const working:Record<Work,{button:string;status:string}>={
-  preview:{button:"Previsualizando…",status:"Comprobando la vista previa…"},
+  preview:{button:"Preparando vista previa…",status:"Vista previa en cola o en verificación…"},
   submit:{button:"Enviando…",status:"Enviando el cambio a aprobación…"},
   discard:{button:"Descartando…",status:"Descartando el cambio…"},
   apply:{button:"Aplicando…",status:"Comprobando y guardando la revisión IFC…"},

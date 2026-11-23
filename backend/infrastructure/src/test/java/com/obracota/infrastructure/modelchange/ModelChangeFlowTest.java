@@ -419,7 +419,8 @@ class ModelChangeFlowTest {
         site.action(id, "preview").andExpect(status().isServiceUnavailable())
             .andExpect(jsonPath("$.message").value("El motor IFC no está disponible.")).andExpect(jsonPath("$.code").doesNotExist());
         engine.failure = new EngineUnavailableException("ENGINE_BUSY", "El motor IFC está ocupado; vuelve a intentarlo.");
-        site.action(id, "preview").andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("ENGINE_BUSY"));
+        site.action(id, "preview").andExpect(status().isServiceUnavailable())
+            .andExpect(header().string("Retry-After", "5")).andExpect(jsonPath("$.code").value("ENGINE_BUSY"));
         engine.failure = new UnprocessableApplicationException("MODEL_TOO_LARGE", "El modelo supera el tamaño que H1 puede verificar (190 MB).");
         site.action(id, "preview").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("MODEL_TOO_LARGE"))
             .andExpect(jsonPath("$.message").value("El modelo supera el tamaño que H1 puede verificar (190 MB)."));

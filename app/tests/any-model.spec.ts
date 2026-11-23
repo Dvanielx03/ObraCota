@@ -1,9 +1,10 @@
 import {expect,test,type Page} from "@playwright/test";
-import {existsSync,mkdirSync,readFileSync,statSync} from "node:fs";
-import {basename,resolve} from "node:path";
+import {existsSync,readFileSync,statSync} from "node:fs";
+import {basename} from "node:path";
 import {MODEL_ONLY} from "./support/visor";
 import {createProject,openFirstVersion,renderButton,renderPanel} from "./support/opciones-visuales";
 import {editBar,editButton} from "./support/editar-prisma";
+import {png} from "./support/png";
 
 /**
  * Lo implementado funciona en cualquier modelo 3D de los motores disponibles (IFC con web-ifc, DWG 3D con sus sólidos
@@ -15,15 +16,14 @@ import {editBar,editButton} from "./support/editar-prisma";
  *   1. Renderizar › Ver en el modelo 3D: Piedra · Claro · Tarde cambia piezas exteriores (> 0) y el lienzo; Restablecer
  *      lo deja como estaba.
  *   2. Editar › Escena › Presentación al cliente › «Recorrer esta escena en 3D»: la escena rodea el modelo, el recorrido
- *      empieza sobre el suelo de la escena, se camina y «Panorama 360° con IA» (una llamada real) abre y se cierra.
- *   3. Con la escena y un acabado, una captura por modelo en docs/capturas/cualquier-modelo/.
+ *      empieza sobre el suelo de la escena, se camina y el visor de panorama abre una imagen de prueba sin usar cuota.
+ *   3. Con la escena y un acabado, una captura por modelo en los resultados de la prueba.
  *   4. Editar: una marca sobre una pieza. En un IFC, «Proponer cambio al modelo» con el agente de prueba (fake) deja un
  *      cambio READY que se aprueba (versión 2) y «Guardar en el modelo» crea el cambio de material; fuera del IFC, los
  *      dos botones explican por qué no aplican.
  * Las tareas largas del hilo principal (PerformanceObserver «longtask») se miden por fase y se adjuntan al informe.
  */
 const MODELS=(["MODEL_A","MODEL_B","MODEL_C"] as const).map(key=>({key,file:process.env[key]??""}));
-const SHOTS=resolve(__dirname,"../../docs/capturas/cualquier-modelo");
 const hidden={style:MODEL_ONLY+".scene-walk,.edit-dock,.edit-popover,.tool-popover,.marks-layer,.edit-layer{visibility:hidden!important}"};
 
 /** Fracción de píxeles que difieren entre dos capturas PNG del mismo tamaño (1 si el tamaño cambia). */
@@ -163,6 +163,8 @@ for(const model of MODELS)test(`Cualquier modelo · ${model.key} · ${basename(m
     timings.longTasks=await page.evaluate(from=>((window as unknown as {__long:{start:number;duration:number}[]}).__long??[]).filter(t=>t.start>=from && t.duration>1000).map(t=>Math.round(t.duration)).join(","),from);
     log(model.key,"2d caminado");
     const bar=page.getByRole("group",{name:"Escena en 3D"});
+    await page.route("**/api/projects/*/versions/*/options/panorama",route=>
+      route.fulfill({contentType:"image/png",body:png(64,32,[173,148,107])}));
     start=Date.now();
     await bar.getByRole("button",{name:"Panorama 360° con IA"}).click();
     log(model.key,"panorama");
@@ -184,8 +186,7 @@ for(const model of MODELS)test(`Cualquier modelo · ${model.key} · ${basename(m
     await panel.getByRole("radio",{name:"Madera"}).click();
     await expect(panel.getByRole("status").filter({hasText:/piezas? exteriores?/})).toBeVisible({timeout:60_000});
     await page.waitForTimeout(2500);
-    mkdirSync(SHOTS,{recursive:true});
-    await page.screenshot({path:resolve(SHOTS,model.key.toLowerCase()+"-"+basename(model.file).replace(/\.[^.]+$/,"").replace(/[^\w-]+/g,"_")+".png"),
+    await page.screenshot({path:info.outputPath(model.key.toLowerCase()+"-"+basename(model.file).replace(/\.[^.]+$/,"").replace(/[^\w-]+/g,"_")+".png"),
       style:".tool-popover,.workspace-toast{visibility:hidden!important}"});
     await panel.getByRole("button",{name:"Restablecer materiales"}).click();
     await renderButton(page).click();
@@ -224,14 +225,15 @@ for(const model of MODELS)test(`Cualquier modelo · ${model.key} · ${basename(m
     });
     await expect(propose).not.toHaveAttribute("aria-disabled","true");
     start=Date.now();
-    const answered=page.waitForResponse(response=>response.url().endsWith("/agent-runs/stream") && response.request().method()==="POST",{timeout:20*60_000});
     await propose.click();
-    const outcome=(await (await answered).text()).match(/event: result\ndata: (.+)/)?.[1];
-    expect(outcome).toBeTruthy();
-    const run=JSON.parse(outcome!);
+    const run=page.getByRole("region",{name:"Propuesta del agente"});
+    await expect(run).toHaveAttribute("data-status","READY",{timeout:240_000});
+    const openChange=run.getByRole("link",{name:"Abrir la tarjeta del cambio"});
+    const changeHref=await openChange.getAttribute("href");
+    expect(changeHref).toMatch(/\/cambios#[0-9a-f-]+$/i);
+    const agentChange=changeHref!.split("#")[1];
     timings.agentMs=Date.now()-start;
-    timings.agent=run.status+" · "+piece!.type;
-    expect(run.status,run.message).toBe("READY");
+    timings.agent="READY · "+piece!.type;
 
     log(model.key,"5 guardar");
     // «Guardar en el modelo» with the same finish: a READY material change (≤ 500 exterior pieces).
@@ -262,8 +264,8 @@ for(const model of MODELS)test(`Cualquier modelo · ${model.key} · ${basename(m
 
     log(model.key,"6 aprobar");
     // The agent's change is approved by the owner: version 2.
-    await page.goto("/proyectos/"+project.id+"/cambios#"+run.change);
-    const changeCard=page.locator(`article[id="${run.change}"]`);
+    await page.goto(changeHref!);
+    const changeCard=page.locator(`article[id="${agentChange}"]`);
     await expect(changeCard.getByText("Lista para aprobar",{exact:true})).toBeVisible({timeout:120_000});
     start=Date.now();
     await changeCard.getByRole("button",{name:"Aprobar y aplicar cambio"}).click();

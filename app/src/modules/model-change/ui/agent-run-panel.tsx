@@ -25,7 +25,7 @@ export function AgentRunPanel({ value, onClose }: { value: AgentRunState; onClos
       {value.state !== "running" && <button type="button" className="agent-run-close" aria-label="Cerrar la propuesta del agente" onClick={onClose}>
         <X size={16} strokeWidth={2} aria-hidden="true" /></button>}
     </header>
-    {value.state === "running" && <p className="agent-run-note">Lee {value.notes === 1 ? "la pieza marcada" : "las piezas marcadas"}, prepara un borrador y verifica su vista previa. Puede tardar un par de minutos.</p>}
+    {value.state === "running" && <p className="agent-run-note">Lee {value.notes === 1 ? "la pieza marcada" : "las piezas marcadas"}, prepara un borrador y solicita su vista previa. Si el motor está ocupado, la verificación espera en cola.</p>}
     {value.state === "error" && <p className="agent-run-note" role="alert">{value.message}</p>}
     {value.state === "done" && value.run.provider === "fake" && <p className="agent-run-provider">Agente de prueba: sin IA y sin costo.</p>}
     {steps.length > 0 &&

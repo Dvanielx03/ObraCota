@@ -47,7 +47,7 @@ class IfcEngineHttpAdapter implements ModelEnginePort {
     /** {@code token} goes as {@code Authorization: Bearer} on every request; blank sends none (engine without token). */
     @Autowired
     IfcEngineHttpAdapter(@Value("${IFC_ENGINE_URL:http://localhost:8000}") String engine,
-                         @Value("${ifc.engine.preview-timeout:PT180S}") Duration previewTimeout,
+                         @Value("${ifc.engine.preview-timeout:PT220S}") Duration previewTimeout,
                          @Value("${ifc.engine.read-timeout:PT60S}") Duration readTimeout,
                          JacksonRecipeCodec recipes,
                          @Value("${ENGINE_TOKEN:}") String token) {

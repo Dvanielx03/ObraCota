@@ -17,9 +17,9 @@ traceback in the log (``errors.library``). An exception of ``apply`` is the reje
 other exception is a fault of the engine, not of the file: it stays a 500, which the backend reads as a
 contract error (502).
 
-**Concurrency and time** (§5.9). ``geometry_slot`` is the global ``Semaphore(1)`` of the work that generates
-geometry: a full /preview, a /build that rebuilds and /diff. A request waits at most ``ENGINE_BUSY_WAIT_S``
-for it, then answers 503 ``ENGINE_BUSY``. ``Deadline`` is checked between phases: past
+**Concurrency and time** (§5.9). ``geometry_slot`` admits geometry work one at a time in arrival order,
+with a bounded queue. Full previews have their own queue wait, separate from the processing deadline.
+At capacity or on wait expiry the engine returns 503 ``ENGINE_BUSY``. ``Deadline`` is checked between phases: past
 ``ENGINE_PREVIEW_DEADLINE_S`` the work stops with 503 ``DEADLINE_EXCEEDED`` and the slot is released. A
 phase in progress (an IfcDiff pass) cannot be interrupted from Python, so the size limit is the main defence.
 
@@ -34,6 +34,7 @@ import importlib.metadata
 import logging
 import threading
 import time
+from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -65,7 +66,40 @@ WRITE_FAILED = "IfcOpenShell no pudo escribir la revisión de este IFC."
 REOPEN_FAILED = "IfcOpenShell no pudo volver a abrir la revisión escrita."
 VALIDATE_FAILED = "IfcOpenShell no pudo validar el esquema de la revisión."
 
-_slot = threading.Semaphore(1)
+class GeometryQueue:
+    """One active job. A waiting request cannot open a model or overtake another waiter."""
+
+    def __init__(self, max_waiters: int):
+        self.max_waiters = max_waiters
+        self.condition = threading.Condition()
+        self.waiters = deque()
+        self.active = False
+
+    def acquire(self, timeout: float) -> bool:
+        with self.condition:
+            if not self.active and not self.waiters:
+                self.active = True
+                return True
+            if len(self.waiters) >= self.max_waiters:
+                return False
+            ticket = object()
+            self.waiters.append(ticket)
+            try:
+                if not self.condition.wait_for(lambda: not self.active and self.waiters[0] is ticket, timeout):
+                    return False
+                self.active = True
+                return True
+            finally:
+                self.waiters.remove(ticket)
+                self.condition.notify_all()
+
+    def release(self) -> None:
+        with self.condition:
+            self.active = False
+            self.condition.notify_all()
+
+
+_slot = GeometryQueue(settings.ENGINE_GEOMETRY_QUEUE_LIMIT)
 
 
 def _clock() -> float:

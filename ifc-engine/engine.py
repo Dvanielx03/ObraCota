@@ -35,7 +35,7 @@ from fastapi import Body, FastAPI, Header, HTTPException
 from starlette.background import BackgroundTask
 from starlette.responses import FileResponse, Response
 
-from obracota_engine import artifacts, auth, build, errors, operations, reading, recipe, scope, store
+from obracota_engine import artifacts, auth, build, errors, operations, reading, recipe, scope, settings, store
 from obracota_engine.dwg import meshfile, solids as dwg_solids
 from obracota_engine.errors import EngineError
 # load and inspect stay importable from here: the step 0 capture of tests/fixtures/inspect-duplex.json
@@ -120,7 +120,7 @@ def preview(payload: Any = Body(None)):
     if request.checks_only:
         with store.models.reading(ref.project, ref.version, ref.sha256) as model, reading._model_errors():
             return operations.run_checks(model, request.recipe)
-    with tempfile.TemporaryDirectory() as workdir, build.geometry_slot():
+    with build.geometry_slot(settings.ENGINE_PREVIEW_WAIT_S), tempfile.TemporaryDirectory() as workdir:
         built = build.build_and_verify(ref, request.recipe, Path(workdir), build.Deadline())
         report = built.report
         if built.ok:

@@ -51,6 +51,9 @@ ENGINE_PREVIEW_DEADLINE_S = _positive_int("ENGINE_PREVIEW_DEADLINE_S", 150)
 
 # How long a request waits for the geometry semaphore before answering 503 ENGINE_BUSY.
 ENGINE_BUSY_WAIT_S = _positive_int("ENGINE_BUSY_WAIT_S", 20)
+# A single active geometry job protects the container's memory. Waiting previews occupy neither geometry nor IFC leases.
+ENGINE_GEOMETRY_QUEUE_LIMIT = _positive_int("ENGINE_GEOMETRY_QUEUE_LIMIT", 2)
+ENGINE_PREVIEW_WAIT_S = _positive_int("ENGINE_PREVIEW_WAIT_S", 60)
 
 # --- Solids of 3D DWG (ACIS), /dwg/solids (ACIS-LECTOR.md §5) ---------------------------------------------
 # Node and the @mlightcad/libredwg-web package that obracota_engine/dwg/extract.mjs runs (Dockerfile).
