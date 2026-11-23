@@ -32,12 +32,10 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/projects/{project}/agent-runs")
 public class AgentRunController {
     private final RunDesignAgent agent;
-    private final AiBudget budget;
     private final ObjectMapper json;
 
-    public AgentRunController(RunDesignAgent agent, AiBudget budget, ObjectMapper json) {
+    public AgentRunController(RunDesignAgent agent, ObjectMapper json) {
         this.agent = agent;
-        this.budget = budget;
         this.json = json;
     }
 
@@ -45,18 +43,14 @@ public class AgentRunController {
     public record RunBody(UUID version, List<NoteBody> notes) {}
     public record StepView(int step, int seq, String tool, String status, String errorCode, String detail) {}
     public record RunView(UUID id, String status, String provider, String model, UUID change, String message, List<StepView> steps) {}
-    public record Availability(boolean available, String provider, int reserveCents, int remainingCents, int maxSteps) {}
 
     @ModelAttribute
     void noStore(HttpServletResponse response) { response.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue()); }
 
     /** Whether the agent can run and what one run reserves (0 with the test agent, which costs nothing). */
     @GetMapping
-    public Availability availability(@PathVariable UUID project, Actor actor) {
-        if (!actor.person()) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        boolean paid = !"fake".equals(agent.provider());
-        return new Availability(agent.available(), agent.provider(), paid ? RunDesignAgent.RESERVE_CENTS : 0, budget.remaining(),
-            RunDesignAgent.MAX_STEPS);
+    public RunDesignAgent.Availability availability(@PathVariable UUID project, Actor actor) {
+        return agent.availability(actor, project);
     }
 
     @PostMapping

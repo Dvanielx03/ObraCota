@@ -16,11 +16,14 @@ import com.obracota.application.modelversion.usecase.ProjectVersions;
 import com.obracota.domain.agent.port.service.AgentModelPort;
 import com.obracota.domain.modelchange.port.ModelEnginePort;
 import com.obracota.domain.security.model.Actor;
+import com.obracota.infrastructure.agent.adapters.in.rest.AgentRunController;
 import com.obracota.infrastructure.agent.adapters.out.ai.GeminiAgentModelAdapter;
 import com.obracota.infrastructure.agent.adapters.out.ai.ScriptedAgentModelAdapter;
 import com.obracota.infrastructure.agent.adapters.out.ai.ScriptedAgentModelAdapter.ScriptedTurn;
 import com.obracota.infrastructure.modelchange.ModelChangeStubs;
 import com.sun.net.httpserver.HttpServer;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +37,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -170,6 +174,39 @@ class DesignAgentRunTest {
         mvc.perform(post(path).contentType("application/json").accept("text/event-stream").content(body)
             .header("Authorization", register())).andExpect(status().isNotFound());
         assertEquals(1, site.changes());
+    }
+
+    @Test void availabilityAndJournalArePrivateToTheProjectOwner() throws Exception {
+        var site = new Site();
+        var path = "/api/projects/" + site.project + "/agent-runs";
+        var run = site.run(ScriptedAgentModelAdapter.defaultScript(), "Cambiar FireRating a EI 60");
+        var otherSession = register();
+
+        site.perform(get(path)).andExpect(status().isOk());
+        site.perform(get(path + "/" + run.run())).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(4));
+        mvc.perform(get(path).header("Authorization", otherSession)).andExpect(status().isNotFound());
+        mvc.perform(get(path + "/" + run.run()).header("Authorization", otherSession)).andExpect(status().isNotFound());
+    }
+
+    @Test void disconnectAfterDraftStopsBeforeThePreviewAndKeepsTheDiary() throws Exception {
+        var site = new Site();
+        var model = ScriptedAgentModelAdapter.defaultScript();
+        var agent = new RunDesignAgent(projects, tools, model, journal, aiRuns, budget, tx, "test-model");
+        var controller = new AgentRunController(agent, json);
+        var response = mock(HttpServletResponse.class);
+        when(response.getOutputStream()).thenReturn(mock(ServletOutputStream.class));
+        doNothing().doThrow(new IOException("Disconnected")).when(response).flushBuffer();
+        var notes = List.of(new AgentRunController.NoteBody(DOOR, "Puerta P80", "Cambiar FireRating a EI 60"));
+        var project = UUID.fromString(site.project);
+
+        controller.stream(project, Actor.person(site.owner), new AgentRunController.RunBody(UUID.fromString(site.version), notes), response);
+
+        assertEquals(2, model.calls());
+        assertEquals(List.of("get_element", "draft_set_property"), db.queryForList(
+            "select tool from agent_tool_call where project_id=? order by step,seq", String.class, project));
+        assertEquals("DRAFT", db.queryForObject("select status from model_change where project_id=?", String.class, project));
+        assertEquals(1, site.revisions());
+        assertEquals(remaining, budget.remaining());
     }
 
     @Test void listsObservedWindowTypesWithoutClaimingCompatibility() throws Exception {

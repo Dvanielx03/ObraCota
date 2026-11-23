@@ -59,6 +59,7 @@ public final class RunDesignAgent {
     public record Step(int step, int seq, String tool, AgentToolJournal.Status status, String errorCode, String detail) {}
 
     public record Result(UUID run, Status status, String provider, String model, UUID change, String message, List<Step> steps) {}
+    public record Availability(boolean available, String provider, int reserveCents, int remainingCents, int maxSteps) {}
 
     private final ProjectFileCatalog projects;
     private final DesignAgentTools tools;
@@ -95,7 +96,11 @@ public final class RunDesignAgent {
         this.modelId = modelId;
     }
 
-    public String provider() { return model.provider(); }
+    public Availability availability(Actor person, UUID project) {
+        requirePerson(person);
+        projects.requireOwner(project, person.user());
+        return new Availability(model.configured(), model.provider(), model.paid() ? RESERVE_CENTS : 0, budget.remaining(), MAX_STEPS);
+    }
 
     /** Refuses, before any budget or AI call, a version the IFC engine cannot change: not IFC, or above its limit. */
     private void requireWorkable(UUID project, UUID version) {
@@ -110,8 +115,6 @@ public final class RunDesignAgent {
                 "El modelo pesa " + Math.round(found.byteSize() / 1048576.0) + " MB: el motor verifica cambios en el IFC hasta "
                     + (maxBytes / 1048576) + " MiB. Divide el modelo o exporta solo la parte que cambia.");
     }
-
-    public boolean available() { return model.configured(); }
 
     /** The tool calls of a past run, in order. */
     public List<Step> steps(Actor person, UUID project, UUID run) {
