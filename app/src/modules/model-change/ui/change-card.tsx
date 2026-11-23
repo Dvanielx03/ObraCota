@@ -76,7 +76,7 @@ export function ChangeCard({change,onChange,locked,onWork}:{change:ModelChange;o
   const proposalReady=change.preview.available && change.reportCurrent && !!change.report?.ok;
   return <article id={change.id} className="change-card">
     <ChangeHeader change={change}/>
-    {change.agentRun && <AgentSteps project={change.project} run={change.agentRun}/>}
+    {change.agentRun && <AgentSteps project={change.project} run={change.agentRun} change={change.id}/>}
     <ChangeRecipe change={change} labels={labels}/>
     {change.report && !change.reportCurrent && <p className="change-note">La receta cambió después de esta vista previa. Previsualízala de nuevo para enviarla.</p>}
     {change.report && change.reportCurrent && !change.preview.available && (change.status==="DRAFT"||change.status==="READY") && change.report.ok &&

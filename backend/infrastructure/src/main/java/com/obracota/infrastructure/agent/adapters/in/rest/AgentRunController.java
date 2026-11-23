@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
@@ -105,6 +106,17 @@ public class AgentRunController {
 
     private static StepView view(RunDesignAgent.Step step) {
         return new StepView(step.step(), step.seq(), step.tool(), step.status().name(), step.errorCode(), step.detail());
+    }
+
+    public record RunHistoryView(UUID id, UUID version, String provider, String model, String status,
+                                 String message, UUID change, Instant startedAt, Instant finishedAt) {}
+
+    @GetMapping("/history")
+    public List<RunHistoryView> history(@PathVariable UUID project, Actor actor,
+                                       @RequestParam(required=false) UUID version, @RequestParam(required=false) UUID change) {
+        return agent.history(actor, project, version, change).stream().map(run ->
+            new RunHistoryView(run.id(), run.version(), run.provider(), run.model(), run.status().name(), run.message(),
+                run.change(), run.startedAt(), run.finishedAt())).toList();
     }
 
     @GetMapping("/{run}")

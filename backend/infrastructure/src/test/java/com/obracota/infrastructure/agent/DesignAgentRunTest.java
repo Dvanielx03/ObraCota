@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.obracota.application.agent.RunDesignAgent;
 import com.obracota.application.agent.RunDesignAgent.Note;
+import com.obracota.application.agent.port.AgentRunHistory;
 import com.obracota.application.agent.port.AgentToolJournal;
 import com.obracota.application.agenttools.DesignAgentTools;
 import com.obracota.application.airun.port.AiRunJournal;
@@ -70,6 +71,7 @@ class DesignAgentRunTest {
     @Autowired ModelChanges changes;
     @Autowired ProjectVersions projectVersions;
     @Autowired AgentToolJournal journal;
+    @Autowired AgentRunHistory history;
     @Autowired AiRunJournal aiRuns;
     @Autowired AiBudget budget;
     @Autowired com.obracota.domain.modelversion.port.VersionRepository versionRepository;
@@ -104,7 +106,7 @@ class DesignAgentRunTest {
         }
 
         RunDesignAgent.Result run(AgentModelPort model, String note) {
-            var agent = new RunDesignAgent(projects, tools, model, journal, aiRuns, budget, tx, "gemini-3.1-flash-lite");
+            var agent = new RunDesignAgent(projects, tools, model, journal, history, aiRuns, budget, tx, "gemini-3.1-flash-lite");
             return agent.run(Actor.person(owner), UUID.fromString(project), UUID.fromString(version),
                 List.of(new Note(DOOR, "Puerta P80", note)));
         }
@@ -146,6 +148,14 @@ class DesignAgentRunTest {
         assertEquals(4, db.queryForObject("select count(*) from agent_tool_call where run_id=?", Integer.class, UUID.fromString(run.get("id").asText())));
         var journaled = read(site.perform(get("/api/projects/" + site.project + "/agent-runs/" + run.get("id").asText())).andExpect(status().isOk()));
         assertEquals(4, journaled.size());
+        var saved = read(site.perform(get("/api/projects/" + site.project + "/agent-runs/history")
+            .queryParam("version", site.version).queryParam("change", run.get("change").asText())).andExpect(status().isOk()));
+        assertEquals(1, saved.size());
+        for (var field : List.of("id", "status", "provider", "model", "message", "change"))
+            assertEquals(run.get(field), saved.get(0).get(field), field);
+        assertEquals(site.version, saved.get(0).get("version").asText());
+        assertTrue(saved.get(0).hasNonNull("startedAt"));
+        assertTrue(saved.get(0).hasNonNull("finishedAt"));
         assertEquals(0, db.queryForObject("select count(*) from ai_run where batch_id=?", Integer.class, UUID.fromString(run.get("id").asText())),
             "the fake provider writes no paid run");
     }
@@ -186,16 +196,24 @@ class DesignAgentRunTest {
         site.perform(get(path + "/" + run.run())).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(4));
         mvc.perform(get(path).header("Authorization", otherSession)).andExpect(status().isNotFound());
         mvc.perform(get(path + "/" + run.run()).header("Authorization", otherSession)).andExpect(status().isNotFound());
+        mvc.perform(get(path + "/history").header("Authorization", otherSession)).andExpect(status().isNotFound());
+        site.perform(get(path + "/history").queryParam("version", UUID.randomUUID().toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test void disconnectAfterDraftStopsBeforeThePreviewAndKeepsTheDiary() throws Exception {
         var site = new Site();
         var model = ScriptedAgentModelAdapter.defaultScript();
-        var agent = new RunDesignAgent(projects, tools, model, journal, aiRuns, budget, tx, "test-model");
+        var agent = new RunDesignAgent(projects, tools, model, journal, history, aiRuns, budget, tx, "test-model");
         var controller = new AgentRunController(agent, json);
         var response = mock(HttpServletResponse.class);
         when(response.getOutputStream()).thenReturn(mock(ServletOutputStream.class));
-        doNothing().doThrow(new IOException("Disconnected")).when(response).flushBuffer();
+        doAnswer(call -> {
+            var active = history.list(UUID.fromString(site.project), site.owner, null, null).getFirst();
+            assertEquals(AgentRunHistory.Status.RUNNING, active.status());
+            assertNull(active.finishedAt());
+            return null;
+        }).doThrow(new IOException("Disconnected")).when(response).flushBuffer();
         var notes = List.of(new AgentRunController.NoteBody(DOOR, "Puerta P80", "Cambiar FireRating a EI 60"));
         var project = UUID.fromString(site.project);
 
@@ -205,6 +223,10 @@ class DesignAgentRunTest {
         assertEquals(List.of("get_element", "draft_set_property"), db.queryForList(
             "select tool from agent_tool_call where project_id=? order by step,seq", String.class, project));
         assertEquals("DRAFT", db.queryForObject("select status from model_change where project_id=?", String.class, project));
+        var ended = history.list(project, site.owner, null, null).getFirst();
+        assertEquals(AgentRunHistory.Status.INTERRUPTED, ended.status());
+        assertNotNull(ended.finishedAt());
+        assertNotNull(ended.change());
         assertEquals(1, site.revisions());
         assertEquals(remaining, budget.remaining());
     }
@@ -247,7 +269,7 @@ class DesignAgentRunTest {
         try {
             var reservedBefore = 800 - budget.remaining();
             var result = site.run(gemini(server), "Cambiar FireRating a EI 60");
-            assertEquals(RunDesignAgent.Status.READY, result.status(), result.message());
+            assertEquals(AgentRunHistory.Status.READY, result.status(), result.message());
             assertEquals(4, hits.get());
             assertEquals(RunDesignAgent.RESERVE_CENTS, 800 - budget.remaining() - reservedBefore, "one reservation per run");
             assertEquals("c2ln", seen.get(1).at("/contents/1/parts/0/thoughtSignature").asText(), "the signature came back");
@@ -269,10 +291,10 @@ class DesignAgentRunTest {
         var model = new ScriptedAgentModelAdapter(List.of(
             ScriptedTurn.call("apply_change", Map.of("change", "x")),
             ScriptedTurn.say("No puedo publicar.")));
-        var agent = new RunDesignAgent(projects, tools, model, journal, aiRuns, budget, tx, "gemini-3.1-flash-lite");
+        var agent = new RunDesignAgent(projects, tools, model, journal, history, aiRuns, budget, tx, "gemini-3.1-flash-lite");
         var result = agent.run(Actor.person(site.owner), UUID.fromString(site.project), UUID.fromString(site.version),
             List.of(new Note(DOOR, injected, "Cambiar FireRating a EI 60")));
-        assertEquals(RunDesignAgent.Status.NO_CHANGE, result.status());
+        assertEquals(AgentRunHistory.Status.NO_CHANGE, result.status());
         assertEquals("apply_change", result.steps().getFirst().tool());
         assertEquals(AgentToolJournal.Status.REJECTED, result.steps().getFirst().status());
         assertEquals("TOOL_NOT_DECLARED", result.steps().getFirst().errorCode());
@@ -293,7 +315,7 @@ class DesignAgentRunTest {
         var version = UUID.fromString(site.version);
         var notes = List.of(new Note(DOOR, "Puerta", "Cambiar FireRating a EI 60"));
         java.util.function.Function<com.obracota.domain.modelversion.model.ModelVersion, RunDesignAgent> agentFor = stored ->
-            new RunDesignAgent(projects, tools, model, journal, aiRuns, budget, tx, "gemini-3.1-flash-lite",
+            new RunDesignAgent(projects, tools, model, journal, history, aiRuns, budget, tx, "gemini-3.1-flash-lite",
                 (p, v) -> Optional.of(stored), 33_554_432L);
         var real = versionRepository.find(project, version).orElseThrow();
         var large = new com.obracota.domain.modelversion.model.ModelVersion(real.id(), real.fileId(), real.revision(), real.name(),
@@ -327,7 +349,7 @@ class DesignAgentRunTest {
         for (int i = 0; i < RunDesignAgent.MAX_STEPS + 3; i++) script.add(ScriptedTurn.call("get_element", Map.of("globalId", DOOR)));
         var model = new ScriptedAgentModelAdapter(script);
         var result = site.run(model, "Cambiar FireRating a EI 60");
-        assertEquals(RunDesignAgent.Status.STOPPED_LIMIT, result.status());
+        assertEquals(AgentRunHistory.Status.STOPPED_LIMIT, result.status());
         assertEquals(RunDesignAgent.MAX_STEPS, model.calls());
         assertEquals(RunDesignAgent.MAX_STEPS, result.steps().size());
     }
@@ -342,7 +364,7 @@ class DesignAgentRunTest {
         });
         try {
             var result = site.run(gemini(server), "Cambiar FireRating a EI 60");
-            assertEquals(RunDesignAgent.Status.FAILED, result.status());
+            assertEquals(AgentRunHistory.Status.FAILED, result.status());
             assertTrue(result.message().contains("429"), result.message());
             assertEquals(1, hits.get(), "the paid call is never repeated");
             assertEquals("HTTP_429", db.queryForObject("select error_code from ai_run where batch_id=?", String.class, result.run()));

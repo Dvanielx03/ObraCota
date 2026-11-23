@@ -1,5 +1,7 @@
 package com.obracota.application.agent;
 
+import com.obracota.application.agent.port.AgentRunHistory;
+import com.obracota.application.agent.port.AgentRunHistory.Status;
 import com.obracota.application.agent.port.AgentToolJournal;
 import com.obracota.application.agenttools.DesignAgentTools;
 import com.obracota.application.airun.port.AiRunJournal;
@@ -50,8 +52,6 @@ public final class RunDesignAgent {
         explain why in one short Spanish sentence.
         - Write summaries and explanations in Spanish.""";
 
-    public enum Status { READY, NO_CHANGE, DISCARDED, STOPPED_LIMIT, FAILED }
-
     /** A note of Editar: on a marked piece ({@code globalId} and its name) or on a zone (both {@code null}). */
     public record Note(String globalId, String name, String text) {}
 
@@ -65,6 +65,7 @@ public final class RunDesignAgent {
     private final DesignAgentTools tools;
     private final AgentModelPort model;
     private final AgentToolJournal journal;
+    private final AgentRunHistory runHistory;
     private final AiRunJournal aiRuns;
     private final AiBudget budget;
     private final Transactions tx;
@@ -77,12 +78,12 @@ public final class RunDesignAgent {
     @FunctionalInterface public interface VersionLookup { Optional<ModelVersion> find(UUID project, UUID version); }
 
     public RunDesignAgent(ProjectFileCatalog projects, DesignAgentTools tools, AgentModelPort model, AgentToolJournal journal,
-                          AiRunJournal aiRuns, AiBudget budget, Transactions tx, String modelId) {
-        this(projects, tools, model, journal, aiRuns, budget, tx, modelId, null, Long.MAX_VALUE);
+                          AgentRunHistory runHistory, AiRunJournal aiRuns, AiBudget budget, Transactions tx, String modelId) {
+        this(projects, tools, model, journal, runHistory, aiRuns, budget, tx, modelId, null, Long.MAX_VALUE);
     }
 
     public RunDesignAgent(ProjectFileCatalog projects, DesignAgentTools tools, AgentModelPort model, AgentToolJournal journal,
-                          AiRunJournal aiRuns, AiBudget budget, Transactions tx, String modelId,
+                          AgentRunHistory runHistory, AiRunJournal aiRuns, AiBudget budget, Transactions tx, String modelId,
                           VersionLookup versions, long maxBytes) {
         this.versions = versions;
         this.maxBytes = maxBytes;
@@ -90,6 +91,7 @@ public final class RunDesignAgent {
         this.tools = tools;
         this.model = model;
         this.journal = journal;
+        this.runHistory = runHistory;
         this.aiRuns = aiRuns;
         this.budget = budget;
         this.tx = tx;
@@ -116,6 +118,12 @@ public final class RunDesignAgent {
                     + (maxBytes / 1048576) + " MiB. Divide el modelo o exporta solo la parte que cambia.");
     }
 
+    public List<AgentRunHistory.Run> history(Actor person, UUID project, UUID version, UUID change) {
+        requirePerson(person);
+        projects.requireOwner(project, person.user());
+        return runHistory.list(project, person.user(), version, change);
+    }
+
     /** The tool calls of a past run, in order. */
     public List<Step> steps(Actor person, UUID project, UUID run) {
         requirePerson(person);
@@ -140,13 +148,29 @@ public final class RunDesignAgent {
             throw new UnprocessableApplicationException("AGENT_UNAVAILABLE", "Para proponer cambios falta configurar el modelo de IA en el servidor.");
         requireWorkable(project, version);
         var run = UUID.randomUUID();
-        if (model.paid()) tx.required(() -> {
-            budget.reserve(RESERVE_CENTS);
+        tx.required(() -> {
+            if (model.paid()) budget.reserve(RESERVE_CENTS);
+            runHistory.start(run, project, version, person.user(), model.provider(), modelId);
             return null;
         });
         var agent = Actor.agent(person.user(), project, run);
         var marked = written.stream().map(Note::globalId).filter(Objects::nonNull).distinct().toList();
         var session = new DesignAgentTools.Session(agent, project, version, marked, description(written));
+        Result result;
+        try {
+            result = execute(person, run, written, session, progress);
+        } catch (UncheckedIOException disconnected) {
+            runHistory.finish(run, Status.INTERRUPTED, "Se cerró la conexión durante la propuesta.", session.change());
+            throw disconnected;
+        } catch (RuntimeException error) {
+            runHistory.finish(run, Status.FAILED, "El agente no pudo terminar la propuesta.", session.change());
+            throw error;
+        }
+        runHistory.finish(run, result.status(), result.message(), result.change());
+        return result;
+    }
+
+    private Result execute(Actor person, UUID run, List<Note> written, DesignAgentTools.Session session, Consumer<Step> progress) {
         var history = new ArrayList<Message>();
         history.add(Message.user(List.of(new Text(prompt(written)))));
         var steps = new ArrayList<Step>();

@@ -18,6 +18,18 @@ export interface AgentRun {
   steps: AgentStep[];
 }
 
+export interface AgentRunSummary extends Pick<AgentRun, "id" | "provider" | "model" | "message" | "change"> {
+  version: string;
+  status: AgentRunStatus | "RUNNING" | "INTERRUPTED" | "LEGACY";
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export const RUN_HISTORY_LABELS: Record<AgentRunSummary["status"], string> = {
+  READY: "Listo para revisión", NO_CHANGE: "Sin cambio", DISCARDED: "Descartado", STOPPED_LIMIT: "Límite de pasos",
+  FAILED: "Falló", RUNNING: "En curso", INTERRUPTED: "Interrumpido", LEGACY: "Ejecución anterior",
+};
+
 export interface AgentAvailability { available: boolean; provider: string; reserveCents: number; remainingCents: number; maxSteps: number }
 
 /** A note of Editar as the agent receives it: on a piece (its IFC GlobalId and name) or on a zone (no GlobalId). */

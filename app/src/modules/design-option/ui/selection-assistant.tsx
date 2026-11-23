@@ -6,6 +6,7 @@ import {ExternalEdit} from "./external-edit";
 import {DoorProposal} from "@/modules/design-change/ui/door-proposal";
 import type {MaskStep} from "./prisma-tour";
 import {SelectedDocuments} from "@/modules/chat-conversation/ui/document-assistant";
+import {AgentHistory} from "@/modules/model-change/ui/agent-history";
 import styles from "./selection-assistant.module.css";
 
 export function SelectionAssistant({elements,ids,grouping,onGroup,onPick,onRemove,color,onColor,viewer,scope,fold,onGuide,onFrame,onExport,onMaskGuide,onMaskPrepared,onMaskImported,onMaskSaved,working=false}:{
@@ -33,6 +34,7 @@ export function SelectionAssistant({elements,ids,grouping,onGroup,onPick,onRemov
     <div className={styles.scroll} data-working={working}>
       <section className={styles.intro}><p>Las piezas que marcas con Seleccionar aparecen aquí. También puedes buscarlas, probar un color o preparar una edición externa.</p>
         <button data-prisma-tour="help" onClick={onGuide}>Guía de Editar</button></section>
+      {scope && <AgentHistory key={scope.version} {...scope}/>}
       <div className={styles.row}><h3>Piezas ({ids.length})</h3><button data-prisma-tour="group" aria-pressed={grouping} onClick={onGroup} title="Agrupar: los resultados de la búsqueda se suman a la selección">Agrupar</button></div>
       <label>Buscar pieza<input data-prisma-tour="search" aria-label="Buscar pieza para la propuesta" placeholder="Nombre, clase o ID" value={query} onChange={e=>setQuery(e.target.value)}/></label>
       {term && <div className={styles.results}>{matches.length?matches.map(i=><button key={i.id} data-prisma-tour={ids.includes(i.id)?"selected-result":"result"} onClick={()=>{onPick(i.id);setQuery("");}}>{i.name} · {i.id}</button>):<small>Sin coincidencias.</small>}</div>}

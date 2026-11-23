@@ -1,5 +1,5 @@
 import { authenticated, authenticatedResponse } from "@/core/http/http-client";
-import type { AgentAvailability, AgentNote, AgentRun, AgentStep } from "../domain/agent-run";
+import type { AgentAvailability, AgentNote, AgentRun, AgentRunSummary, AgentStep } from "../domain/agent-run";
 
 const runs = (project: string) => "projects/" + encodeURIComponent(project) + "/agent-runs";
 
@@ -43,3 +43,6 @@ export async function runDesignAgent(project: string, version: string, notes: Ag
 /** The steps of a past run, read from the agent's journal (agent_tool_call): the trail behind a change it proposed. */
 export const agentRunSteps = (project: string, run: string, signal?: AbortSignal) =>
   authenticated<AgentStep[]>(runs(project) + "/" + encodeURIComponent(run), { signal });
+
+export const agentRunHistory = (project: string, filter: { version: string } | { change: string }, signal?: AbortSignal) =>
+  authenticated<AgentRunSummary[]>(runs(project) + "/history?" + new URLSearchParams(filter), { signal });

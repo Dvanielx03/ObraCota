@@ -2,6 +2,7 @@ package com.obracota.infrastructure.agent.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.obracota.application.agent.RunDesignAgent;
+import com.obracota.application.agent.port.AgentRunHistory;
 import com.obracota.application.agent.port.AgentToolJournal;
 import com.obracota.application.agenttools.DesignAgentTools;
 import com.obracota.application.airun.port.AiRunJournal;
@@ -14,6 +15,7 @@ import com.obracota.domain.agent.port.service.AgentModelPort;
 import com.obracota.infrastructure.agent.adapters.out.ai.GeminiAgentModelAdapter;
 import com.obracota.infrastructure.agent.adapters.out.ai.ScriptedAgentModelAdapter;
 import com.obracota.infrastructure.agent.adapters.out.persistence.JdbcAgentToolJournal;
+import com.obracota.infrastructure.agent.adapters.out.persistence.JdbcAgentRunHistory;
 import com.obracota.infrastructure.aimodel.ModelCatalog;
 import java.net.URI;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,13 +44,14 @@ public class AgentConfiguration {
     @Bean DesignAgentTools designAgentTools(ModelChanges changes, ModelReading reading) { return new DesignAgentTools(changes, reading); }
 
     @Bean JdbcAgentToolJournal agentToolJournal(JdbcTemplate db, ObjectMapper json) { return new JdbcAgentToolJournal(db, json); }
+    @Bean JdbcAgentRunHistory agentRunHistory(JdbcTemplate db) { return new JdbcAgentRunHistory(db); }
 
     @Bean RunDesignAgent runDesignAgent(ProjectFileCatalog projects, DesignAgentTools tools, AgentModelPort model, AgentToolJournal journal,
-                                        AiRunJournal aiRuns, AiBudget budget, Transactions tx, ModelCatalog models,
+                                        AgentRunHistory history, AiRunJournal aiRuns, AiBudget budget, Transactions tx, ModelCatalog models,
                                         @Value("${agent.model:}") String modelId,
                                         com.obracota.domain.modelversion.port.VersionRepository versions,
                                         @Value("${agent.max-model-bytes:33554432}") long maxBytes) {
-        return new RunDesignAgent(projects, tools, model, journal, aiRuns, budget, tx,
+        return new RunDesignAgent(projects, tools, model, journal, history, aiRuns, budget, tx,
             modelId.isBlank() ? models.forCapability("CHAT").id() : modelId, versions::find, maxBytes);
     }
 }

@@ -27,3 +27,12 @@
 .change-agent-steps{margin:0 0 12px;padding:8px 12px;border:1px solid var(--line);border-radius:8px}
 .change-agent-steps>summary{cursor:pointer;font:var(--type-label, var(--type-body));color:var(--ink)}
 .change-agent-steps>ol,.change-agent-steps>p{margin-top:8px}
+.agent-history>summary{cursor:pointer;font:var(--type-label,var(--type-body));color:var(--ink)}
+.agent-history-list{display:grid;gap:8px;margin:8px 0;padding:0;list-style:none}
+.agent-history .agent-history-list>li{display:grid;gap:4px;padding-block:8px;border-bottom:1px solid var(--border-soft);overflow-wrap:anywhere}
+.agent-history-list>li>p,.agent-history-list>li>a{margin:0;font:var(--type-body)}
+.agent-history-list>li>a{width:fit-content;white-space:nowrap}
+.agent-history-meta{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;font:var(--type-hint);color:var(--muted)}
+.agent-history-meta>strong{color:var(--ink)}
+.agent-history-meta>time{white-space:nowrap}
+.change-agent-steps>.agent-history-meta{margin-block:8px}

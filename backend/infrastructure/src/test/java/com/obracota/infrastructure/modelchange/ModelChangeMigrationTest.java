@@ -109,14 +109,28 @@ class ModelChangeMigrationTest {
         assertEquals("Cotización de prueba", prices.getFirst().source());
         assertEquals(TYPE, prices.getFirst().key().typeId().orElseThrow());
 
-        // R4 (V18): the legacy door tables go away; the migrated history and prices stay readable.
+        UUID historicalRun = UUID.randomUUID(), historicalChange = UUID.randomUUID();
+        db.update("""
+            insert into model_change(id,project_id,file_id,base_version,format,status,origin,author_id,agent_run_id,
+                description,recipe,created_at,updated_at)
+            select ?,project_id,file_id,base_version,format,'DRAFT','AGENT',author_id,?,description,recipe,created_at,updated_at
+            from model_change where id=?
+            """, historicalChange, historicalRun, pending);
+
+        // V18 retires the door tables. V20 records the older link without inferring its outcome.
         flyway(data, "latest", locations).migrate();
         assertFalse(table(db, "door_change"));
         assertFalse(table(db, "door_unit_price"));
         assertTrue(table(db, "door_project_minimum"));
-        assertEquals(3, changes.list(project, Set.of(), null, 100).size());
+        assertEquals(4, changes.list(project, Set.of(), null, 100).size());
         assertEquals("{\"door\":{}}", changes.find(project, pending).orElseThrow().legacyReview());
         assertEquals(1, new PriceBookAdapter(db).prices(project, base).size());
+        var history = new com.obracota.infrastructure.agent.adapters.out.persistence.JdbcAgentRunHistory(db);
+        var run = history.list(project, user, base, historicalChange).getFirst();
+        assertEquals(historicalRun, run.id());
+        assertEquals("LEGACY", run.status().name());
+        assertEquals("unknown", run.provider());
+        assertNull(run.finishedAt());
     }
 
     private static boolean table(JdbcTemplate db, String name) {
