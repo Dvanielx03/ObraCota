@@ -16,6 +16,11 @@ ai:
   budget:
     # One monthly cap for every paid AI call (visual options and document assistant).
     monthly-limit-cents: ${AI_MONTHLY_LIMIT_CENTS:800}
+agent:
+  # Design agent (H4): "fake" (scripted, no network, no cost) until "gemini" is chosen on purpose.
+  provider: ${AGENT_PROVIDER:fake}
+  # Empty: the catalog's CHAT model (ai_model). A model id here must exist in ai_model (ai_run references it).
+  model: ${AGENT_MODEL:}
 management:
   endpoints.web.exposure.include: health
   endpoint.health.show-details: never
@@ -24,3 +29,6 @@ security:
   secure-cookie: ${COOKIE_SECURE:true}
   access-ttl: PT10M
   refresh-ttl: P7D
+  google:
+    # OAuth client id (Web) for «Continuar con Google»; empty turns it off (the button hides, POST /api/auth/google is 503).
+    client-id: ${GOOGLE_CLIENT_ID:}

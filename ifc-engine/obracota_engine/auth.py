@@ -6,8 +6,8 @@ With ``ENGINE_TOKEN`` set, every route except ``/health`` (Compose's healthcheck
 ``{"detail", "code"}`` body. Without the variable the engine stays open, as the tests and a bare
 ``docker run`` expect; compose.yaml makes the variable mandatory.
 
-It is plain ASGI middleware, not ``BaseHTTPMiddleware``, so the streamed ``FileResponse`` of /build and
-/apply passes through untouched.
+It is plain ASGI middleware, not ``BaseHTTPMiddleware``, so the streamed ``FileResponse`` of /build
+passes through untouched.
 """
 import hmac
 

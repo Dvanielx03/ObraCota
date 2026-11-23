@@ -64,17 +64,28 @@ services:
       IMAGE_PROVIDER: ${IMAGE_PROVIDER:-gemini}
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      # RVT to IFC with Autodesk Platform Services Model Derivative; empty id or secret turns the conversion off.
+      # APS_BUCKET is optional (default: "obracota-" + a hash of the client id).
+      APS_CLIENT_ID: ${APS_CLIENT_ID:-}
+      APS_CLIENT_SECRET: ${APS_CLIENT_SECRET:-}
+      APS_BUCKET: ${APS_BUCKET:-}
       IFC_ENGINE_URL: http://ifc-engine:8000
       ENGINE_TOKEN: ${ENGINE_TOKEN:?Configura ENGINE_TOKEN en .env}
       # The heap follows mem_limit instead of the 25 % default of the JVM.
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
       AI_MONTHLY_LIMIT_CENTS: ${AI_MONTHLY_LIMIT_CENTS:-800}
+      # Design agent (H4): "fake" runs a scripted agent without AI; "gemini" calls Gemini (needs GEMINI_API_KEY).
+      AGENT_PROVIDER: ${AGENT_PROVIDER:-fake}
+      AGENT_MODEL: ${AGENT_MODEL:-}
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-obracota}
       POSTGRES_USER: ${POSTGRES_USER:-obracota}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
       JWT_SECRET: ${JWT_SECRET:?Configura JWT_SECRET en .env}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      # «Continuar con Google» (Google Identity Services, sin costo): el client id OAuth de tipo «Aplicación web».
+      # Vacío lo apaga: el botón no aparece. La app lo lee de GET /api/auth/google/config, sin reconstruir.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     networks:
