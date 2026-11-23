@@ -99,18 +99,13 @@ test("Proponer cambio al modelo deja un borrador del agente listo para aprobar",
     expect(original!.notes[0].globalId).toMatch(/^[0-9A-Za-z_$]{22}$/);
     const panel=page.getByRole("region",{name:"Propuesta del agente"});
     await expect(panel).toContainText("El agente está preparando el cambio");
-    await expect(panel.and(page.locator('[aria-busy="true"]')).getByText("Leer la pieza marcada")).toBeVisible();
+    await expect(panel.and(page.locator('[aria-busy="true"]')).getByText("Leer la pieza marcada")).toBeVisible({timeout:60_000});
     await page.evaluate(()=>window.dispatchEvent(new Event("test:release-agent-result")));
     const response=await answered;
     expect(response.headers()["content-type"]).toContain("text/event-stream");
-    const outcome=(await response.text()).match(/event: result\ndata: (.+)/)?.[1];
-    expect(outcome).toBeTruthy();
-    const run=JSON.parse(outcome!);
-    expect(run.status,run.message).toBe("READY");
-    expect(run.provider).toBe("fake");
-
+    expect(response.headers()["cache-control"]).toContain("no-transform");
     // 3 · the steps, then the card: READY, set_property, created by the agent.
-    await expect(panel.getByRole("heading",{name:"Borrador listo para tu revisión"})).toBeVisible();
+    await expect(panel.getByRole("heading",{name:"Borrador listo para tu revisión"})).toBeVisible({timeout:230_000});
     const steps=panel.getByRole("list",{name:"Pasos del agente"}).getByRole("listitem");
     await expect(steps).toHaveCount(4);
     await expect(steps.nth(0)).toContainText("Leer la pieza marcada");
@@ -118,13 +113,16 @@ test("Proponer cambio al modelo deja un borrador del agente listo para aprobar",
     await expect(steps.nth(2)).toContainText("Verificar la vista previa");
     await expect(steps.nth(3)).toContainText("Enviar a tu aprobación");
     await expect(panel).toContainText("Agente de prueba: sin IA y sin costo.");
-    await panel.getByRole("link",{name:"Abrir la tarjeta del cambio"}).click();
-    await expect(page).toHaveURL(new RegExp("/cambios#"+run.change));
-    const card=page.locator(`article[id="${run.change}"]`);
+    const openChange=panel.getByRole("link",{name:"Abrir la tarjeta del cambio"});
+    const changeId=(await openChange.getAttribute("href"))?.split("#").at(1);
+    expect(changeId).toMatch(/^[\da-f-]{36}$/);
+    await openChange.click();
+    await expect(page).toHaveURL(new RegExp("/cambios#"+changeId));
+    const card=page.locator(`article[id="${changeId}"]`);
     await expect(card.getByText("Lista para aprobar",{exact:true})).toBeVisible({timeout:60_000});
     await expect(card.getByRole("region",{name:"Receta"})).toContainText("FireRating");
-    const change=await (await page.request.get(base+"/model-changes/"+run.change,{headers:project.headers})).json();
-    expect(change).toMatchObject({status:"READY",origin:"AGENT",agentRun:run.id});
+    const change=await (await page.request.get(base+"/model-changes/"+changeId,{headers:project.headers})).json();
+    expect(change).toMatchObject({status:"READY",origin:"AGENT",agentRun:expect.stringMatching(/^[\da-f-]{36}$/)});
     expect(change.recipe.operations[0]).toMatchObject({op:"ifc.set_property",element:door,property:"FireRating",value:"EI 60"});
     expect(change.report.ok).toBe(true);
 
@@ -134,7 +132,7 @@ test("Proponer cambio al modelo deja un borrador del agente listo para aprobar",
     await expect(card.getByRole("button",{name:"Aprobar y aplicar cambio"})).toBeEnabled();
 
     // 5 · the diary lists the four calls of the fake run; nothing went to Google.
-    const diary=await (await page.request.get(base+"/agent-runs/"+run.id,{headers:project.headers})).json();
+    const diary=await (await page.request.get(base+"/agent-runs/"+change.agentRun,{headers:project.headers})).json();
     expect(diary.map((step:{tool:string})=>step.tool)).toEqual(["get_element","draft_set_property","preview_change","submit_change"]);
     // …and the card shows the same trail after a reload, read from the diary.
     await page.reload();

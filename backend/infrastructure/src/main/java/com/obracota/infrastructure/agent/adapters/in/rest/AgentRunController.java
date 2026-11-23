@@ -64,6 +64,7 @@ public class AgentRunController {
 
     @PostMapping(value="/stream", produces=MediaType.TEXT_EVENT_STREAM_VALUE)
     public void stream(@PathVariable UUID project, Actor actor, @RequestBody RunBody body, HttpServletResponse response) throws IOException {
+        response.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().noTransform().getHeaderValue());
         response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE + ";charset=UTF-8");
         response.setHeader("X-Accel-Buffering", "no");
         try {
