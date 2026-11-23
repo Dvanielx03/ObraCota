@@ -65,6 +65,32 @@ test("Proponer cambio al modelo deja un borrador del agente listo para aprobar",
     });
     const sent=page.waitForRequest(request=>request.url().endsWith("/agent-runs/stream") && request.method()==="POST");
     const answered=page.waitForResponse(response=>response.url().endsWith("/agent-runs/stream") && response.request().method()==="POST",{timeout:240_000});
+    // Hold only the terminal SSE frame in the browser. The real API and IFC engine still produce every frame.
+    // This makes the progress assertion deterministic even when a cached preview finishes in one paint.
+    await page.evaluate(()=>{
+      const fetchRequest=window.fetch;
+      window.fetch=async (...args: Parameters<typeof fetch>)=>{
+        const response=await fetchRequest.apply(window,args);
+        if(!response.url.endsWith("/agent-runs/stream") || !response.body)return response;
+        const hold=new Promise<void>(resolve=>window.addEventListener("test:release-agent-result",()=>resolve(),{once:true}));
+        const decoder=new TextDecoder(), encoder=new TextEncoder();
+        let pending="";
+        const events=response.body.pipeThrough(new TransformStream<Uint8Array,Uint8Array>({
+          async transform(chunk,controller){
+            pending+=decoder.decode(chunk,{stream:true});
+            let end=pending.indexOf("\n\n");
+            while(end!==-1){
+              const event=pending.slice(0,end+2);
+              pending=pending.slice(end+2);
+              if(event.startsWith("event: result"))await hold;
+              controller.enqueue(encoder.encode(event));
+              end=pending.indexOf("\n\n");
+            }
+          },
+        }));
+        return new Response(events,{headers:response.headers,status:response.status});
+      };
+    });
     await propose.click();
     await sent;
     expect(original!.version).toBe(v1);
@@ -74,6 +100,7 @@ test("Proponer cambio al modelo deja un borrador del agente listo para aprobar",
     const panel=page.getByRole("region",{name:"Propuesta del agente"});
     await expect(panel).toContainText("El agente está preparando el cambio");
     await expect(panel.and(page.locator('[aria-busy="true"]')).getByText("Leer la pieza marcada")).toBeVisible();
+    await page.evaluate(()=>window.dispatchEvent(new Event("test:release-agent-result")));
     const response=await answered;
     expect(response.headers()["content-type"]).toContain("text/event-stream");
     const outcome=(await response.text()).match(/event: result\ndata: (.+)/)?.[1];
