@@ -88,6 +88,7 @@ export function sceneEnvironment(host: EnvironmentHost) {
   let group: T.Group | null = null;
   let current: SceneEnvironment | null = null;
   let groundMesh: T.Mesh | null = null;
+  let rainTimer: number | undefined;
   const owned: { dispose(): void }[] = [];
   let saved: {
     hemi: [T.Color, T.Color, number]; sun: [T.Color, number, T.Vector3]; clear: [T.Color, number];
@@ -122,6 +123,8 @@ export function sceneEnvironment(host: EnvironmentHost) {
   }
 
   function restore() {
+    window.clearInterval(rainTimer);
+    rainTimer = undefined;
     if (group) { scene.remove(group); group = null; }
     groundMesh = null;
     owned.splice(0).forEach((item) => item.dispose());
@@ -242,7 +245,7 @@ export function sceneEnvironment(host: EnvironmentHost) {
     const matrix = new T.Matrix4(), quaternion = new T.Quaternion(), scale = new T.Vector3(), position = new T.Vector3(), color = new T.Color();
     function instanced(geometry: T.BufferGeometry, items: { x: number; y: number; z: number; sx: number; sy: number; sz: number; turn?: number; color: number }[], flat = true) {
       if (!items.length) return;
-      const mesh = new T.InstancedMesh(keep(geometry), keep(new T.MeshStandardMaterial({ roughness: .9, metalness: 0, flatShading: flat })), items.length);
+      const mesh = keep(new T.InstancedMesh(keep(geometry), keep(new T.MeshStandardMaterial({ roughness: .9, metalness: 0, flatShading: flat })), items.length));
       items.forEach((item, i) => {
         quaternion.setFromAxisAngle(new T.Vector3(0, 1, 0), item.turn ?? 0);
         matrix.compose(position.set(item.x, item.y, item.z), quaternion, scale.set(item.sx, item.sy, item.sz));
@@ -308,9 +311,34 @@ export function sceneEnvironment(host: EnvironmentHost) {
     instanced(keep(new T.ConeGeometry(1, 1, 9)), peaks);
     instanced(keep(new T.DodecahedronGeometry(.5, 0)), rocks);
 
-    // Rain streaks and snow flakes: one static draw call each, in a cylinder around the model.
+    // Figures are separate from the model and the walking collision mesh.
+    if (environment.people && groundMesh) {
+      const heads: Parameters<typeof instanced>[1] = [], bodies: typeof heads = [], limbs: typeof heads = [];
+      const { count, silhouette } = environment.people;
+      // Position the first figures beside the footprint, where the default camera can show their scale.
+      const nearby = [new T.Vector2(box.max.x + unit, center.z), new T.Vector2(center.x, box.max.z + unit)]
+        .filter(p => !water.some(wet => wet(p.x, p.y))).slice(0, count);
+      const places = [...nearby, ...spots(count - nearby.length, R(0), R(.28))];
+      for (const p of places) {
+        const height = (1.58 + rand() * .26) * unit, turn = rand() * Math.PI * 2;
+        const cloth = silhouette ? 0x353b41 : pick([0x385c79, 0xb77953, 0x5d7462, 0xaca39a]);
+        const skin = silhouette ? cloth : pick([0x967052, 0xc99570, 0xe4b396]);
+        heads.push({ x: p.x, y: groundY + height * .94, z: p.y, sx: height * .06, sy: height * .07, sz: height * .06, color: skin });
+        bodies.push({ x: p.x, y: groundY + height * .69, z: p.y, sx: height * .22, sy: height * .34, sz: height * .13, turn, color: cloth });
+        for (const side of [-1, 1]) {
+          const x = Math.cos(turn) * side, z = -Math.sin(turn) * side;
+          limbs.push({ x: p.x + x * height * .052, y: groundY + height * .26, z: p.y + z * height * .052, sx: height * .08, sy: height * .52, sz: height * .095, turn, color: 0x343a43 });
+          limbs.push({ x: p.x + x * height * .134, y: groundY + height * .66, z: p.y + z * height * .134, sx: height * .05, sy: height * .31, sz: height * .05, turn, color: cloth });
+        }
+      }
+      instanced(new T.IcosahedronGeometry(1, 1), heads);
+      instanced(new T.BoxGeometry(1, 1, 1), bodies);
+      instanced(new T.BoxGeometry(1, 1, 1), limbs);
+    }
+
+    // Rain uses one bounded buffer; snow retains its static preview.
     if (environment.weather === "rain" || snowy) {
-      const count = snowy ? 2600 : 2400, radius = 1.6 * D, height = Math.max(size.y * 2.2, 18 * unit);
+      const count = snowy ? 2600 : 1400, radius = 1.6 * D, height = Math.max(size.y * 2.2, 18 * unit);
       const points = new Float32Array(count * (snowy ? 3 : 6));
       for (let i = 0; i < count; i++) {
         const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * radius, x = center.x + Math.cos(a) * r, z = center.z + Math.sin(a) * r, y = groundY + rand() * height;
@@ -318,12 +346,31 @@ export function sceneEnvironment(host: EnvironmentHost) {
         else points.set([x, y, z, x + .08 * unit, y - .7 * unit, z + .04 * unit], i * 6);
       }
       const geometry = keep(new T.BufferGeometry());
-      geometry.setAttribute("position", new T.BufferAttribute(points, 3));
+      const positions = new T.BufferAttribute(points, 3);
+      geometry.setAttribute("position", positions);
       const drops = snowy
         ? new T.Points(geometry, keep(new T.PointsMaterial({ color: 0xffffff, size: 2.6, sizeAttenuation: false, transparent: true, opacity: .9, depthWrite: false })))
         : new T.LineSegments(geometry, keep(new T.LineBasicMaterial({ color: 0xc4d0dc, transparent: true, opacity: .5, depthWrite: false })));
       drops.frustumCulled = false;
       group.add(drops);
+      if (!snowy) {
+        positions.setUsage(T.DynamicDrawUsage);
+        const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+        let previous = performance.now();
+        rainTimer = window.setInterval(() => {
+          const now = performance.now();
+          const fall = Math.min(now - previous, 100) * .009 * unit;
+          previous = now;
+          if (motion.matches || document.hidden) return;
+          for (let i = 1; i < points.length; i += 6) {
+            const y = points[i] - fall;
+            points[i] = y < groundY ? y + height : y;
+            points[i + 3] = points[i] - .7 * unit;
+          }
+          positions.needsUpdate = true;
+          host.redraw();
+        }, 80);
+      }
     }
     scene.add(group);
     current = { ...environment };

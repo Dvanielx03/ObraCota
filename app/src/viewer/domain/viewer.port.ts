@@ -125,6 +125,7 @@ export interface SceneEnvironment {
   season: SceneSeason | null;
   surroundings: SceneSurroundings | null;
   style: SceneStyle | null;
+  people?: { count: number; silhouette: boolean };
 }
 export interface ExteriorFinish { material: ExteriorMaterial | null; tone: ExteriorTone | null; light: ExteriorLight | null }
 /**

@@ -88,5 +88,23 @@ test("La escena de Editar se recorre en 3D, abre un panorama 360° y se restable
     await expect(bar).toHaveCount(0);
     await expect(stage).not.toHaveAttribute("data-environment",/.+/);
     await expect.poll(async()=>difference(page,neutral,await canvas.screenshot(hidden)),{timeout:10_000}).toBeLessThan(.01);
+
+    // Rain changes the image with a fixed camera and stops changing it with reduced motion.
+    if(!await editBar(page).isVisible())await editButton(page).click();
+    await editBar(page).getByRole("button",{name:"Escena",exact:true}).click();
+    await card.getByRole("tab",{name:/Clima y estación/}).click();
+    await card.getByRole("radio",{name:"Lluvia",exact:true}).click();
+    await card.getByRole("button",{name:"Recorrer esta escena en 3D"}).click();
+    await expect(stage).toHaveAttribute("data-environment","afternoon rain - countryside -");
+    const controls=page.getByRole("toolbar",{name:"Controles del recorrido"});
+    await expect(controls).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(controls).toBeHidden();
+    const raining=await canvas.screenshot(hidden);
+    await expect.poll(async()=>difference(page,raining,await canvas.screenshot(hidden)),{timeout:10_000}).toBeGreaterThan(0);
+    await page.emulateMedia({reducedMotion:"reduce"});
+    const still=await canvas.screenshot(hidden);
+    await expect.poll(async()=>difference(page,still,await canvas.screenshot(hidden)),{timeout:10_000}).toBe(0);
+    await page.screenshot({path:info.outputPath("escena-lluvia.png")});
   }finally{await project.remove();}
 });

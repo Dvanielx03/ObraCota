@@ -1,5 +1,5 @@
 import type { ExteriorFinish, ExteriorMaterial, ExteriorTone, SceneEnvironment } from "@/viewer/domain/viewer.port";
-import { ENVIRONMENTS, GRAPHIC_STYLES, SEASONS, TIMES, WEATHERS, type EnvironmentId, type GraphicStyleId, type SeasonId, type TimeId, type WeatherId } from "./edit-globals";
+import { CROWDS, ENVIRONMENTS, GRAPHIC_STYLES, PEOPLE_STYLES, SEASONS, TIMES, WEATHERS, type EnvironmentId, type GraphicStyleId, type SeasonId, type TimeId, type WeatherId } from "./edit-globals";
 
 /**
  * «Recorrer esta escena en 3D»: reads the scene that a request describes (the text Escena composes, a Renderizar
@@ -37,6 +37,7 @@ const STYLE_RULES: readonly Rule<GraphicStyleId>[] = [
 ];
 const FINISH_WORDS: Record<string, ExteriorMaterial> = { madera: "wood", "concreto a la vista": "concrete", concreto: "concrete", acero: "steel", vidrio: "glass", piedra: "stone", pintura: "paint" };
 const TONE_WORDS: Record<string, ExteriorTone> = { claro: "light", medio: "medium", oscuro: "dark" };
+const CROWD_COUNTS = { none: 0, one: 1, couple: 2, few: 4, crowded: 12 } as const;
 
 function first<Id extends string>(text: string, rules: readonly Rule<Id>[]): Id | null {
   return rules.find(([, rule]) => rule.test(text))?.[0] ?? null;
@@ -62,12 +63,15 @@ export function readScene(request: string): RequestScene {
   const season = exact(scene, SEASONS) ?? first(scene, SEASON_RULES);
   const surroundings = exact(scene, ENVIRONMENTS) ?? first(scene, SURROUNDING_RULES);
   const style = exact(scene, GRAPHIC_STYLES) ?? first(scene, STYLE_RULES);
+  const crowd = /(?:no incluyas|sin) personas/.test(scene) ? "none" : exact(scene, CROWDS);
+  const count = CROWD_COUNTS[crowd ?? "none"];
   const finishMatch = /acabado:\s*([a-záéíóúñ ]+?)(?:\s+en tono\s+(claro|medio|oscuro))?\./.exec(text);
   const toneMatch = /tono:\s*(claro|medio|oscuro)/.exec(text);
   const material = finishMatch ? FINISH_WORDS[finishMatch[1].trim()] ?? null : null;
   const tone = finishMatch?.[2] ? TONE_WORDS[finishMatch[2]] : toneMatch ? TONE_WORDS[toneMatch[1]] : null;
   return {
-    environment: { time: time ?? "afternoon", weather: weather ?? "clear", season, surroundings: surroundings ?? "countryside", style },
+    environment: { time: time ?? "afternoon", weather: weather ?? "clear", season, surroundings: surroundings ?? "countryside", style,
+      ...(count > 0 && { people: { count, silhouette: exact(scene, PEOPLE_STYLES) === "silhouette" } }) },
     finish: material ? { material, tone: tone ?? "medium", light: null } : null,
   };
 }
