@@ -4,6 +4,8 @@ import com.obracota.application.security.usecase.*;
 import com.obracota.domain.security.port.repository.SecurityRepository;
 import com.obracota.domain.security.port.service.*;
 import com.obracota.infrastructure.security.adapters.out.crypto.*;
+import com.obracota.infrastructure.security.adapters.out.google.GoogleIdTokenVerifier;
+import java.net.URI;
 import com.obracota.infrastructure.security.ratelimit.*;
 import java.time.Clock;
 import java.time.Duration;
@@ -25,6 +27,12 @@ public class SecurityConfig {
     @Bean LoginUseCase login(SecurityRepository r, PasswordService p, SessionIssuer i) { return new LoginUseCase(r,p,i); }
     @Bean RefreshUseCase refresh(SecurityRepository r, TokenService t, SessionIssuer i) { return new RefreshUseCase(r,t,i); }
     @Bean LogoutUseCase logout(SecurityRepository r, TokenService t) { return new LogoutUseCase(r,t); }
+    /** «Continuar con Google»: off while GOOGLE_CLIENT_ID is empty. Keys come from Google's public JWKS, free of charge. */
+    @Bean GoogleIdentityVerifier googleVerifier(@Value("${security.google.client-id:}") String clientId,
+            @Value("${security.google.jwks-uri:https://www.googleapis.com/oauth2/v3/certs}") URI jwks) {
+        return new GoogleIdTokenVerifier(clientId, GoogleIdTokenVerifier.http(jwks), Clock.systemUTC());
+    }
+    @Bean GoogleSignInUseCase googleSignIn(SecurityRepository r, GoogleIdentityVerifier v, SessionIssuer i) { return new GoogleSignInUseCase(r,v,i); }
     /** Login and registration limits; the defaults leave room for a whole Playwright run from one address. */
     @Bean AuthAttempts authAttempts(@Value("${security.attempts.per-address:120}") int perAddress,
             @Value("${security.attempts.address-window:PT1M}") Duration addressWindow,
@@ -36,11 +44,12 @@ public class SecurityConfig {
     @Bean SecurityFilterChain filter(HttpSecurity http, TokenService t, SecurityRepository r) throws Exception {
         return http.csrf(c -> c.disable()).sessionManagement(c -> c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(c -> c.requestMatchers(HttpMethod.GET,"/actuator/health").permitAll()
-                .requestMatchers(HttpMethod.POST,"/api/auth/register","/api/auth/login","/api/auth/refresh","/api/auth/logout").permitAll()
+                .requestMatchers(HttpMethod.POST,"/api/auth/register","/api/auth/login","/api/auth/google","/api/auth/refresh","/api/auth/logout").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/auth/google/config").permitAll()
                 // The first matching rule wins (§4.6). Publishing, restoring and pricing are the person's:
                 .requestMatchers(HttpMethod.POST,
                     "/api/projects/*/model-changes/*/apply","/api/projects/*/model-changes/*/restore",
-                    "/api/projects/*/design-changes/*/apply","/api/projects/*/design-changes/*/restore",
+                    "/api/projects/*/design-changes/*/restore",
                     "/api/projects/*/versions/*/prices/copy").hasAuthority(Authorities.PERSON_SESSION)
                 .requestMatchers(HttpMethod.PUT,
                     "/api/projects/*/design-changes/pricing","/api/projects/*/versions/*/prices").hasAuthority(Authorities.PERSON_SESSION)

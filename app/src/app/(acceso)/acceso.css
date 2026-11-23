@@ -1,0 +1,108 @@
+/*
+ * Sign-in screen (/ingresar and /registro): full-height split, form column on the left (45 %), picture on the right.
+ * Under 900 px the picture becomes a short band above the form. Colours and type come from theme.css.
+ * Shape rule: actions are pills (Google's own button, the tabs, the submit), fields 12 px, the picture 24 px.
+ */
+.auth-screen {
+  --auth-gutter: 16px;
+  --auth-column: 400px;
+  display: grid;
+  grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "bar visual" "main visual";
+  column-gap: clamp(24px, 4vw, 64px);
+  min-height: 100dvh;
+  padding: var(--auth-gutter);
+  background: var(--surface);
+  color: var(--ink);
+}
+.auth-screen :is(h1, p, figure) { margin: 0; }
+.auth-screen ::selection { background: var(--brand-soft); color: var(--ink); }
+
+.auth-bar { grid-area: bar; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 0 24px; }
+.auth-back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font: var(--type-ui); color: var(--muted); text-decoration: none; border-radius: var(--radius-sm); }
+.auth-back svg { transition: transform var(--duration-base) var(--ease-standard); }
+.auth-back:hover { color: var(--ink); }
+.auth-back:hover svg { transform: translateX(-2px); }
+.auth-back:focus-visible { outline-offset: 4px; }
+
+.auth-main { grid-area: main; display: grid; place-items: center; padding: 24px 24px 32px; }
+.auth-column { display: grid; gap: 24px; width: min(100%, var(--auth-column)); }
+
+/* Headline with the «Cota de nivel» symbol on its right, as the reference places its mark. */
+.auth-intro { display: grid; gap: 12px; }
+.auth-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.auth-intro h1 { font: 700 clamp(36px, 3.4vw, 48px)/1.04 var(--font-sans); letter-spacing: -.03em; text-wrap: balance; }
+.auth-symbol { display: grid; flex: none; padding-top: 4px; color: var(--ink); }
+.auth-lead { max-width: 36ch; font: 400 16px/1.5 var(--font-sans); color: var(--muted); text-wrap: pretty; }
+.auth-trust { font: 600 14px/20px var(--font-sans); color: var(--ink); }
+
+/* Google draws its own button inside .auth-google-button; while the config loads, a pill of the same size holds the place. */
+.auth-google { display: grid; gap: 12px; }
+/* Google's frame is a little wider than its pill and paints white corners on a dark page: clip it to the pill. */
+.auth-google-button { display: flex; align-items: center; justify-content: center; height: 40px; overflow: hidden; border-radius: var(--radius-pill); }
+.auth-google-button[hidden] { display: none; }
+.auth-google[data-state="checking"] .auth-google-button { background: var(--primary); opacity: .12; }
+.auth-check { display: flex; align-items: center; justify-content: center; gap: 6px; font: var(--type-hint); color: var(--muted); }
+.auth-check svg { color: var(--brand-ink); }
+.auth-divider { display: flex; align-items: center; gap: 12px; margin-top: 4px; font: var(--type-hint); color: var(--muted); }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+/* Segmented tabs: «Iniciar sesión» / «Crear cuenta». */
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 4px; border: 1px solid var(--border-soft); border-radius: var(--radius-pill); background: var(--hover); }
+.auth-tabs button { min-height: 36px; padding: 0 12px; border-radius: var(--radius-pill); font: var(--type-tab); color: var(--muted);
+  transition: background-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard); }
+.auth-tabs button:hover { background: transparent; color: var(--ink); }
+.auth-tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+.auth-tabs button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+.auth-form { display: grid; gap: 16px; margin-top: -8px; }
+.auth-field { display: grid; gap: 6px; font: var(--type-label); color: var(--ink); }
+.auth-field input { width: 100%; height: 44px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-lg); background: var(--field);
+  font: 400 15px/1 var(--font-sans); color: var(--ink); caret-color: var(--brand-ink);
+  transition: border-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard); }
+.auth-field input::placeholder { color: var(--muted); opacity: 1; }
+.auth-field input:hover { border-color: var(--ink); }
+.auth-field input:focus-visible { outline: none; border-color: var(--brand-ink); box-shadow: 0 0 0 3px var(--brand-soft); }
+.auth-field input:user-invalid { border-color: var(--error); }
+.auth-note { font: var(--type-hint); color: var(--muted); }
+.auth-form .auth-note { margin-top: -10px; }
+.auth-error { padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--error) 35%, transparent); border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--error) 8%, transparent); color: var(--error); font: 500 13px/1.45 var(--font-sans); }
+
+.auth-submit { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; margin-top: 4px; padding: 0 20px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-pill); background: var(--surface); color: var(--ink); font: 600 15px/1 var(--font-sans);
+  transition: background-color var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard); }
+.auth-submit:hover:not(:disabled) { background: var(--hover); }
+.auth-submit:active:not(:disabled) { transform: scale(.99); }
+.auth-submit:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.auth-submit:disabled { cursor: progress; }
+
+.auth-legal { font: var(--type-caption); color: var(--muted); text-wrap: pretty; }
+.auth-legal a { color: var(--ink); text-decoration: underline; text-underline-offset: .2em; }
+
+/* The picture fills the height and stays while a long form scrolls. */
+.auth-visual { grid-area: visual; position: sticky; top: var(--auth-gutter); height: calc(100dvh - 2 * var(--auth-gutter)); min-height: 560px;
+  overflow: hidden; border-radius: var(--radius-3xl); background: var(--bg); }
+.auth-visual img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 55%; }
+
+/* One authored moment: the picture settles in and the column rises once. */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-visual img { animation: auth-settle 1.1s cubic-bezier(.16, 1, .3, 1) both; }
+  .auth-column { animation: auth-rise .7s cubic-bezier(.16, 1, .3, 1) .05s both; }
+  @keyframes auth-settle { from { transform: scale(1.06); filter: saturate(.6) blur(6px); } to { transform: none; filter: none; } }
+  @keyframes auth-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+}
+
+@media (max-width: 1100px) {
+  .auth-screen { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+/* Under 900 px: one column, the picture as a short band between the bar and the form. */
+@media (max-width: 899px) {
+  .auth-screen { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; grid-template-areas: "bar" "visual" "main"; }
+  .auth-bar { padding: 0; }
+  .auth-visual { position: relative; top: 0; height: clamp(148px, 26vw, 220px); min-height: 0; margin-top: 8px; border-radius: var(--radius-2xl); }
+  .auth-visual img { object-position: 50% 62%; }
+  .auth-main { place-items: start center; padding: 28px 0 24px; }
+  .auth-intro h1 { font-size: clamp(32px, 9vw, 40px); }
+}

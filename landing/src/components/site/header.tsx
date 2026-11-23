@@ -114,7 +114,8 @@ export function SiteHeader() {
   }, [enInicio]);
 
   const panelUrl = process.env.NEXT_PUBLIC_PANEL_URL;
-  const entryUrl = panelUrl || (enInicio ? "#contacto" : "/#contacto");
+  // «Entrar al panel» opens the panel's sign-in screen (Google first, or an email account).
+  const entryUrl = panelUrl ? panelUrl.replace(/\/$/, "") + "/ingresar" : enInicio ? "#contacto" : "/#contacto";
   const entryLabel = panelUrl ? "Entrar al panel" : "Solicitar demostración";
 
   return (

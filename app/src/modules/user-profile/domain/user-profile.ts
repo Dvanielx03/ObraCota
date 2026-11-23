@@ -14,7 +14,7 @@ export const FIRST_REVIEWS = [
 
 export const STARTS = [
   { id: "sample", label: "Proyecto de muestra", hint: "ReStage, un edificio real publicado como dato abierto. Es un modelo 3D." },
-  { id: "own", label: "Mi archivo", hint: "Creas un proyecto y subes tu IFC, DWG, FBX u OBJ." },
+  { id: "own", label: "Mi archivo", hint: "Creas un proyecto y subes tu IFC, DWG, RVT, FBX u OBJ." },
 ] as const;
 
 export type Role = (typeof ROLES)[number]["id"];

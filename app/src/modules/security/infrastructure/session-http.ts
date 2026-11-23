@@ -6,6 +6,11 @@ export const sessionHttp: SessionPort = {
     const session = await request<AccessSession>("auth/" + mode, { method: "POST", body: JSON.stringify(credentials) });
     sessionStore.set(session);
   },
+  async google(credential) {
+    const { created, ...session } = await request<AccessSession & { created?: boolean }>("auth/google", { method: "POST", body: JSON.stringify({ credential }) });
+    sessionStore.set(session);
+    return created === true;
+  },
   async logout() {
     await request<void>("auth/logout", { method: "POST" });
     sessionStore.set(null);

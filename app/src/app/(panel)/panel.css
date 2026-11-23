@@ -629,3 +629,11 @@
   .panel-columns, .summary-layout, .guide-feature, .account-split { grid-template-columns: minmax(0, 1fr); }
   .account-split > div + div { padding: 24px 0 0; border-left: 0; border-top: 1px solid var(--border); margin-top: 24px; }
 }
+
+/* «Continuar con Google» above the email form: Google draws its own button; a divider leads to the form. */
+.auth-google { display: grid; gap: 16px; }
+.auth-google[hidden] { display: none; }
+.auth-google-button { display: flex; justify-content: center; min-height: 44px; }
+.auth-google-button[hidden] { display: none; }
+.auth-divider { display: flex; align-items: center; gap: 12px; margin: 0; font: var(--type-hint); color: var(--muted); }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }

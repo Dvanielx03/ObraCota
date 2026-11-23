@@ -1,0 +1,2 @@
+Imagen generada con FLUX.2 klein vía Cloudflare Workers AI para ObraCota, 2026-11-22.
+Archivo: acceso.webp (pantalla de acceso del panel). Sin texto, sin logotipos de terceros.

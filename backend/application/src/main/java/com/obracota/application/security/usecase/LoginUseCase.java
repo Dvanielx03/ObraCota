@@ -13,7 +13,8 @@ public record LoginUseCase(SecurityRepository repository, PasswordService passwo
     public SessionResponse execute(String email, String password) {
         String normalized = email.strip().toLowerCase(Locale.ROOT);
         var user = repository.byEmail(normalized).orElseThrow(InvalidCredentialsException::new);
-        if (password.getBytes(StandardCharsets.UTF_8).length > 72 || !passwords.matches(password, user.passwordHash()))
+        // An account created with Google has no password to check.
+        if (!user.hasPassword() || password.getBytes(StandardCharsets.UTF_8).length > 72 || !passwords.matches(password, user.passwordHash()))
             throw new InvalidCredentialsException();
         return sessions.start(user);
     }

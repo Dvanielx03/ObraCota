@@ -8,7 +8,8 @@ import com.obracota.domain.security.model.*;
 public class SecurityUserJpaEntity {
     @Id private UUID id;
     @Column(nullable=false, unique=true, length=254) private String email;
-    @Column(name="password_hash", nullable=false) private String hash;
+    @Column(name="password_hash") private String hash;
+    @Column(name="google_subject", unique=true, length=255) private String googleSubject;
     @Enumerated(EnumType.STRING) private Role role;
     protected SecurityUserJpaEntity() {}
     public SecurityUserJpaEntity(SecurityUser user) {
