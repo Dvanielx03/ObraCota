@@ -209,10 +209,12 @@ export function VisualOptions({ base, optionKey, name, state, open, group, choic
                   disabled={!ready} onClick={() => onCompare({ batch: batch.id, slot: option.slot })}><PanelRightDashed size={14} strokeWidth={2} aria-hidden="true" /></button>
                 <button type="button" className="option-icon" aria-label={"Descargar opción " + option.slot} title="Ajustar y descargar" aria-haspopup="dialog"
                   disabled={!ready} onClick={() => onDownload({ batch: batch.id, slot: option.slot })}><Download size={14} strokeWidth={2} aria-hidden="true" /></button>
-                {onWalkScene && <button type="button" className="option-icon" aria-label={"Recorrer esta escena en 3D · opción " + option.slot}
-                  title="Recorrer esta escena en 3D: el entorno de esta opción alrededor del modelo real, sin IA ni costo"
-                  disabled={!ready} onClick={() => onWalkScene(batch.request + " " + option.description)}><Footprints size={14} strokeWidth={2} aria-hidden="true" /></button>}
               </div>
+              {onWalkScene && <button type="button" className="option-walk" aria-label={"Recorrer esta escena en 3D · opción " + option.slot}
+                title="Previsualizar el entorno alrededor del modelo sin consumir IA"
+                disabled={!ready} onClick={() => onWalkScene(batch.request + " " + option.description)}>
+                <Footprints size={14} strokeWidth={2} aria-hidden="true" />Recorrer esta escena en 3D
+              </button>}
             </div>
           </li>;
         })}</ul>

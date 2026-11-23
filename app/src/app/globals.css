@@ -542,6 +542,10 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .option-icon:hover:not(:disabled){color:var(--ink)}
 .option-icon svg{width:14px;height:14px}
 .option-icon:disabled{opacity:.35;cursor:not-allowed;background:transparent}
+.option-walk{display:inline-flex;align-items:center;justify-self:start;gap:6px;min-height:28px;padding:3px 6px;border-radius:var(--radius-md);color:var(--ink);font:var(--type-caption);text-align:left}
+.option-walk:hover:not(:disabled){background:var(--hover)}
+.option-walk:disabled{opacity:.5;cursor:not-allowed}
+.option-walk svg{flex:none}
 .option-original summary,.option-runs summary,.adjust-closeup summary{cursor:pointer;padding:2px 0;font:var(--type-hint);color:var(--muted)}
 .option-original img{display:block;width:100%;margin-top:6px;border-radius:var(--radius-md)}
 .option-runs p{margin:4px 0 0;font:var(--type-caption);color:var(--muted);overflow-wrap:anywhere}

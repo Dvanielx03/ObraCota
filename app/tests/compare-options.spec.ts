@@ -20,7 +20,7 @@ test("Una opción se compara con la vista del modelo con el ratón y con el tecl
       json: {
         available: true,
         batches: [{
-          id: "terna-1", request: "Puerta en roble natural", state: "READY", selected: null,
+          id: "terna-1", request: "Puerta en roble natural en la ciudad", state: "READY", selected: null,
           options: [1, 2, 3].map((slot) => ({ slot, description: "Acabado de prueba " + slot })), runs: [],
         }],
       },
@@ -108,6 +108,11 @@ test("Una opción se compara con la vista del modelo con el ratón y con el tecl
     // Comparar no elige: la opción 2 sigue por elegir en las tandas de RENDERIZAR.
     await renderButton(page).click();
     await expect(render.getByRole("button", { name: "Elegir opción 2" })).toBeEnabled();
+    const walk = render.getByRole("button", { name: "Recorrer esta escena en 3D · opción 2" });
+    await expect(walk).toHaveText("Recorrer esta escena en 3D");
+    await walk.click();
+    await expect(page.locator(".stage")).toHaveAttribute("data-environment", "afternoon clear - city -");
+    await expect(page.locator("main")).toHaveAttribute("data-walk", "on");
   } finally {
     await project.remove();
   }
