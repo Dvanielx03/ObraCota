@@ -24,6 +24,7 @@ public interface DesignOptionBatches {
     List<Map<String, Object>> list(UUID version, String element);
 
     Optional<Binary> captured(UUID id);
+    Optional<Binary> mask(UUID id);
 
     Optional<Binary> image(UUID id, int slot);
 

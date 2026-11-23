@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { strFromU8, unzipSync } from "three/addons/libs/fflate.module.js";
 import { editBar, editButton } from "./support/editar-prisma";
 import { createProject, openFirstVersion, pickFirstPiece, renderButton, renderPanel, sendButton } from "./support/opciones-visuales";
 
@@ -33,23 +35,33 @@ test("Un área marcada sobre la captura viaja como máscara alineada", async ({ 
 
   // La prueba responde por el servidor: no se llama a ningún modelo de imagen.
   const sent: { element: string; request: string; jpeg: string; mask?: string }[] = [];
-  await page.route("**/api/projects/*/versions/*/options?element=*", (route) =>
-    route.fulfill({ json: { available: true, batches: [], budget: { reserve_cents: 100, remaining_cents: 800 } } }));
+  const batch = randomUUID();
+  const change = "Quiero que el techo sea uniforme, teniendo una forma de cuadrado como un techo moderno";
+  await page.route("**/api/projects/*/versions/*/options?element=*", (route) => {
+    const edit = sent[0];
+    const batches = edit && new URL(route.request().url()).searchParams.get("element") === edit.element ? [{
+      id: batch, request: edit.request, state: "FAILED", selected: null, hasMask: true, options: [],
+      runs: [{slot: 0, status: "FAILED", model_id: "gemini-3.1-flash-lite", error_code: "HTTP_503", total_tokens: null}],
+    }] : [];
+    return route.fulfill({ json: { available: true, batches, budget: { reserve_cents: 100, remaining_cents: 800 } } });
+  });
   await page.route("**/api/projects/*/versions/*/options", async (route) => {
     if (route.request().method() !== "POST") return route.fallback();
     sent.push(route.request().postDataJSON());
-    return route.fulfill({ status: 202, json: { id: randomUUID() } });
+    return route.fulfill({ status: 202, json: { id: batch } });
   });
+  await page.route(`**/options/${batch}/images/0`, route => route.fulfill({body: Buffer.from(sent[0].jpeg,"base64"),contentType:"image/jpeg"}));
+  await page.route(`**/options/${batch}/mask`, route => route.fulfill({body: Buffer.from(sent[0].mask!,"base64"),contentType:"image/jpeg"}));
   /** Size of an image and the brightness of some pixels, read in the browser. */
-  const inspect = (base64: string, points: [number, number][]) =>
-    page.evaluate(async ({ base64, points }) => {
-      const bitmap = await createImageBitmap(await (await fetch("data:image/jpeg;base64," + base64)).blob());
+  const inspect = (base64: string, points: [number, number][], mime = "image/jpeg") =>
+    page.evaluate(async ({ base64, points, mime }) => {
+      const bitmap = await createImageBitmap(await (await fetch("data:" + mime + ";base64," + base64)).blob());
       const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
       const context = canvas.getContext("2d")!;
       context.drawImage(bitmap, 0, 0);
       return { width: bitmap.width, height: bitmap.height,
         light: points.map(([fx, fy]) => context.getImageData(Math.round(fx * bitmap.width), Math.round(fy * bitmap.height), 1, 1).data[0]) };
-    }, { base64, points });
+    }, { base64, points, mime });
 
   try {
     await openFirstVersion(page, project.id, ifc!, "Duplex");
@@ -69,6 +81,7 @@ test("Un área marcada sobre la captura viaja como máscara alineada", async ({ 
     const layer = page.locator(".edit-layer");
     const marks = layer.locator("[data-edit-mark]");
     await expect(marks).toHaveCount(0);
+    await page.getByRole("combobox", { name: "Cambiar orientación" }).selectOption("top");
     // Una zona solo vale para el encuadre en que se dibuja: se espera a que la cámara se detenga.
     await cameraSettled(page);
 
@@ -88,9 +101,9 @@ test("Un área marcada sobre la captura viaja como máscara alineada", async ({ 
     await expect(note).toBeFocused();
     const sendEdit = field.getByRole("button", { name: "Enviar edición" });
     await expect(sendEdit).toHaveAttribute("aria-disabled", "true");
-    await note.fill("Revestimiento en piedra");
+    await note.fill(change);
     await expect(sendEdit).not.toHaveAttribute("aria-disabled", /.*/);
-    await expect(marks).toHaveAccessibleName("Marca 1, zona de 50 % del ancho y 50 % del alto del lienzo: Revestimiento en piedra");
+    await expect(marks).toHaveAccessibleName("Marca 1, zona de 50 % del ancho y 50 % del alto del lienzo: " + change);
     // El costo se ve antes de enviar.
     await expect(pill).toHaveText("Reserva 1,00 USD · quedan 8,00 USD");
     await page.screenshot({ animations: "disabled", path: process.env.EVIDENCE_DIR ? process.env.EVIDENCE_DIR + "/area.png" : info.outputPath("area.png") });
@@ -99,7 +112,7 @@ test("Un área marcada sobre la captura viaja como máscara alineada", async ({ 
     await sendEdit.click();
     await expect.poll(() => sent.length).toBe(1);
     expect(sent[0].element).toBe(guid);
-    expect(sent[0].request).toBe("Marca 1 · Zona marcada: Revestimiento en piedra.");
+    expect(sent[0].request).toBe("Marca 1 · Zona marcada: " + change + ".");
     expect(sent[0].mask).toBeTruthy();
     const image = await inspect(sent[0].jpeg, []);
     const mask = await inspect(sent[0].mask!, [[0.5, 0.45], [0.1, 0.1], [0.9, 0.9], [0.3, 0.25], [0.7, 0.65]]);
@@ -117,6 +130,15 @@ test("Un área marcada sobre la captura viaja como máscara alineada", async ({ 
     await expect(renderPanel(page)).toBeVisible();
     const subject = renderPanel(page).getByRole("radiogroup", { name: "Sobre qué pedir opciones" });
     await expect(subject.getByRole("radio", { name: piece, exact: true })).toHaveAttribute("aria-checked", "true");
+    await expect(renderPanel(page).getByText("La generación de imágenes no llegó a iniciarse.", {exact:false})).toBeVisible();
+    const download = page.waitForEvent("download");
+    await renderPanel(page).getByRole("button", {name: "Descargar paquete para Gemini"}).click();
+    const zip = unzipSync(readFileSync((await (await download).path())!));
+    expect(Object.keys(zip)).toEqual(["01-vista-original.png", "02-mascara-seleccion.png", "03-prompt-para-gemini.txt"]);
+    expect(strFromU8(zip["03-prompt-para-gemini.txt"])).toContain(change);
+    const recovered = await inspect(Buffer.from(zip["02-mascara-seleccion.png"]).toString("base64"), [[.5,.45],[.1,.1]], "image/png");
+    expect(recovered.light).toEqual([255,0]);
+    expect(sent).toHaveLength(1);
     await page.keyboard.press("Escape");
     await expect(renderPanel(page)).toBeHidden();
     await expect(editButton(page)).toHaveAttribute("aria-pressed", "true");

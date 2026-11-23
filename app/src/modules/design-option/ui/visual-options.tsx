@@ -7,9 +7,10 @@ import { BusyButton, LoaderArt, LoadingStatus, Skeleton, Spinner } from "@/share
 import type { ExteriorPreview, GroupCapture } from "@/viewer/domain/viewer.port";
 import { ChipChoice, ChipToggles } from "./option-chips";
 import { usePrivateImage, type OptionHistoryState } from "./use-option-history";
+import { archiveEditFiles, recoverEditFiles } from "./external-edit-files";
 import { DAYLIGHTS, DEFAULT_CHOICES, FINISHES, KEEPS, REQUEST_LIMIT, TONES, asksForChange, composeRequest, formatUsd, type OptionChoices } from "../domain/option-request";
-import { budgetExhausted, isWorking, type OptionTarget } from "../domain/option-history";
-import { chooseOption, optionImagePath, requestOptions } from "../infrastructure/option-http";
+import { budgetExhausted, isWorking, optionFailure, type OptionBatch, type OptionTarget } from "../domain/option-history";
+import { chooseOption, optionImage, optionImagePath, requestOptions } from "../infrastructure/option-http";
 
 /** What Renderizar asks about when there is a selection: the selected pieces or the whole framing (DU-16). */
 export type RenderScope = "selection" | "view";
@@ -56,6 +57,24 @@ function OriginalCapture({ path }: { path: string }) {
   return <details className="option-original" onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary>Ver captura original</summary>{open && <PrivateImage path={path} label="Captura usada para esta terna" />}
   </details>;
+}
+
+function RecoverEdit({base,batch}:{base:string;batch:OptionBatch}) {
+  const [busy,setBusy]=useState(false),[error,setError]=useState("");
+  async function download(){
+    setBusy(true);setError("");
+    try{
+      const [view,mask]=await Promise.all([optionImage(optionImagePath(base,batch.id,0)),optionImage(`${base}/${batch.id}/mask`)]);
+      const zip=archiveEditFiles(await recoverEditFiles(view,mask,batch.request));
+      const url=URL.createObjectURL(zip);
+      const link=document.createElement("a");
+      link.href=url;link.download="ObraCota-edicion-Gemini.zip";link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch{setError("No se pudo recuperar el paquete. Intenta descargarlo de nuevo.");}
+    finally{setBusy(false);}
+  }
+  return <><BusyButton type="button" className="text-button" busy={busy} busyLabel="Preparando el ZIP…" onClick={()=>void download()}>
+    Descargar paquete para Gemini</BusyButton>{error && <p role="alert" className="options-note">{error}</p>}</>;
 }
 
 /**
@@ -189,7 +208,7 @@ export function VisualOptions({ base, optionKey, name, state, open, group, choic
       <h3 className="section-label">Tandas</h3>
       {history.batches.map((batch) => <article key={batch.id} className="option-batch">
         <p className="option-batch-request" title={batch.request}>{batch.request}</p>
-        {batch.state === "FAILED" ? <p className="options-note">La generación quedó incompleta. {batch.runs.some((run) => run.error_code === "HTTP_429") ? "Gemini alcanzó un límite de solicitudes o de cuota. Revisa la cuota del modelo antes de volver a enviar la captura." : "Consulta el detalle en Consumo de la generación."}</p>
+        {batch.state === "FAILED" ? <><p className="options-note">{optionFailure(batch)}</p>{batch.hasMask && open && <RecoverEdit base={base} batch={batch}/>}</>
           : batch.state !== "READY" && <div className="options-waiting">
             <LoaderArt name="options" size={64} maxLoopMs={5000} className="loader-art-small" />
             <div><LoadingStatus className="options-working">Preparando las opciones…</LoadingStatus>

@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties={"ai.queue.initial-delay=600000","GEMINI_API_KEY=test-only","AI_MONTHLY_LIMIT_CENTS=200"})
+@SpringBootTest(properties={"ai.queue.initial-delay=600000","GEMINI_API_KEY=test-only","AI_MONTHLY_LIMIT_CENTS=300"})
 @AutoConfigureMockMvc @ActiveProfiles("test") @Import(DesignOptionFlowTest.Trial.class)
 class DesignOptionFlowTest {
     @TempDir static Path root;
@@ -33,7 +33,10 @@ class DesignOptionFlowTest {
         catch(Exception e){throw new AssertionError(e);}
     }
     @TestConfiguration static class Trial {
-        @Bean @Primary ChatModelPort trialChat(){return (model,prompt)->new ChatModelPort.Reply("Roble\nAcero\nPino",new Consumption(8,3,11));}
+        @Bean @Primary ChatModelPort trialChat(){return (model,prompt)->{
+            if(prompt.contains("techo uniforme"))throw new ProviderFailure("HTTP_503");
+            return new ChatModelPort.Reply("Roble\nAcero\nPino",new Consumption(8,3,11));
+        };}
         @Bean @Primary ImageGenerationPort trialImage(){return (model,jpeg,prompt)->{
             if(prompt.contains("fallar"))throw new ProviderFailure("HTTP_429");
             return new ImageGenerationPort.Image(picture(prompt.hashCode(),"png"),"image/png",new Consumption(10,20,30));
@@ -69,6 +72,7 @@ class DesignOptionFlowTest {
         for(int slot=1;slot<=3;slot++)
             mvc.perform(get(base+"/"+id+"/images/"+slot).header("Authorization",user)).andExpect(content().contentType("image/png"));
         mvc.perform(get(base+"/"+id+"/images/0").header("Authorization",user)).andExpect(content().bytes(capture));
+        mvc.perform(get(base+"/"+id+"/mask").header("Authorization",user)).andExpect(status().isNotFound());
         mvc.perform(put(base+"/"+id+"/selection/2").header("Authorization",user)).andExpect(status().isNoContent());
         mvc.perform(get(base).param("element","guid-1").header("Authorization",user)).andExpect(jsonPath("$.batches[0].selected").value(2));
         mvc.perform(get(base+"/"+id+"/images/1").header("Authorization",register())).andExpect(status().isNotFound());
@@ -79,6 +83,19 @@ class DesignOptionFlowTest {
         worker.process();
         assertEquals("HTTP_429",db.queryForObject("select error_code from ai_run where batch_id=? and slot=1",String.class,failed));
         assertEquals("FAILED",db.queryForObject("select state from design_option_batch where id=?",String.class,failed));
+        var failedChat=UUID.randomUUID();
+        var mask=picture(0xffffff,"jpeg");
+        var roof=new DesignOptionController.Input(failedChat,"roof","Cubierta","Quiero un techo uniforme",input.jpeg(),Base64.getEncoder().encodeToString(mask));
+        mvc.perform(post(base).header("Authorization",user).contentType("application/json").content(json.writeValueAsBytes(roof))).andExpect(status().isAccepted());
+        worker.process();
+        mvc.perform(get(base).param("element","roof").header("Authorization",user)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.batches[0].state").value("FAILED"))
+            .andExpect(jsonPath("$.batches[0].hasMask").value(true))
+            .andExpect(jsonPath("$.batches[0].runs[0].slot").value(0))
+            .andExpect(jsonPath("$.batches[0].runs[0].error_code").value("HTTP_503"))
+            .andExpect(jsonPath("$.batches[0].options.length()").value(0));
+        mvc.perform(get(base+"/"+failedChat+"/mask").header("Authorization",user)).andExpect(status().isOk()).andExpect(content().bytes(mask));
+        mvc.perform(get(base+"/"+failedChat+"/mask").header("Authorization",register())).andExpect(status().isNotFound());
         var excess=new DesignOptionController.Input(UUID.randomUUID(),"guid-1","Puerta","Otro",input.jpeg(),null);
         mvc.perform(post(base).header("Authorization",user).contentType("application/json").content(json.writeValueAsBytes(excess))).andExpect(status().isTooManyRequests());
     }

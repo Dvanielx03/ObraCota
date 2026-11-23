@@ -36,13 +36,14 @@ public class DesignOptionBatchAdapter implements DesignOptionBatches {
 
     @Override
     public List<Map<String, Object>> list(UUID version, String element) {
-        var batches = db.query("select id,description,state,selected_slot from design_option_batch where version_id=? and element_key=? order by created_at desc",
+        var batches = db.query("select id,description,state,selected_slot,selection_mask is not null from design_option_batch where version_id=? and element_key=? order by created_at desc",
             (r, n) -> {
                 var b = new LinkedHashMap<String, Object>();
                 b.put("id", r.getString(1));
                 b.put("request", r.getString(2));
                 b.put("state", r.getString(3));
                 b.put("selected", r.getObject(4));
+                b.put("hasMask", r.getBoolean(5));
                 return b;
             }, version, element);
         for (var b : batches) {
@@ -50,7 +51,18 @@ public class DesignOptionBatchAdapter implements DesignOptionBatches {
             b.put("drafts", db.queryForList("select description from design_option_description where batch_id=? order by slot", String.class, id));
             b.put("options", db.query("select slot,description from design_option where batch_id=? order by slot",
                 (r, n) -> Map.of("slot", r.getInt(1), "description", r.getString(2)), id));
-            b.put("runs", db.queryForList("select slot, model_id, status, error_code, input_tokens,output_tokens,total_tokens from ai_run where batch_id=? order by slot", id));
+            b.put("runs", db.query("select slot, model_id, status, error_code, input_tokens,output_tokens,total_tokens from ai_run where batch_id=? order by slot",
+                (r, n) -> {
+                    var run = new LinkedHashMap<String, Object>();
+                    run.put("slot", r.getInt(1));
+                    run.put("model_id", r.getString(2));
+                    run.put("status", r.getString(3));
+                    run.put("error_code", r.getString(4));
+                    run.put("input_tokens", r.getObject(5));
+                    run.put("output_tokens", r.getObject(6));
+                    run.put("total_tokens", r.getObject(7));
+                    return run;
+                }, id));
         }
         return List.copyOf(batches);
     }
@@ -58,6 +70,12 @@ public class DesignOptionBatchAdapter implements DesignOptionBatches {
     @Override
     public Optional<Binary> captured(UUID id) {
         return db.query("select captured,'image/jpeg' from design_option_batch where id=?", DesignOptionBatchAdapter::binary, id).stream().findFirst();
+    }
+
+    @Override
+    public Optional<Binary> mask(UUID id) {
+        return db.query("select selection_mask,'image/jpeg' from design_option_batch where id=? and selection_mask is not null",
+            DesignOptionBatchAdapter::binary, id).stream().findFirst();
     }
 
     @Override

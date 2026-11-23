@@ -87,6 +87,11 @@ public class DesignOptionController {
         var image=options.image(project,version,user,id,slot);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.parseMediaType(image.mime())).body(image.bytes());
     }
+    @GetMapping("/{id}/mask")
+    public ResponseEntity<byte[]> mask(@PathVariable UUID project,@PathVariable UUID version,@AuthenticationPrincipal UUID user,@PathVariable UUID id) {
+        var mask=options.mask(project,version,user,id);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.IMAGE_JPEG).body(mask.bytes());
+    }
     @PutMapping("/{id}/selection/{slot}") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void select(@PathVariable UUID project,@PathVariable UUID version,@AuthenticationPrincipal UUID user,@PathVariable UUID id,@PathVariable int slot) {
         options.select(project,version,user,id,slot);

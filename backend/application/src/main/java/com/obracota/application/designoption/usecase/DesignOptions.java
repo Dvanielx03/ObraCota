@@ -85,6 +85,13 @@ public final class DesignOptions {
         });
     }
 
+    public Binary mask(UUID project, UUID version, UUID user, UUID id) {
+        return tx.required(() -> {
+            within(project, version, user, id);
+            return batches.mask(id).orElseThrow(NotFoundApplicationException::new);
+        });
+    }
+
     private void within(UUID project, UUID version, UUID user, UUID id) {
         versions.get(project, user, version);
         if (!batches.belongs(version, id)) throw new NotFoundApplicationException();

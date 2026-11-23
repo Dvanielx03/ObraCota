@@ -5,9 +5,19 @@ export interface OptionBatch {
   request: string;
   state: BatchState;
   selected: number | null;
+  hasMask?: boolean;
   drafts?: string[];
   options: { slot: number; description: string }[];
-  runs: { model_id: string; status: string; error_code: string | null; total_tokens: number | null }[];
+  runs: { slot?: number; model_id: string; status: string; error_code: string | null; total_tokens: number | null }[];
+}
+
+export function optionFailure(batch: OptionBatch) {
+  const failed = batch.runs.find(run => run.status === "FAILED");
+  const stage = failed?.slot === 0 ? " al preparar las propuestas" : failed?.slot ? " al generar las imágenes" : "";
+  if (failed?.error_code === "HTTP_503") return "El proveedor no estuvo disponible" + stage + ". "
+    + (failed.slot === 0 ? "La generación de imágenes no llegó a iniciarse." : "La tanda quedó incompleta.");
+  if (failed?.error_code === "HTTP_429") return "El proveedor alcanzó un límite de solicitudes o de cuota" + stage + ".";
+  return "La generación quedó incompleta. Consulta el detalle en Consumo de la generación.";
 }
 export interface OptionHistory {
   available: boolean;

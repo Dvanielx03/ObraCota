@@ -17,14 +17,39 @@ export interface EditFiles {
 export function prepareEditFiles(frame:GroupCapture,pieces:ElementInfo[],request:string):EditFiles{
   if(frame.missing)throw new Error("Hay piezas ocultas o fuera del encuadre. Gira la cámara o encuadra la selección y vuelve a preparar el paquete.");
   const references=pieces.map(piece=>"- "+piece.name+" · "+piece.level+" · ID "+(piece.guid||piece.id)).join("\n");
-  const prompt=[
+  return {original:decode(frame.image),mask:decode(frame.mask),prompt:editPrompt(frame.width,frame.height,request,references)};
+}
+
+function editPrompt(width:number,height:number,request:string,references?:string){
+  return [
     "Edit image 1 ("+originalName+"). Image 2 ("+maskName+") is its pixel-aligned edit mask.",
     "White pixels are the only editable area. Preserve all black areas exactly, including any roof or surface outside the white mask. Use the mask as the authoritative target, regardless of the color or name of any object.",
-    "Return an edited version of image 1 only. Preserve the original camera, projection, crop, aspect ratio and placement of objects. Target size: "+frame.width+" × "+frame.height+" px. Do not overlay the mask, text or annotations.",
-    "Selected model references, for context:\n"+references,
+    "Return an edited version of image 1 only. Preserve the original camera, projection, crop, aspect ratio and placement of objects. Target size: "+width+" × "+height+" px. Do not overlay the mask, text or annotations.",
+    ...(references ? ["Selected model references, for context:\n"+references] : []),
     "Requested change (original wording):\n"+request.trim(),
   ].join("\n\n");
-  return {original:decode(frame.image),mask:decode(frame.mask),prompt};
+}
+
+export async function recoverEditFiles(original:Blob,mask:Blob,request:string):Promise<EditFiles>{
+  async function convert(source:Blob, binary:boolean) {
+    const bitmap=await createImageBitmap(source);
+    try {
+      const {width,height}=bitmap;
+      const canvas=document.createElement("canvas");
+      canvas.width=width;canvas.height=height;
+      const ctx=canvas.getContext("2d",{willReadFrequently:binary})!;
+      ctx.drawImage(bitmap,0,0);
+      if(binary){
+        const image=ctx.getImageData(0,0,width,height);
+        for(let i=0;i<image.data.length;i+=4)image.data[i]=image.data[i+1]=image.data[i+2]=image.data[i]>=128 ? 255 : 0;
+        ctx.putImageData(image,0,0);
+      }
+      return {bytes:decode(canvas.toDataURL("image/png")),width,height};
+    }finally{bitmap.close();}
+  }
+  const [view,selection]=await Promise.all([convert(original,false),convert(mask,true)]);
+  if(view.width!==selection.width || view.height!==selection.height)throw new Error("La máscara guardada tiene otro encuadre.");
+  return {original:view.bytes,mask:selection.bytes,prompt:editPrompt(view.width,view.height,request)};
 }
 
 export function archiveEditFiles(files:EditFiles){
