@@ -42,3 +42,23 @@ test("Revisión de piscina · cambios de texto y cota",async({page},info)=>{
   const text=await readFile((await (await download).path())!,"utf8");
   expect(text).toMatch(/Revisar etiqueta en R1 — [^\n]+2BD4A[^\n]+16\.16949[^\n]+verificar R1/);
 });
+
+test("Piloto de escritura AC1032 · compara la copia editada con el original",async({page},info)=>{
+  const original=process.env.TEST_DWG,pilot=process.env.TEST_DWG_PILOT;
+  test.skip(!original||!pilot);
+  test.setTimeout(180_000);
+  await page.goto("/proyectos/restage/visor");
+  await expect(page.getByRole("button",{name:"Revisar entrega"})).toBeVisible();
+  await page.locator("header input").setInputFiles(pilot!);
+  await expect(page.locator(".project")).toHaveText(path.basename(pilot!),{timeout:90_000});
+  await page.getByRole("button",{name:"Revisar entrega"}).click();
+  await page.getByRole("button",{name:"Comparar versiones DWG"}).click();
+  await page.getByLabel("Versión anterior").setInputFiles(original!);
+  await expect(page.getByText("2 diferencias · 0 identificadores sin correspondencia única")).toBeVisible({timeout:60_000});
+  await expect(page.getByText(/Rebose → Rebose \(PRUEBA\)/)).toBeVisible();
+  await page.screenshot({path:info.outputPath("piloto-compartido.png")});
+  await page.getByRole("button",{name:"Localizar 2BD4A"}).click();
+  await expect(page.locator(".inspector")).toContainText("16,169499 m");
+  await page.getByText("Texto de origen",{exact:true}).click();
+  await expect(page.locator(".inspector code")).toContainText("<> (PRUEBA)");
+});
