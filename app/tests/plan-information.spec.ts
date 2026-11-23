@@ -1,6 +1,7 @@
 import {expect,test} from "@playwright/test";
 import {basename} from "node:path";
 import {randomUUID} from "node:crypto";
+import {readFile} from "node:fs/promises";
 
 test("La información de piscina corresponde al texto, la cota y la capa seleccionados",async({page},info)=>{
   const file=process.env.TEST_DWG;
@@ -71,4 +72,44 @@ test("Un PDF vinculado a Rebose permanece en la selección correcta del DWG",asy
     await expect(cite).toHaveCount(0);
     await page.reload();await select("2C81E");await expect(cite).toBeVisible();
   }finally{await page.request.delete("/api/projects/"+id,{headers});}
+});
+
+test("Consulta y descarga evidencia verificable del plano de piscina",async({page},info)=>{
+  const file=process.env.TEST_DWG;
+  test.skip(!file || basename(file).toLowerCase()!=="dwg_piscina_030824.dwg");
+  await page.goto("/proyectos/restage/visor");
+  await expect(page.getByRole("button",{name:"Revisar entrega"})).toBeVisible();
+  await page.locator("header input").setInputFiles(file!);
+  await expect(page.locator(".project")).toHaveText(basename(file!),{timeout:90_000});
+  const query=page.getByRole("searchbox",{name:"Buscar elemento"});
+  const kind=page.getByRole("combobox",{name:"Tipo de consulta del plano"});
+  const download=page.getByRole("button",{name:"Descargar ficha"});
+  await kind.selectOption("text");
+  await query.fill("2c81e");
+  const hit=page.getByRole("button",{name:/Rebose.*Handle 2C81E/i});
+  await hit.click();
+  await expect(hit).toHaveAttribute("aria-pressed","true");
+  await expect(page.locator(".note-marker")).toBeVisible();
+
+  await kind.selectOption("dimension");
+  await expect(page.getByText("Ningún elemento coincide.")).toBeVisible();
+  await expect(download).toBeDisabled();
+  await query.fill("2BD4A");
+  const dimension=page.getByRole("button",{name:/Handle 2BD4A · 16,169499 m/});
+  await expect(page.getByText("1 coincidencia",{exact:true})).toBeVisible();
+  await dimension.click();
+  await expect(dimension).toHaveAttribute("aria-pressed","true");
+  const received=page.waitForEvent("download");
+  await download.click();
+  const content=await readFile((await (await received).path())!,"utf8");
+  expect(content).toContain("DWG_PISCINA_030824.dwg");
+  expect(content).toContain("Handle 2BD4A · 16,169499 m");
+  expect(content).toContain("Puntos");
+  expect(content).not.toContain("Handle 2C81E");
+  await page.screenshot({path:info.outputPath("consulta-cota.png")});
+
+  await kind.selectOption("layer");
+  await query.fill("cotas - general");
+  await expect(page.getByRole("button",{name:/^Cotas - General\s+\d+$/})).toBeVisible();
+  await expect(download).toBeEnabled();
 });

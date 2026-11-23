@@ -1,0 +1,6 @@
+.drawing-query { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font: var(--type-caption); color: var(--muted); }
+.drawing-query select, .drawing-query-download { min-height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--field); color: var(--ink); font: inherit; }
+.drawing-query-download { margin-inline-start: auto; }
+.drawing-query-download:hover:not(:disabled) { background: var(--hover); }
+.drawing-query-download:disabled { opacity: .55; cursor: not-allowed; }
+.drawing-query-evidence { display: block; margin-top: 3px; color: var(--muted); font: var(--type-caption); }
