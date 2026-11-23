@@ -41,6 +41,7 @@ class AskDocumentTest {
         final List<UUID> questions = new ArrayList<>();
         final Map<UUID, Answer> answers = new HashMap<>();
         final List<Passage> embedded = new ArrayList<>();
+        List<Passage> evidence = List.of(PAGE_3);
         float[] rankedWith;
         @Override public List<Source> sources(UUID project) { return List.of(); }
         @Override public boolean belongs(UUID project, UUID document) { return owned; }
@@ -51,7 +52,7 @@ class AskDocumentTest {
         @Override public void embed(UUID document, Passage passage, float[] vector, String model) { embedded.add(passage); }
         @Override public List<Passage> ranked(UUID document, String question, String model, float[] vector) {
             rankedWith = vector;
-            return List.of(PAGE_3);
+            return evidence;
         }
         @Override public void answer(UUID id, Answer answer) { answers.put(id, answer); }
     }
@@ -81,8 +82,8 @@ class AskDocumentTest {
     boolean chatFails, embeddingFails;
 
     /** A catalog whose project lookup answers «owned» for any project. */
-    ProjectFileCatalog catalog(boolean owner) {
-        var projects = (ProjectRepository) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{ProjectRepository.class},
+    static ProjectFileCatalog catalog(boolean owner) {
+        var projects = (ProjectRepository) Proxy.newProxyInstance(AskDocumentTest.class.getClassLoader(), new Class<?>[]{ProjectRepository.class},
             (proxy, method, args) -> method.getName().startsWith("find") ? (owner ? Optional.of(new Object()) : Optional.empty()) : null);
         return new ProjectFileCatalog(projects, null);
     }
