@@ -1,0 +1,14 @@
+Biblioteca de materiales de la vista previa exterior (visor 3D de ObraCota)
+Fecha de descarga: 2026-11-22
+Fuente: Poly Haven (https://polyhaven.com), API pública https://api.polyhaven.com
+Licencia: CC0 1.0 Universal (dominio público), https://polyhaven.com/license
+Formato: mapas 1K JPG originales convertidos a WebP (color, normal OpenGL, rugosidad en gris).
+
+Carpeta    Recurso de Poly Haven       URL                                                   Tamaño real del recurso
+piedra     Stone Wall                  https://polyhaven.com/a/stone_wall                     2,00 m x 2,00 m
+madera     Wood Plank Wall             https://polyhaven.com/a/wood_plank_wall                1,00 m x 1,00 m
+concreto   Concrete Wall 008           https://polyhaven.com/a/concrete_wall_008              2,71 m x 2,71 m
+ladrillo   Red Brick 03                https://polyhaven.com/a/red_brick_03                   1,00 m x 1,00 m
+acero      Metal Plate                 https://polyhaven.com/a/metal_plate                    0,50 m x 0,50 m
+
+Vidrio y Pintura no usan textura: son materiales físicos lisos definidos en el código del visor.

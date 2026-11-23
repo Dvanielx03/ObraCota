@@ -1,7 +1,12 @@
 "use client";
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { Download, Footprints, PanelRightDashed, Pencil, RotateCcw, Sparkles } from "lucide-react";
-import type { CameraPose, ElementInfo, ViewerPort } from "@/viewer/domain/viewer.port";
+import type { CameraPose, ElementInfo, ExteriorMaterial, ExteriorPreview, ExteriorTone, ViewerPort } from "@/viewer/domain/viewer.port";
+import { finishMaterial } from "@/modules/design-option/domain/finish-material";
+import { FINISH_PIECES_LIMIT, saveFinishChange } from "@/modules/model-change/infrastructure/finish-change";
+import { agentAvailability, runDesignAgent } from "@/modules/model-change/infrastructure/agent-run-http";
+import { agentNotes, proposeReason as agentReason, type AgentAvailability } from "@/modules/model-change/domain/agent-run";
+import { AgentRunPanel, type AgentRunState } from "@/modules/model-change/ui/agent-run-panel";
 import { VisualOptions, type RenderScope } from "@/modules/design-option/ui/visual-options";
 import { OptionCompare } from "@/modules/design-option/ui/option-compare";
 import { OptionDownloadPanel } from "@/modules/design-option/ui/option-download";
@@ -13,7 +18,7 @@ import {
   EDIT_MARK_LIMIT, addEditMark, areaMarks, canAddEditMark, editRequestText, hasEditText, markedPieces, marksToSend, nextMarkId, pieceStillMarked,
   pointMark, removeEditMark, replaceEditMark, setEditMarkText, type EditMark,
 } from "@/modules/design-option/domain/edit-marks";
-import { chooseGlobal, globalEditText, isApplicable, withPeoplePrompt, type GlobalEdit } from "@/modules/design-option/domain/edit-globals";
+import { applyPreset, chooseScene, clearCategory, globalEditText, isApplicable, withPeoplePrompt, type SceneEdit } from "@/modules/design-option/domain/edit-globals";
 import { DEFAULT_CHOICES, formatUsd, type OptionChoices } from "@/modules/design-option/domain/option-request";
 import type { Area } from "@/modules/design-option/domain/selection-area";
 import { FULL_FRAME, NEUTRAL, isFullFrame, isNeutral, type Adjustments, type Framing } from "@/modules/design-option/domain/image-adjust";
@@ -61,6 +66,10 @@ export interface EditControl {
   onEnter: () => void;
   onExit: () => void;
   onUngroup: () => void;
+  /** Not an IFC (DWG, FBX, OBJ): what the file is, so the agent and «Guardar en el modelo» say why they are off. */
+  nonIfc?: string;
+  /** Why the IFC on screen cannot take model changes (too large for the engine to verify), or undefined. */
+  changeLimit?: string;
 }
 
 const pieceName = (piece: ElementInfo) => piece.name || piece.type;
@@ -90,7 +99,10 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   /** REVISAR's own panel is open: the other panels and Editar's sub-bar give way to it. */
   reviewOpen?: boolean;
   onCloseReview?: () => void;
-  walk: { reason?: string; onStart: () => void };
+  /** `onScene` builds the scene of a request around the model in 3D («Recorrer esta escena en 3D»); false when it cannot. */
+  walk: { reason?: string; onStart: () => void; onScene?: (request: string) => boolean;
+    /** Why the walk cannot start even with a scene's ground around the model (no verified units); undefined when it can. */
+    sceneReason?: string };
   camera: ReactNode;
   onWorking: (working: boolean) => void;
 }) {
@@ -153,6 +165,33 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   useEffect(() => onWorking(working), [working, onWorking]);
   useEffect(() => () => onWorking(false), [onWorking]);
   const [choices, setChoices] = useState<OptionChoices>(DEFAULT_CHOICES);
+  // Renderizar › Ver en el modelo 3D: the chips preview the finish on the model's exterior, locally.
+  // Sending a request clears the chips but keeps the preview until «Restablecer materiales».
+  const [livePreview, setLivePreview] = useState(true);
+  const [exterior, setExterior] = useState<ExteriorPreview | null>(null);
+  // The finish shown on the model right now: what «Guardar en el modelo» saves, even after the chips are cleared.
+  const [shown, setShown] = useState<{ material: ExteriorMaterial; tone: ExteriorTone | null } | null>(null);
+  const { finish, tone, daylight } = choices;
+  useEffect(() => {
+    if (!livePreview || plan || !(finish || tone || daylight)) return;
+    const result = viewer()?.previewExteriorFinish({ material: finish, tone, light: daylight });
+    if (result) { setExterior(result); setShown(finish ? { material: finish, tone } : null); }
+  }, [viewer, livePreview, plan, finish, tone, daylight]);
+  const resetExterior = useCallback(() => { viewer()?.previewExteriorFinish(null); setExterior(null); setShown(null); }, [viewer]);
+  // «Guardar en el modelo» (H2 material): the GlobalIds of the exterior pieces under the preview.
+  const exteriorGuids = exterior?.ids?.map((id) => edit.piece(id)?.guid).filter((guid): guid is string => !!guid) ?? [];
+  const saveReason = !scope ? "Guarda primero una versión del modelo" : !shown || !exterior?.pieces ? "Elige un acabado y míralo en el modelo 3D"
+    : edit.changeLimit ? edit.changeLimit : !exteriorGuids.length ? "Solo un IFC guarda materiales en el modelo" + (edit.nonIfc ? " (este es " + edit.nonIfc + "); la vista previa sí se ve aquí" : "") : exteriorGuids.length > FINISH_PIECES_LIMIT ? "Hay más de " + FINISH_PIECES_LIMIT + " piezas exteriores"
+    : undefined;
+  const saveFinish = useCallback(async () => {
+    if (!scope || !shown) throw new Error("Elige un acabado y míralo en el modelo 3D.");
+    const change = await saveFinishChange(scope.project, scope.version, finishMaterial(shown.material, shown.tone), exteriorGuids);
+    return { href: "/proyectos/" + change.project + "/cambios#" + change.id, ready: change.status === "READY", material: change.recipe.operations[0]?.op === "ifc.set_material" ? change.recipe.operations[0].material : "" };
+  }, [scope, shown, exteriorGuids]);
+  const toggleLivePreview = useCallback(() => {
+    if (livePreview) resetExterior();
+    setLivePreview(!livePreview);
+  }, [livePreview, resetExterior]);
 
   // Download adjustments live here so the reset button can sit in the panel header.
   const [adjust, setAdjust] = useState<Adjustments>(NEUTRAL), [framing, setFraming] = useState<Framing>(FULL_FRAME);
@@ -163,7 +202,7 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   const [marks, setMarks] = useState<EditMark[]>([]);
   const [openMark, setOpenMark] = useState<number | null>(null);
   const [markFocus, setMarkFocus] = useState<MarkFocus | null>(null);
-  const [globalEdit, setGlobalEdit] = useState<GlobalEdit | null>(null);
+  const [globalEdit, setGlobalEdit] = useState<SceneEdit | null>(null);
   const [areaPose, setAreaPose] = useState<CameraPose | null>(null);
   const [lost, setLost] = useState<{ marks: EditMark[]; pose: CameraPose; at: number } | null>(null);
   const [notice, setNotice] = useState<{ text: string; at: number } | null>(null);
@@ -320,7 +359,7 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
     : pieces.length && tooLong ? "Reduce la selección: hay demasiadas piezas para una petición"
     : aiReason ?? (sending ? "Enviando la edición…" : undefined);
   const sendTitle = "Enviar edición" + (cost ? " · reserva " + cost : "");
-  const applyReason = !isApplicable(globalEdit) ? "Elige una opción primero" : aiReason ?? (sending ? "Enviando la edición…" : undefined);
+  const applyReason = !isApplicable(globalEdit) ? "Elige al menos una categoría de la escena o un acceso rápido" : aiReason ?? (sending ? "Enviando la edición…" : undefined);
   // Short, like the reference's hint: the cost of sending and what remains of the monthly AI budget.
   const costLine = budget ? "Reserva " + formatUsd(budget.reserve_cents) + " · quedan " + formatUsd(budget.remaining_cents) : undefined;
   const pill: EditPill | null = editError && sending !== "global" && !(active && active !== "select") ? { text: editError, tone: "error" }
@@ -328,6 +367,38 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
     : marking && !marks.length ? { text: HINT, tone: "hint" }
     : hasEditText(marks) ? { text: (pieces.length && tooLong ? sendReason : aiReason) ?? costLine ?? "", tone: "cost" }
     : null;
+
+  // «Proponer cambio al modelo» (H4, D9): the same notes, sent to the design agent instead of the image model.
+  const [agentInfo, setAgentInfo] = useState<AgentAvailability | null>(null);
+  const [agentRun, setAgentRun] = useState<AgentRunState | null>(null);
+  const agentProject = edit.on && !plan ? scope?.project : undefined;
+  useEffect(() => {
+    if (!agentProject) return;
+    const abort = new AbortController();
+    agentAvailability(agentProject, abort.signal).then(setAgentInfo).catch(() => setAgentInfo(null));
+    return () => abort.abort();
+  }, [agentProject]);
+  const notes = agentNotes(marks);
+  const running = agentRun?.state === "running";
+  const proposeOff = !scope ? noScope : edit.nonIfc ? "El agente cambia solo modelos IFC (este es " + edit.nonIfc + "): sube su exportación IFC para proponer cambios" : edit.changeLimit ? edit.changeLimit : agentReason(notes)
+    ?? (agentInfo && !agentInfo.available ? "Falta configurar el modelo de IA del agente en el servidor" : undefined)
+    ?? (agentInfo && agentInfo.reserveCents > agentInfo.remainingCents ? "Se agotó el presupuesto mensual de IA" : undefined)
+    ?? (running ? "El agente está preparando el cambio…" : sending ? "Enviando la edición…" : undefined);
+  const proposeTitle = "Proponer cambio al modelo" + (!agentInfo ? "" : agentInfo.reserveCents ? " · reserva " + formatUsd(agentInfo.reserveCents) : " · agente de prueba, sin costo");
+  async function propose() {
+    if (!scope || running) return;
+    const sent = agentNotes(marks);
+    setAgentRun({ state: "running", notes: sent.filter((note) => note.globalId).length });
+    setOpenMark(null);
+    try {
+      const run = await runDesignAgent(scope.project, scope.version, sent);
+      setAgentRun({ state: "done", run, project: scope.project });
+      // A draft ready for review takes the notes along, as «Enviar edición» does with its request.
+      if (run.status === "READY") { setMarks([]); setAreaPose(null); setLost(null); }
+    } catch (error) {
+      setAgentRun({ state: "error", message: error instanceof Error && error.message ? error.message : "No se pudo proponer el cambio." });
+    }
+  }
 
   async function send(kind: "marks" | "global") {
     const port = viewer();
@@ -390,6 +461,14 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   const ids = pieces.map((piece) => piece.id);
   const untouched = isNeutral(adjust) && isFullFrame(framing);
   const startWalk = () => { setTool(null); guard(() => { clearEdit(); walk.onStart(); }); };
+  /** «Recorrer esta escena en 3D»: the scene goes around the model, then the walk starts where it can. */
+  const walkScene = (request: string) => {
+    if (!walk.onScene?.(request)) { flash("No se pudo construir la escena en la vista 3D."); return; }
+    // The scene's ground is a floor: a model in metres is walked on it even when it has no floor of its own.
+    const reason = walk.sceneReason;
+    if (reason) { setTool(null); setActive("select"); flash("Escena aplicada a la vista 3D. El recorrido: " + reason.charAt(0).toLowerCase() + reason.slice(1) + "."); return; }
+    startWalk();
+  };
   // REVISAR keeps its own panel: the shortcut closes the other one first, as a click outside would.
   const clickReview = () => { setTool(null); bars.current?.querySelector<HTMLButtonElement>(".review-trigger")?.click(); };
 
@@ -423,10 +502,12 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   const port = viewer();
   return <>
     {edit.on && !plan && host && port && <EditMarksLayer viewer={port} host={host} marks={marks} marking={marking} open={openMark} focus={markFocus}
-      areaPose={areaPose} sendReason={sendReason} sendTitle={sendTitle} sending={sending === "marks"} onOpen={setOpenMark} onPoint={addPoint} onArea={addArea}
+      areaPose={areaPose} sendReason={sendReason} sendTitle={sendTitle} sending={sending === "marks"}
+      propose={{ reason: proposeOff, title: proposeTitle, busy: running, run: () => void propose() }} onOpen={setOpenMark} onPoint={addPoint} onArea={addArea}
       onText={(id, text) => setMarks((list) => setEditMarkText(list, id, text))} onRemove={removeMark} onMove={moveMark}
       onMiss={() => flash(MISS)} onCameraMoved={areasLost} onSend={() => void send("marks")} />}
     {notice && <p key={notice.at} className="workspace-toast edit-toast" role="status">{notice.text}</p>}
+    {agentRun && <AgentRunPanel value={agentRun} onClose={() => setAgentRun(null)} />}
     {lost && <div key={lost.at} className="workspace-toast edit-toast" data-action="" role="status">
       <span>{lost.marks.length === 1 ? "Se quitó la zona marcada: solo valía para el encuadre anterior." : "Se quitaron las zonas marcadas: solo valían para el encuadre anterior."}</span>
       <button type="button" onClick={restoreAreas}>Deshacer</button>
@@ -457,17 +538,22 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
       addReason={marks.length >= EDIT_MARK_LIMIT ? "Ya hay " + EDIT_MARK_LIMIT + " marcas: quita una para añadir otra" : undefined} onAddCenter={addCenter}
       resetReason={marks.length || globalEdit ? undefined : "No hay ediciones que restablecer"} onReset={resetEdits}
       cost={cost} applyReason={applyReason} applying={sending === "global"} error={sending ? undefined : editError || undefined}
-      onChoose={(tool, field, value) => { setEditError(""); setGlobalEdit((current) => chooseGlobal(current, tool, field, value)); }}
-      onPrompt={(text) => setGlobalEdit((current) => withPeoplePrompt(current, text))} onApply={() => void send("global")} selectButton={selectButton} />}
+      onChoose={(field, value) => { setEditError(""); setGlobalEdit((current) => chooseScene(current, field, value)); }}
+      onPreset={(id) => { setEditError(""); setGlobalEdit((current) => applyPreset(current, id)); }}
+      onClear={(category) => setGlobalEdit((current) => clearCategory(current, category))}
+      onPrompt={(text) => setGlobalEdit((current) => withPeoplePrompt(current, text))} onApply={() => void send("global")} selectButton={selectButton}
+      walk={walk.onScene ? { reason: isApplicable(globalEdit) ? undefined : "Elige al menos una categoría de la escena o un acceso rápido", note: walk.sceneReason, run: () => walkScene(globalEditText(globalEdit)) } : undefined} />}
     <ToolPopover open={tool === "render"} anchor={renderButton} id="tool-render" label="Renderizar opciones visuales" title="Renderizar"
       closeLabel="Cerrar Renderizar" width={340} keepMounted bare onClose={() => setTool(null)}>
       {base && key && !unavailable && <VisualOptions key={key} base={base} optionKey={key} name={name} state={state} open={tool === "render"} group={edit.on && !viewScope}
         choices={choices} onChoices={setChoices}
+        preview={plan ? undefined : { on: livePreview, result: exterior, onToggle: toggleLivePreview, onReset: resetExterior, save: { reason: saveReason, run: saveFinish } }}
         capture={viewScope ? () => viewer()!.captureGroup([], "jpeg", "current").image : capture}
         groupCapture={edit.on && !viewScope ? () => viewer()!.captureGroup(ids) : undefined}
         scope={pieces.length ? { value: viewScope ? "view" : "selection", selection: pieces.length === 1 ? selectionName : pieces.length + " piezas", onChange: setRenderScope } : undefined}
         reveal={reveal} onRevealed={revealed}
-        onCompare={(next) => { setWanted(next); setTool("compare"); }} onDownload={(next) => { setWanted(next); setTool("download"); }} />}
+        onCompare={(next) => { setWanted(next); setTool("compare"); }} onDownload={(next) => { setWanted(next); setTool("download"); }}
+        onWalkScene={walk.onScene ? walkScene : undefined} />}
     </ToolPopover>
     {proposal ? <ToolPopover open={tool === "compare"} anchor={compareButton} id="tool-compare" label="Comparar con la base" title="Comparar con la base"
       closeLabel="Cerrar comparación" width={384} keepMounted onClose={() => setTool(null)}>

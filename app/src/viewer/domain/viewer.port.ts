@@ -18,6 +18,8 @@ export interface ModelInfo {
   name: string;
   schema: string;
   walk?: boolean;
+  /** In verified units (metres), so it can be walked on the ground of a scene around it even without a floor of its own. */
+  sceneWalk?: boolean;
   sample: boolean;
   elements: ElementInfo[];
 }
@@ -65,7 +67,28 @@ export interface ViewerPort {
    * the right button orbits and the middle one pans. The wheel still zooms.
    */
   setMarking(on: boolean): void;
-  open(file: File | null, signal: AbortSignal, status: (text: string) => void): Promise<ModelInfo>;
+  /**
+   * Local preview of a finish on the exterior of the model (walls with Pset_*Common.IsExternal, or the
+   * pieces seen first from outside) and of the daylight. Only the scene changes: the file, the server and
+   * the captures' AI flow are untouched. `null` restores the model's own materials and light.
+   */
+  previewExteriorFinish(finish: ExteriorFinish | null): ExteriorPreview;
+  /**
+   * «Recorrer esta escena en 3D»: the scene of an Escena choice or of a generated option, built with real geometry
+   * around the model (sun and sky of the time of day, fog or rain of the weather, ground and low-poly trees or
+   * neighbours of the surroundings, tone mapping of the style). Local only, it also holds during the walk and
+   * combines with the exterior finish preview. False on plans or with nothing open.
+   */
+  previewEnvironment(environment: SceneEnvironment): boolean;
+  /** Back to the neutral viewer: the scene objects go and the light, fog and tone mapping are restored. */
+  clearEnvironment(): void;
+  /** The scene shown right now, or null. */
+  currentEnvironment(): SceneEnvironment | null;
+  /**
+   * Opens a file. `source` is the stored version it came from: a DWG of ACIS solids then asks the server
+   * for their mesh (GET …/versions/{version}/solids) and draws it with the lines.
+   */
+  open(file: File | null, signal: AbortSignal, status: (text: string) => void, source?: { project: string; version: string }): Promise<ModelInfo>;
   select(id: string | null): void;
   locate(id: string): void;
   fit(): void;
@@ -87,3 +110,25 @@ export type GroupCaptureView="current"|"reframe"|"isolated";
 /** What a click lands on: the piece (viewer id) and the 3D point of its surface. */
 export interface ProbeHit { id: string; point: [number, number, number] }
 export type ViewDirection = "front" | "back" | "right" | "left" | "top" | "bottom" | "iso";
+export type ExteriorMaterial = "wood" | "concrete" | "steel" | "glass" | "stone" | "paint";
+export type ExteriorTone = "light" | "medium" | "dark";
+export type ExteriorLight = "morning" | "afternoon" | "night";
+export type SceneTime = "morning" | "afternoon" | "night" | "sunrise" | "noon" | "golden" | "sunset" | "blue";
+export type SceneWeather = "clear" | "partly" | "overcast" | "fog" | "rain" | "snow";
+export type SceneSeason = "spring" | "summer" | "autumn" | "winter";
+export type SceneSurroundings = "none" | "countryside" | "city" | "coast" | "mountain" | "forest" | "lake" | "river" | "desert" | "tropical" | "residential" | "garden";
+export type SceneStyle = "photo" | "white-model" | "model" | "flat" | "watercolor" | "marker" | "pastel" | "collage" | "illustration" | "pencil" | "ink";
+/** What the 3D scene shows; null keeps the viewer's own value of that aspect. */
+export interface SceneEnvironment {
+  time: SceneTime | null;
+  weather: SceneWeather | null;
+  season: SceneSeason | null;
+  surroundings: SceneSurroundings | null;
+  style: SceneStyle | null;
+}
+export interface ExteriorFinish { material: ExteriorMaterial | null; tone: ExteriorTone | null; light: ExteriorLight | null }
+/**
+ * How many pieces took the finish and how they were found (declared IsExternal, rays from outside, none). `ids` are
+ * their viewer ids, so «Guardar en el modelo» can name the same pieces in a model change.
+ */
+export interface ExteriorPreview { pieces: number; source: "pset" | "perimeter" | "none"; ids?: string[] }

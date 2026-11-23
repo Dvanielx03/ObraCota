@@ -70,7 +70,7 @@ export function addPolyfaceMeshes(reader,ptr,database){
 const SOLIDS=["3DSOLID","REGION","BODY","SURFACE","EXTRUDEDSURFACE","LOFTEDSURFACE","REVOLVEDSURFACE","SWEPTSURFACE","PLANESURFACE","NURBSURFACE"];
 export function emptyReason(skipped){
   const solids=SOLIDS.reduce((n,type)=>n+(skipped.get(type)||0),0);
-  if(solids)return "Este DWG es un modelo 3D con "+solids+(solids===1?" sólido":" sólidos")+" ACIS. El visor dibuja planos (líneas, arcos, polilíneas, caras 3D y textos); los sólidos ACIS necesitan un núcleo geométrico que ObraCota todavía no tiene.";
+  if(solids)return "Este DWG es un modelo 3D con "+solids+(solids===1?" sólido":" sólidos")+" ACIS. Abierto desde tu equipo, el visor solo dibuja planos (líneas, arcos, polilíneas, caras 3D y textos): guárdalo en un proyecto para verlo en 3D, porque el servidor calcula sus sólidos.";
   const names={INSERT:"referencias a bloques sin geometría dibujable",TEXT:"textos vacíos",MTEXT:"textos vacíos",DIMENSION:"cotas no admitidas"};
   const found=[...skipped].filter(([type])=>type!=="Otros objetos sin decodificar").map(([type,n])=>n+" "+(names[type]??"entidades "+type)).join(", ");
   return found
@@ -207,10 +207,14 @@ export function extract(db, unknown,indexOnly=false) {
   if(unknown)skipped.set("Otros objetos sin decodificar",unknown);
   const records=labels.concat(dimensions);
   if(indexOnly)return {groups:[],labels:records,units:db.header.INSUNITS??0};
+  // ACIS solids are drawn from the server's mesh (GET …/versions/{id}/solids) when the file is a stored version;
+  // the viewer needs how many there are and each layer's colour to draw them beside the lines.
+  const acis=SOLIDS.reduce((n,type)=>n+(skipped.get(type)||0),0);
+  const layerColors=Object.fromEntries(db.tables.LAYER.entries.map(l=>[l.name,l.color]));
   if(!batches.size){
     const error=new Error(emptyReason(skipped));
     // Only a model of ACIS solids is the manufacturer case the stored thumbnail and the mesh hint serve.
-    if(SOLIDS.some(type=>skipped.get(type)))error.code="acis";
+    if(acis){error.code="acis";error.solids={acis,layerColors,units:db.header.INSUNITS??0,omissions:[...skipped].map(([t,n])=>t+" ("+n+")").join(", ")};}
     throw error;
   }
   const groups=Array.from(batches.values(),batch=>({...batch,positions:new Float32Array(batch.positions)}));
@@ -218,7 +222,8 @@ export function extract(db, unknown,indexOnly=false) {
     const [x,y,z]=annotation.anchor;
     annotation.anchor=[x-origin.x,z-origin.z,origin.y-y];
   }
-  return {groups,labels:records,units:db.header.INSUNITS??0,depth:maxZ-minZ,omissions:[...skipped].map(([t,n])=>t+" ("+n+")").join(", ")};
+  return {groups,labels:records,units:db.header.INSUNITS??0,depth:maxZ-minZ,omissions:[...skipped].map(([t,n])=>t+" ("+n+")").join(", "),
+    origin:[origin.x,origin.y,origin.z],acis,layerColors};
 }
 /**
  * The thumbnail AutoCAD saves in the DWG (shown in its file dialog), as an image a browser can draw:
@@ -303,9 +308,10 @@ self.onmessage=async({data})=>{
         try{thumbnail=storedThumbnail(reader,ptr);}
         catch{/* The picture only completes the message; without it the message stands alone. */}
       }
-      if(thumbnail){
-        const framed=await framedThumbnail(thumbnail);
-        self.postMessage({error:message,reason:"acis",preview:{kind:framed.kind,mime:framed.mime,bytes:framed.bytes,crop:framed.crop}},[framed.bytes.buffer]);
+      if(error?.code==="acis" && !data.indexOnly){
+        const framed=thumbnail?await framedThumbnail(thumbnail):null;
+        const preview=framed?{kind:framed.kind,mime:framed.mime,bytes:framed.bytes,crop:framed.crop}:undefined;
+        self.postMessage({error:message,reason:"acis",preview,solids:error.solids,version,versionId:await fileVersion(bytes)},framed?[framed.bytes.buffer]:[]);
         return;
       }
       throw error;

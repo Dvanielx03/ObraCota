@@ -1,4 +1,5 @@
 "use client";
+import { changeLimitReason } from "@/modules/model-change/domain/change-limit";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CubeIcon, SidebarSimpleIcon, XIcon } from "@phosphor-icons/react";
 import { Circle, Footprints, Hand, House, ListChecks, Maximize, Minus, Plus, Rotate3d, Square, SquareDashed, X } from "lucide-react";
@@ -22,6 +23,9 @@ import type { VersionNotes } from "@/modules/model-version/domain/model-version"
 import { VersionRail, type VersionRailHandle } from "@/modules/model-version/ui/version-rail";
 import { VersionCompare } from "@/modules/model-version/ui/version-compare";
 import { WorkspaceTools, type WorkspaceToolsHandle } from "./workspace-tools";
+import { SceneWalkBar, type WalkScene } from "@/modules/design-option/ui/scene-walk";
+import { readScene } from "@/modules/design-option/domain/scene-environment";
+import { optionsPath } from "@/modules/design-option/infrastructure/option-http";
 import { IconTool, ModeButton, RovingToolbar, ToolSeparator } from "./tool-bar";
 import { ShortcutSheet } from "./shortcut-sheet";
 import { TOOL_KEYS, shortcutFor, toolNotice, type ShortcutAction } from "../domain/shortcuts";
@@ -86,8 +90,13 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
 }) {
   const container = useRef<HTMLDivElement>(null), viewer = useRef<ViewerPort|null>(null), input = useRef<HTMLInputElement>(null);
   const request = useRef<AbortController|null>(null), last = useRef<File|null>(initialFile ?? null);
+  // Read by `open` without making it change (and restart the viewer) on every render of the stored page.
+  const storedRef = useRef(storedVersion);
+  storedRef.current = storedVersion;
   const previewing = !!proposal;
   const [model,setModel] = useState<ModelInfo|null>(null), [selected,setSelected] = useState<string|null>(null);
+  // Bytes of the file on screen: the IFC engine verifies changes only up to MODEL_CHANGE_MAX_BYTES.
+  const [openedBytes,setOpenedBytes] = useState(0);
   const [status,setStatus] = useState("Iniciando visor…"), [error,setError] = useState(""), [pan,setPan] = useState(false);
   /** The thumbnail a DWG of ACIS solids keeps, shown in the «No se pudo abrir» card that tells its failure. */
   const failure = useOpenFailure(error);
@@ -108,6 +117,19 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     try{localStorage.setItem(PANEL_KEY,next?"open":"closed");}catch{/* Remembered for this visit only. */}
   }
   const [walk,setWalk]=useState<"idle"|"mark"|"active">("idle");
+  // «Recorrer esta escena en 3D»: the scene built around the model, kept across the walk until «Restablecer».
+  const [walkScene,setWalkScene]=useState<WalkScene|null>(null);
+  useEffect(()=>{setWalkScene(null);},[model]);
+  const showScene=useCallback((request:string)=>{
+    const port=viewer.current;
+    if(!port)return false;
+    const {environment,finish}=readScene(request);
+    if(finish)port.previewExteriorFinish(finish);
+    if(!port.previewEnvironment(environment))return false;
+    setWalkScene({environment,request});
+    return true;
+  },[]);
+  const resetScene=useCallback(()=>{viewer.current?.clearEnvironment();viewer.current?.previewExteriorFinish(null);setWalkScene(null);},[]);
   const [walkError,setWalkError]=useState(""),[walkLoading,setWalkLoading]=useState(""),[walkOlder,setWalkOlder]=useState(false);
   const walkRequest=useRef<AbortController|null>(null),previousFile=useRef<File|undefined>(undefined),beforeWalk=useRef(true);
   const walkEnded=useRef(false);
@@ -241,13 +263,14 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     request.current = job;
     setError("");setStatus(file?"Leyendo archivo…":"Abriendo ReStage…");setOpening(fileLine(file));
     try {
-      const next = await viewer.current.open(file,job.signal,setStatus);
+      // The stored version the file came from: its ACIS solids are tessellated on the server.
+      const next = await viewer.current.open(file,job.signal,setStatus,file && file===initialFile ? storedRef.current : undefined);
       if (!job.signal.aborted) {
         last.current=file;setPan(false);
         setPrismaStep(null);
         const design=!previewing && !next.drawing && next.environment!=="plan" && new URLSearchParams(window.location.search).get("panel")==="asistente";
         setAssistant(design);setGrouping(false);setColor(null);
-        setTab("reading");setModel(next);
+        setTab("reading");setModel(next);setOpenedBytes(file?.size??0);
         setGuide(step=>step==="done"?"off":step==="note"||step==="review"?"select":step);
         const target=file && file===initialFile ? new URLSearchParams(window.location.search).get("element") : null;
         const initial = target ? next.elements.find(item=>item.guid===target || item.id===target)
@@ -290,7 +313,8 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   // later loads in the same visit (another file, another version) show the file being read.
   const [entered,setEntered] = useState(false);
   useEffect(()=>{if(ready)setEntered(true);},[ready]);
-  const prismaAvailable=ready && !plan && !model?.drawing;
+  // Editar, Renderizar and the walk work on any 3D model: IFC, a 3D DWG, FBX, OBJ or the sample; not on a plan.
+  const prismaAvailable=ready && !plan;
   // The quick tour follows what the person does and skips a stop whose control this file lacks.
   useEffect(()=>{
     if(!ready || !quick || quickPaused)return;
@@ -437,8 +461,8 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
       fileName={model?.name || "Visor de modelos"} pending={!model} meta={model?(plan?"Plano 2D":"Vista 3D")+" · "+model.schema:undefined}
       badge={proposal && showingInitial?{label:proposal.label,detail:proposal.description}:undefined}
       onFile={file=>void open(file)} input={input} openDisabled={touring || (!viewer.current && !!error)} inert={presenting}
-      exportMenu={<ExportMenu disabledReason={exportReason} viewCount={viewCount} onNotice={say}
-        context={()=>{const list=strip.current?.snapshot();return list && model?{views:list.views,project:projectName,file:model.name,version:revision?.label}:null;}}
+      exportMenu={<ExportMenu disabledReason={exportReason} viewCount={viewCount} onNotice={say} stored={!!storedVersion && !proposal}
+        context={()=>{const list=strip.current?.snapshot();return list && model?{views:list.views,project:projectName,file:model.name,version:revision?.label,stored:storedVersion}:null;}}
         camera={{pose:readPose,apply:next=>applyPose(next),capture:()=>viewer.current?.capture("png",EXPORT_MAX_SIDE)??null}}
         stage={()=>container.current?.closest<HTMLElement>(".stage")??null}/>}
       present={{ref:presentButton,disabled:!stripShown || !viewCount,title:presentReason,onClick:present}}
@@ -457,13 +481,16 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           {model && <><small>{model.schema}</small><button className="close" aria-label="Cerrar modelo" onClick={closeModel}><XIcon/></button></>}
         </div>}
         <div className="view" style={{visibility:ready?"visible":"hidden"}} data-ready={ready || undefined} ref={container}/>
+        {ready && !plan && walkScene && <SceneWalkBar scene={walkScene} onReset={resetScene}
+          base={serverNotes && storedVersion?optionsPath(storedVersion.project,storedVersion.version):undefined}
+          capture={()=>viewer.current?.capture("jpeg")??null}/>}
         {status || settling ? <ModelPreparing phase={status || ENTRY_SETTLING_PHASE} stage={entered && engine?"model":"viewer"} detail={opening}>
             {engine && status && <button type="button" onClick={()=>{request.current?.abort();setStatus("");setHolding(false);}}>Cancelar</button>}
           </ModelPreparing>
           : !ready && <div className="feedback" role="status" data-kind={error?"error":"empty"}>
           {error ? <CubeIcon size={32}/> : <EmptyArt width={220}/>}<h2>{error?"No se pudo abrir":"Abrir un modelo"}</h2>
-          {error ? <p>{error}</p> : <p>Sube un IFC, DWG, FBX u OBJ de tu equipo, o recorre el edificio de ejemplo.</p>}
-          {failure && <StoredPreview failure={failure}/>}
+          {error ? <p>{error}</p> : <p>Sube un IFC, DWG, RVT, FBX u OBJ de tu equipo, o recorre el edificio de ejemplo.</p>}
+          {failure && <StoredPreview failure={failure} stored={proposal?undefined:storedVersion}/>}
           <div>{viewer.current ? <><button onClick={()=>input.current?.click()}>Elegir archivo</button>
             <button onClick={()=>model?setError(""):open(null)}>{model?"Volver al modelo":"Explorar ReStage"}</button></> :
             <button onClick={()=>{setError("");setStatus("Iniciando visor…");setSession(s=>s+1);}}>Reintentar</button>}</div>
@@ -506,13 +533,16 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
         {ready && !touring && model && <WorkspaceTools key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} control={tools} viewer={readViewer} plan={plan}
           scope={!plan && serverNotes && storedVersion ? storedVersion : undefined} pieces={optionPieces} onWorking={setOptionsWorking}
           proposal={proposal && showingInitial?{renderReason:PROPOSAL_RENDER,compare:proposal.compare({elements:model.elements,viewer:readViewer,selected})}:undefined}
-          edit={{on:assistant,grouping,reason:proposal && showingInitial?PROPOSAL_EDIT:prismaAvailable?undefined:"Editar necesita un modelo 3D (IFC, FBX, OBJ o el ejemplo GLB); las propuestas de cambio solo funcionan con IFC",
+          edit={{on:assistant,grouping,nonIfc:model.sample || /^IFC/i.test(model.schema)?undefined:model.schema.split(" ")[0],changeLimit:changeLimitReason(openedBytes),reason:proposal && showingInitial?PROPOSAL_EDIT:prismaAvailable?undefined:"Editar necesita un modelo 3D (IFC, DWG 3D, FBX, OBJ o el ejemplo GLB); las propuestas de cambio solo funcionan con IFC",
             selection:ids,onSelection:next=>{setIds(next);setColor(null);},piece:findElement,onFocusPiece:setEditFocus,
             onEnter:enterEdit,onExit:exitEdit,onUngroup:()=>setGrouping(false)}}
           reviewOpen={reviewOpen} onCloseReview={()=>review.current?.close()}
           review={<DeliveryReview server={serverNotes && storedVersion?storedVersion:proposal && showingInitial?proposal.scope:undefined} control={review} onOpenChange={setReviewOpen} guided={guide==="review"&&!paused} onDownloaded={()=>{if(guide==="review"&&!paused){setGuide("done");rememberGuide();}}} key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} model={model} locate={id=>{setPanel(true);pick(id);viewer.current?.locate(id);}}
             trigger={(toggle,anchor,open)=><ModeButton ref={anchor} icon={ListChecks} label="Revisar" aria-label="Revisar entrega" aria-haspopup="dialog" aria-expanded={open} aria-controls="tool-review" className="review-trigger" shortcut={TOOL_KEYS.review} onClick={toggle}/>}/>}
-          walk={{reason:model.walk && prismaAvailable?undefined:"Disponible al abrir un IFC guardado en uno de tus proyectos",onStart:startWalk}}
+          walk={{reason:model.walk && prismaAvailable?undefined:model.sceneWalk && prismaAvailable?"Este modelo no tiene un piso propio: aplica una escena en Editar › Escena y recórrela sobre su suelo"
+            :"Disponible al abrir un modelo 3D con unidades verificables (IFC, DWG 3D o FBX) guardado en uno de tus proyectos",
+            sceneReason:model.sceneWalk && prismaAvailable?undefined:"Necesita un modelo 3D con unidades verificables (IFC, DWG 3D con unidad declarada o FBX); un OBJ no declara unidades",
+            onStart:startWalk,onScene:showScene}}
           camera={<RovingToolbar label="Controles de la cámara" className="tools">
             {!plan && <><IconTool icon={Rotate3d} aria-label="Orbitar" aria-pressed={!pan} onClick={()=>{if(pan)togglePan();}}/>
             <IconTool icon={Hand} aria-label="Desplazar" aria-pressed={pan} onClick={()=>{if(!pan)togglePan();}}/><ToolSeparator/></>}

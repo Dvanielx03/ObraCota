@@ -1,4 +1,4 @@
-import { IfcAPI, IFCPROJECT, IFCRELCONTAINEDINSPATIALSTRUCTURE, IFCRELASSOCIATESMATERIAL } from "../ifc/web-ifc-api.js";
+import { IfcAPI, IFCPROJECT, IFCRELCONTAINEDINSPATIALSTRUCTURE, IFCRELASSOCIATESMATERIAL, IFCRELDEFINESBYPROPERTIES } from "../ifc/web-ifc-api.js";
 
 import {fileVersion} from "./file-version.js";
 import {readDoorEvidence} from "./door-evidence.js";
@@ -29,6 +29,23 @@ self.onmessage = async ({data: file}) => {
     }
     const levels = relationMap(IFCRELCONTAINEDINSPATIALSTRUCTURE, "RelatingStructure", item => item?.Name?.value);
     const materials = relationMap(IFCRELASSOCIATESMATERIAL, "RelatingMaterial", item => item?.Name?.value);
+    // Pset_*Common.IsExternal, so the viewer can tell the envelope apart (exterior finish preview).
+    const external = new Map();
+    const definitions = api.GetLineIDsWithType(model, IFCRELDEFINESBYPROPERTIES);
+    for (let i = 0; i < definitions.size(); i++) {
+      try {
+        const rel = api.GetLine(model, definitions.get(i));
+        const set = api.GetLine(model, rel.RelatingPropertyDefinition?.value);
+        if (!/^Pset_.*Common$/.test(set?.Name?.value ?? "")) continue;
+        for (const ref of set.HasProperties ?? []) {
+          const property = api.GetLine(model, ref.value);
+          if (property?.Name?.value !== "IsExternal") continue;
+          const value = property.NominalValue?.value;
+          const flag = value === true || value === "T" || value === ".T." || value === "TRUE";
+          for (const object of rel.RelatedObjects ?? []) external.set(object.value, flag);
+        }
+      } catch { /* a malformed property set does not stop the read */ }
+    }
     const geometry = new Map();
     const elements = [];
     const buffers = [];
@@ -57,7 +74,8 @@ self.onmessage = async ({data: file}) => {
       const line = api.GetLine(model,id);
       const type = api.GetNameFromTypeCode(line.type);
       elements.push({id: String(id), guid: line.GlobalId?.value, name: line.Name?.value || type + " #" + id,
-        type, level: levels.get(id) || "Sin nivel directo", material: materials.get(id), parts});
+        type, level: levels.get(id) || "Sin nivel directo", material: materials.get(id), parts,
+        external: external.get(id), predefined: typeof line.PredefinedType?.value === "string" ? line.PredefinedType.value : undefined});
     });
     if (!elements.length) throw new Error("El IFC no contiene geometría visible.");
     readDoorEvidence(api,model,elements.filter(element=>element.type.toUpperCase()==="IFCDOOR"),geometry);

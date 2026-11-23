@@ -5,9 +5,46 @@ import type {SceneModel} from "./model-source";
 
 const bodies=/^(IFC(WALL|SLAB|ROOF|DOOR|WINDOW|CURTAINWALL|FURNISHINGELEMENT|COLUMN|BEAM|MEMBER|PLATE|STAIR|RAMP|GEOGRAPHICELEMENT|BUILDINGELEMENTPROXY|FOOTING))/;
 const radius=.23,eye=1.65;
+/**
+ * Collision triangles the walk indexes at most. The octree is built on the main thread (with the bounding-box split
+ * below, about 0.75 s for the 280 000 triangles of the Jalis sofa); a larger model keeps its biggest pieces.
+ */
+const TRIANGLE_BUDGET=600_000;
 const movement:Record<string,string>={w:"forward",ArrowUp:"forward",s:"back",ArrowDown:"back",a:"left",ArrowLeft:"left",d:"right",ArrowRight:"right"};
 
 class WalkOctree extends Octree {
+  /**
+   * three's split tests every triangle against every child with the exact box–triangle test (13 axes): 160 000
+   * triangles of ReStage took 5.3 s on the main thread. A triangle goes instead into every child its own bounding
+   * box overlaps: a few more triangles per leaf, the same collisions (the capsule and floor tests stay exact),
+   * built in a fraction of the time.
+   */
+  override split(level:number){
+    if(!this.box)return this;
+    const half=this.box.getSize(new T.Vector3()).multiplyScalar(.5),children:WalkOctree[]=[];
+    for(let x=0;x<2;x++)for(let y=0;y<2;y++)for(let z=0;z<2;z++){
+      const min=this.box.min.clone().add(new T.Vector3(x*half.x,y*half.y,z*half.z));
+      const child=new WalkOctree(new T.Box3(min,min.clone().add(half)));
+      child.trianglesPerLeaf=this.trianglesPerLeaf;child.maxLevel=this.maxLevel;
+      children.push(child);
+    }
+    let triangle:T.Triangle|undefined;
+    while((triangle=this.triangles.pop())){
+      const {a,b,c}=triangle;
+      const x0=Math.min(a.x,b.x,c.x),x1=Math.max(a.x,b.x,c.x),y0=Math.min(a.y,b.y,c.y),y1=Math.max(a.y,b.y,c.y),z0=Math.min(a.z,b.z,c.z),z1=Math.max(a.z,b.z,c.z);
+      for(const child of children){
+        const {min,max}=child.box!;
+        if(x1>=min.x && x0<=max.x && y1>=min.y && y0<=max.y && z1>=min.z && z0<=max.z)child.triangles.push(triangle);
+      }
+    }
+    for(const child of children){
+      const count=child.triangles.length;
+      if(count>this.trianglesPerLeaf && level<this.maxLevel)child.split(level+1);
+      if(count)this.subTrees.push(child);
+    }
+    return this;
+  }
+
   private collect(matches:(box:T.Box3)=>boolean){
     const result=new Set<T.Triangle>(),pending=[...this.subTrees];
     while(pending.length){
@@ -41,28 +78,41 @@ export function walkWorld(model:SceneModel){
   const start=performance.now(),meshes=new T.Group();
   let triangles=0;
   model.root.updateMatrixWorld(true);
+  // IFC pieces collide by class; a mesh without one (DWG solids, a scaled 3D drawing) is a body as it is.
+  const candidates:{node:T.Mesh;count:number;size:number}[]=[];
+  const box=new T.Box3();
   model.root.traverse(node=>{
-    if(!(node instanceof T.Mesh)||!bodies.test(String(node.userData.ifcType)))return;
+    if(!(node instanceof T.Mesh)||!node.visible||(node.userData.ifcType!==undefined && !bodies.test(String(node.userData.ifcType))))return;
     const count=(node.geometry.index?.count??node.geometry.attributes.position.count)/3;
+    candidates.push({node,count,size:box.setFromObject(node).getSize(new T.Vector3()).length()});
+  });
+  // A large model keeps its biggest pieces (slabs, walls, stairs) within the collision budget: the small,
+  // dense details (bolts, profiles) are what goes when it does not fit.
+  if(candidates.reduce((sum,item)=>sum+item.count,0)>TRIANGLE_BUDGET)candidates.sort((a,b)=>b.size-a.size);
+  for(const {node,count} of candidates){
+    if(triangles+count>TRIANGLE_BUDGET)continue;
     triangles+=count;
-    if(triangles>800_000)throw new Error("El modelo supera el límite de 800 000 triángulos de colisión del recorrido.");
     const proxy=node.clone(false);
     proxy.matrixAutoUpdate=false;
     proxy.matrix.copy(node.matrixWorld);
     meshes.add(proxy);
-  });
+  }
   if(!triangles)throw new Error("El modelo carece de superficies utilizables para recorrer.");
   const tree=new WalkOctree();
   // Long slabs or repeated faces can occupy many children. Bound subdivision for IFC meshes.
   tree.maxLevel=6;
   tree.trianglesPerLeaf=32;
   tree.fromGraphNode(meshes);
-  performance.measure("obracota:walk-index",{start,end:performance.now(),detail:{triangles}});
+  performance.measure("obracota:walk-index",{start,end:performance.now(),detail:{triangles,pieces:meshes.children.length,of:candidates.length}});
   return {tree,coordination:new T.Matrix4().fromArray(model.coordination)};
 }
 export type WalkWorld=ReturnType<typeof walkWorld>;
 
-export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,heading:T.Vector3,render:(camera:T.Camera)=>void){
+/**
+ * `ground`, when given, is the height of the scene's ground around the model («Recorrer esta escena en 3D»): an
+ * endless floor at that level, so the walk can leave the building and go around it. Read on every step.
+ */
+export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,heading:T.Vector3,render:(camera:T.Camera)=>void,ground?:()=>number|null){
   const camera=new T.PerspectiveCamera(65,1,.035,2000);
   camera.rotation.order="YXZ";
   function capsule(point:T.Vector3){
@@ -70,8 +120,12 @@ export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,
   }
   let body=capsule(foot),current=world;
   const down=new T.Vector3(0,-1,0);
+  function onGround(position:T.Vector3){
+    const level=ground?.();
+    return level!==null && level!==undefined && position.y>=level-.05 && position.y-level<=.4;
+  }
   function grounded(tree:WalkOctree,position:T.Vector3){
-    return tree.floorAt(position.clone().add(new T.Vector3(0,.12,0)),.28);
+    return tree.floorAt(position.clone().add(new T.Vector3(0,.12,0)),.28) || onGround(position);
   }
   function room(tree:Octree,player:Capsule){
     const hit=tree.capsuleIntersect(player);
@@ -80,7 +134,7 @@ export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,
   if(!grounded(world.tree,foot)||!room(world.tree,body))
     throw new Error("Elige una superficie de piso libre, con espacio para caminar.");
   let safe=body.clone();
-  const keys=new Set<string>(),vector=new T.Vector3(),step=new T.Vector3();
+  const keys=new Set<string>(),vector=new T.Vector3(),step=new T.Vector3(),lift=new T.Vector3();
   let frame=0,previous=performance.now(),velocity=0,standing=true,needsDraw=true;
   // Frames drawn while walking, per second of movement (KNOWN_ISSUES #4): the last measure is kept as a mark.
   let measureFrom=0,measured=0;
@@ -139,6 +193,11 @@ export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,
         body.translate(hit.normal.multiplyScalar(hit.depth+.00001));
       }
       if(!room(current.tree,body)){body=before;velocity=0;}
+      const level=ground?.();
+      if(level!==null && level!==undefined){
+        const below=level-(body.start.y-radius);
+        if(below>0){body.translate(lift.set(0,below+.00001,0));if(velocity<0){velocity=0;standing=true;}}
+      }
     }
     const feet=body.start.clone().addScaledVector(down,radius);
     if(standing && grounded(current.tree,feet))safe=body.clone();
@@ -152,6 +211,10 @@ export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,
   canvas.focus();frame=requestAnimationFrame(tick);
   return {
     move,
+    /** The walker's eye, for pictures taken during the walk. */
+    camera,
+    /** Draws the next frame again (the scene around the walk changed). */
+    redraw(){needsDraw=true;},
     switch(next:WalkWorld){
       const align=new T.Matrix4().multiplyMatrices(next.coordination,current.coordination.clone().invert());
       const point=body.start.clone().addScaledVector(down,radius+.004).applyMatrix4(align);

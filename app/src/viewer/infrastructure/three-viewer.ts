@@ -3,6 +3,8 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import {PlanSheet} from "./plan-sheet";
 import { loadModel, type SceneModel } from "./model-source";
 import { walking, walkWorld, type WalkWorld } from "./walk";
+import { exteriorPreview } from "./exterior-finish";
+import { sceneEnvironment } from "./scene-environment";
 import type { ElementInfo, GroupCaptureView, ViewerPort, ViewDirection,CameraPose} from "../domain/viewer.port";
 
 function release(root:T.Object3D) {
@@ -35,7 +37,8 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   canvas.setAttribute("aria-label","Vista tridimensional del modelo. Usa el explorador para seleccionar con teclado.");
   container.appendChild(canvas);
   const scene = new T.Scene();
-  scene.add(new T.HemisphereLight(0xffffff,0x9f9685,2));
+  const sky=new T.HemisphereLight(0xffffff,0x9f9685,2);
+  scene.add(sky);
   const sun = new T.DirectionalLight(0xfff4db,2.1);
   sun.position.set(6,10,7);
   scene.add(sun);
@@ -248,6 +251,19 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     });
     draw();
   }
+  // Renderizar › Ver en el modelo 3D: a selected piece keeps its highlight; the finish waits in `originals`.
+  const exterior=exteriorPreview(scene,renderer,sky,sun,{
+    get:mesh=>originals.has(mesh)?originals.get(mesh)!:mesh.material,
+    set:(mesh,material)=>{if(originals.has(mesh))originals.set(mesh,material);else mesh.material=material;},
+    redraw:()=>draw(),
+  });
+  // «Recorrer esta escena en 3D»: sky, ground, trees and weather around the model, kept during the walk.
+  const environment=sceneEnvironment({scene,renderer,hemisphere:sky,sun,bounds:()=>bounds,
+    redraw:()=>{if(walk)walk.redraw();else draw();},
+    mark:state=>{
+      const stage=container.closest<HTMLElement>(".stage")??container;
+      if(state)stage.dataset.environment=state;else delete stage.dataset.environment;
+    }});
   function locateOnPlan(id:string) {
     const forward=camera.getWorldDirection(new T.Vector3());
     // The cursor zoom can shift the frustum away from the OrbitControls target.
@@ -334,6 +350,13 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     ray.params.Points.threshold=ray.params.Line.threshold;
     ray.setFromCamera(new T.Vector2((x-rect.left)/rect.width*2-1,1-(y-rect.top)/rect.height*2),camera);
     return ray.intersectObject(root,true).find(hit=>hit.object.userData.elementId);
+  }
+  function groundAt(x:number,y:number){
+    const ground=environment.ground();
+    if(!ground)return;
+    const rect=canvas.getBoundingClientRect(),ray=new T.Raycaster();
+    ray.setFromCamera(new T.Vector2((x-rect.left)/rect.width*2-1,1-(y-rect.top)/rect.height*2),camera);
+    return ray.intersectObject(ground,false)[0];
   }
   function pivotAt(point:T.Vector3) {
     // OrbitControls looks at its target. Shift the orthographic frustum in the
@@ -480,7 +503,8 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   function walkAt(x:number,y:number){
     const notify=markFloor;
     if(!notify || !activeModel || !originalFile)return;
-    const hit=hitAt(x,y);
+    // With a scene around the model its ground counts as floor too: the walk can start outside and go around.
+    const hit=hitAt(x,y)??groundAt(x,y);
     if(!hit){notify("Selecciona un punto visible en el piso.");return;}
     try{
       let entry=walkModels.get(originalFile);
@@ -491,7 +515,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
         target.getCenter(heading).sub(hit.point).setY(0);
         if(heading.lengthSq()<.001)heading.set(0,0,-1);
       }
-      walk=walking(canvas,entry.world,hit.point,heading.normalize(),view=>renderer.render(scene,view));
+      walk=walking(canvas,entry.world,hit.point,heading.normalize(),view=>renderer.render(scene,view),()=>environment.groundLevel());
     }catch(error){
       notify(error instanceof Error?error.message:"No se pudo iniciar el recorrido.");
       return;
@@ -515,7 +539,8 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       const boost=sharper>ratio*1.05;
       if(boost){renderer.setPixelRatio(sharper);renderer.setSize(width,height,false);}
       try{
-        renderer.render(scene,camera);
+        // During the walk the picture is what the walker sees («Panorama 360° con IA» sends it as reference).
+        renderer.render(scene,walk?.camera??camera);
         const image=document.createElement("canvas");
         const scale=Math.min(1,maxSide/Math.max(canvas.width,canvas.height));
         image.width=Math.max(1,Math.round(canvas.width*scale));
@@ -525,7 +550,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
         ctx.drawImage(canvas,0,0,image.width,image.height);
         return image;
       }finally{
-        if(boost){renderer.setPixelRatio(ratio);renderer.setSize(width,height,false);renderer.render(scene,camera);}
+        if(boost){renderer.setPixelRatio(ratio);renderer.setSize(width,height,false);renderer.render(scene,walk?.camera??camera);}
       }
   }
   function groupBounds(selection:Set<string>){
@@ -629,6 +654,16 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   }
   return {
     capture(format="jpeg",maxSide){return snapshot(captureBackground(),maxSide).toDataURL("image/"+format,0.9);},
+    previewExteriorFinish(finish){
+      if(!finish){exterior.reset();draw();return {pieces:0,source:"none"};}
+      return exterior.apply(plan || walk?null:activeModel?.root??root,finish);
+    },
+    previewEnvironment(next){
+      if(plan || !root || bounds.isEmpty())return false;
+      return environment.apply(next);
+    },
+    clearEnvironment(){environment.reset();},
+    currentEnvironment(){return environment.current();},
     previewGroup(ids,color){select(null,new Set(ids),color);canvas.toggleAttribute("data-group-preview",ids.length>0);},
     frameGroup(ids){
       const area=groupBounds(new Set(ids));
@@ -636,9 +671,10 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     },
     captureGroup,
     enterWalk(mark){
-      if(!activeModel?.coordination || !originalFile || plan){mark("Abre un IFC 3D o un FBX con unidades verificables.");return;}
-      // A manufacturer piece in metres without a floor at its base (a lamp, a chair) has nowhere to stand.
-      if(activeModel.walk===false){mark("Este modelo no tiene un piso para recorrer.");return;}
+      if(!activeModel?.coordination || !originalFile || plan){mark("Abre un modelo 3D con unidades verificables: IFC, DWG 3D o FBX.");return;}
+      // A manufacturer piece in metres without a floor at its base (a lamp, a chair) has nowhere to stand,
+      // unless a scene around it («Recorrer esta escena en 3D») gives it a ground.
+      if(activeModel.walk===false && environment.groundLevel()===null){mark("Este modelo no tiene un piso para recorrer.");return;}
       if(windowMode)exitWindow();
       endPulse();stopTween();
       markFloor=mark;controls.enabled=false;canvas.style.cursor="crosshair";canvas.focus();
@@ -667,10 +703,10 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       }
     },
     walkMove(key,held){walk?.move(key,held);},
-    async open(file,signal,status) {
-      const next = await loadModel(file,signal,status);
+    async open(file,signal,status,source) {
+      const next = await loadModel(file,signal,status,source);
       if (disposed || signal.aborted) {release(next.root);throw new DOMException("Cancelado","AbortError");}
-      cancelWalk();select(null);
+      cancelWalk();select(null);exterior.reset();environment.reset();
       if (root) {scene.remove(root);release(root);}
       root = next.root; scene.add(root);activeModel=next;originalFile=file;
       annotations=new Map(next.elements.filter(item=>item.annotation).map(item=>[item.id,item]));
@@ -718,14 +754,14 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
         sheet=new PlanSheet(initialPlanBounds,root);
       }
       fit();
-      return {environment:plan?"plan":"model",name:next.name,schema:next.schema,sample:next.sample,elements:next.elements,drawing:next.drawing,versionId:next.versionId,walk:next.walk!==false && !!next.coordination && !plan};
+      return {environment:plan?"plan":"model",name:next.name,schema:next.schema,sample:next.sample,elements:next.elements,drawing:next.drawing,versionId:next.versionId,walk:next.walk!==false && !!next.coordination && !plan,sceneWalk:!!next.coordination && !plan};
     },
       fit,select(id){canvas.removeAttribute("data-group-preview");select(id);},locate,orient,pose,applyPose,extents:()=>fit(false),
     windowZoom(){stopTween();if(windowMode)exitWindow();else{windowMode=true;canvas.style.cursor="crosshair";canvas.focus();}},
     clear() {
       stopTween();cancelWalk();activeModel=undefined;originalFile=null;
       if(windowMode)exitWindow();
-      select(null);
+      select(null);exterior.reset();environment.reset();
       sheet=undefined;annotations.clear();
       if (root) {scene.remove(root);release(root);root=null;}
       draw();
@@ -750,7 +786,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       disposed = true; observer.disconnect(); controls.dispose();
       canvas.removeEventListener("pointerdown",start);canvas.removeEventListener("pointerup",end);
       canvas.removeEventListener("webglcontextlost",lose);
-      originals.forEach((mat,m)=>{m.material=mat;}); if (root) release(root);
+      originals.forEach((mat,m)=>{m.material=mat;}); exterior.reset(); environment.reset(); if (root) release(root);
       span.geometry.dispose();span.material.dispose();previewMaterial.dispose();
       hint.remove();marker.remove();box.remove();highlightedLines.dispose();highlightedPoints.dispose();highlight.dispose();renderer.dispose();canvas.remove();
     }

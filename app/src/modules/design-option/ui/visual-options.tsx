@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, Coins, Download, Eye, EyeOff, PanelRightDashed, Ruler, Sparkles, Trees } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Box, Check, Coins, Download, Eye, EyeOff, Footprints, PanelRightDashed, RotateCcw, Ruler, Save, Sparkles, Trees } from "lucide-react";
 import { BusyButton, LoaderArt, LoadingStatus, Skeleton, Spinner } from "@/shared/ui/loading";
-import type { GroupCapture } from "@/viewer/domain/viewer.port";
+import type { ExteriorPreview, GroupCapture } from "@/viewer/domain/viewer.port";
 import { ChipChoice, ChipToggles } from "./option-chips";
 import { usePrivateImage, type OptionHistoryState } from "./use-option-history";
 import { DAYLIGHTS, DEFAULT_CHOICES, FINISHES, KEEPS, REQUEST_LIMIT, TONES, asksForChange, composeRequest, formatUsd, type OptionChoices } from "../domain/option-request";
@@ -16,6 +18,36 @@ function PrivateImage({ path, label }: { path: string; label: string }) {
   const { url, error } = usePrivateImage(path);
   return url ? <img src={url} alt={label} /> : error ? <span className="option-thumb-wait">Sin imagen</span>
     : <><Skeleton className="image-skeleton" /><span className="visually-hidden">Cargando {label.charAt(0).toLowerCase() + label.slice(1)}…</span></>;
+}
+
+/** What «Guardar en el modelo» needs: why it is off, and the action, which answers where the change card is. */
+export interface SaveFinish { reason?: string; run: () => Promise<{ href: string; ready: boolean; material: string }> }
+
+/**
+ * «Guardar en el modelo» (H2 material): turns the finish previewed on the exterior into a real model change. The engine
+ * previews it, and the owner reviews it in 3D and approves it on its card; the file only changes once she approves.
+ */
+function SaveFinishButton({ save }: { save: SaveFinish }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [href, setHref] = useState("");
+  async function run() {
+    setBusy(true); setMessage(""); setHref("");
+    try {
+      const result = await save.run();
+      setHref(result.href);
+      setMessage(result.ready ? "Cambio «" + result.material + "» creado y verificado. Abriendo su tarjeta para revisarlo en 3D y aprobarlo…"
+        : "El cambio quedó en borrador: el motor encontró algo que revisar. Abriendo su tarjeta…");
+      router.push(result.href);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "No se pudo crear el cambio."); }
+    finally { setBusy(false); }
+  }
+  return <div className="exterior-save">
+    <BusyButton type="button" className="text-button exterior-save-button" busy={busy} spinnerSize={12} busyLabel="Verificando en el motor IFC…"
+      icon={<Save size={12} strokeWidth={2} aria-hidden="true" />} disabled={busy || !!save.reason} title={save.reason ?? "Crea un cambio de modelo con este material en las piezas exteriores; la propietaria lo aprueba"}
+      onClick={() => void run()}>Guardar en el modelo</BusyButton>
+    {save.reason && <small className="exterior-save-reason">{save.reason}</small>}
+    {message && <p className="options-note" role="status">{message}{href && <> <Link href={href}>Ver el cambio</Link></>}</p>}
+  </div>;
 }
 
 /** The original capture of a batch is only downloaded when its disclosure is opened. */
@@ -32,15 +64,19 @@ function OriginalCapture({ path }: { path: string }) {
  * already generated for this subject — a piece, a selection or the whole framing. The request is
  * the same API call as before (D-14). The edits sent from Editar land in the same batches.
  */
-export function VisualOptions({ base, optionKey, name, state, open, group, choices, onChoices, capture, groupCapture, scope, reveal, onRevealed, onCompare, onDownload }: {
+export function VisualOptions({ base, optionKey, name, state, open, group, choices, onChoices, preview, capture, groupCapture, scope, reveal, onRevealed, onCompare, onDownload, onWalkScene }: {
   base: string; optionKey: string; name: string; state: OptionHistoryState; open: boolean; group: boolean;
   choices: OptionChoices; onChoices: (choices: OptionChoices) => void;
+  /** The chips previewed on the exterior of the 3D model (local, nothing is sent); absent on 2D plans. */
+  preview?: { on: boolean; result: ExteriorPreview | null; onToggle: () => void; onReset: () => void; save?: SaveFinish };
   capture: () => string; groupCapture?: () => GroupCapture;
   /** With a selection, a switch between the selection and the whole framing. */
   scope?: { value: RenderScope; selection: string; onChange: (scope: RenderScope) => void };
   /** An edit was just sent from Editar: the batches scroll into view once, where its result will appear. */
   reveal?: boolean; onRevealed?: () => void;
   onCompare: (target: OptionTarget) => void; onDownload: (target: OptionTarget) => void;
+  /** «Recorrer esta escena en 3D»: builds the scene the batch asked for around the model (real geometry, no AI). */
+  onWalkScene?: (request: string) => void;
 }) {
   const field = useId(), listId = useId(), previewId = useId();
   const [peek, setPeek] = useState(false);
@@ -111,6 +147,20 @@ export function VisualOptions({ base, optionKey, name, state, open, group, choic
       <ChipChoice legend="Tono" items={TONES} value={choices.tone} onChange={(tone) => choose({ tone })} columns={3} />
       <ChipChoice legend="Luz del día" items={DAYLIGHTS} value={choices.daylight} onChange={(daylight) => choose({ daylight })} columns={3} />
     </fieldset>
+    {preview && <div className="exterior-preview" role="group" aria-label="Vista previa en el modelo 3D">
+      <button type="button" className="chip exterior-toggle" aria-pressed={preview.on} onClick={preview.onToggle}
+        title="Aplica las fichas al exterior del modelo en este visor, sin cambiar el archivo">
+        <Box size={16} strokeWidth={2} aria-hidden="true" />Ver en el modelo 3D</button>
+      <p className="options-note" role="status">{!preview.on ? "Las fichas solo se usan para la imagen de IA."
+        : !preview.result ? "Elige una ficha para verla en el exterior del modelo. Es una vista previa local: el archivo no cambia."
+        : !choices.finish && !preview.result.pieces ? "Luz aplicada al modelo. Elige un acabado para el exterior."
+        : preview.result.pieces ? "Acabado en " + preview.result.pieces + (preview.result.pieces === 1 ? " pieza exterior" : " piezas exteriores")
+          + (preview.result.source === "pset" ? " (marcadas como exteriores en el IFC)." : " (detectadas por el contorno del modelo).") + " El archivo no cambia."
+        : "No se encontraron muros o cubiertas exteriores en este modelo."}</p>
+      {preview.result && <div className="exterior-actions"><button type="button" className="text-button exterior-reset" onClick={preview.onReset}>
+        <RotateCcw size={12} strokeWidth={2} aria-hidden="true" />Restablecer materiales</button>
+        {preview.save && preview.on && <SaveFinishButton save={preview.save} />}</div>}
+    </div>}
     <div className="request-field">
       <div className="request-label-row">
         <label className="section-label" htmlFor={field}>Cambio solicitado</label>
@@ -159,6 +209,9 @@ export function VisualOptions({ base, optionKey, name, state, open, group, choic
                   disabled={!ready} onClick={() => onCompare({ batch: batch.id, slot: option.slot })}><PanelRightDashed size={14} strokeWidth={2} aria-hidden="true" /></button>
                 <button type="button" className="option-icon" aria-label={"Descargar opción " + option.slot} title="Ajustar y descargar" aria-haspopup="dialog"
                   disabled={!ready} onClick={() => onDownload({ batch: batch.id, slot: option.slot })}><Download size={14} strokeWidth={2} aria-hidden="true" /></button>
+                {onWalkScene && <button type="button" className="option-icon" aria-label={"Recorrer esta escena en 3D · opción " + option.slot}
+                  title="Recorrer esta escena en 3D: el entorno de esta opción alrededor del modelo real, sin IA ni costo"
+                  disabled={!ready} onClick={() => onWalkScene(batch.request + " " + option.description)}><Footprints size={14} strokeWidth={2} aria-hidden="true" /></button>}
               </div>
             </div>
           </li>;
