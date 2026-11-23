@@ -30,7 +30,7 @@ async function difference(page:Page,a:Buffer,b:Buffer){
   },[a.toString("base64"),b.toString("base64")] as const);
 }
 
-test("Las fichas de Renderizar se ven en el exterior del modelo y se restablecen",async({page})=>{
+test("Las fichas de Renderizar se ven en el exterior del modelo y se restablecen",async({page},info)=>{
   test.skip(!existsSync(file),"Falta el IFC de prueba: "+file);
   test.setTimeout(300_000);
   const project=await createProject(page,"Materiales exteriores");
@@ -49,6 +49,7 @@ test("Las fichas de Renderizar se ven en el exterior del modelo y se restablecen
     await expect(panel.getByRole("status").filter({hasText:/piezas? exterior/})).toBeVisible();
     // Las texturas llegan después del primer cuadro: se espera a que el lienzo cambie de verdad.
     await expect.poll(async()=>difference(page,before,await canvas.screenshot(hidden)),{timeout:20_000}).toBeGreaterThan(.02);
+    await page.screenshot({ ...hidden, path: info.outputPath("acabado-exterior.png") });
     await panel.getByRole("button",{name:"Restablecer materiales"}).click();
     await expect.poll(async()=>difference(page,before,await canvas.screenshot(hidden)),{timeout:10_000}).toBeLessThan(.002);
   }finally{await project.remove();}

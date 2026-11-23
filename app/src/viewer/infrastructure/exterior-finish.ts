@@ -284,6 +284,12 @@ export function exteriorPreview(scene: T.Scene, renderer: T.WebGLRenderer, hemis
       }
       source = shell.source;
       const material = build(finish.material, finish.tone ?? "medium");
+      if (!material.transparent && shell.walls.some(mesh => mesh.userData.ifcType)) {
+        // Some IFCs contain a second coplanar proxy over the wall. Resolve the depth tie for this preview only.
+        material.polygonOffset = true;
+        material.polygonOffsetFactor = -2;
+        material.polygonOffsetUnits = -2;
+      }
       materials.push(material);
       const targets = finish.material === "concrete" || finish.material === "paint" ? [...shell.walls, ...shell.roofs] : shell.walls;
       for (const mesh of targets) { originals.set(mesh, slot.get(mesh)); slot.set(mesh, material); }
