@@ -1,2 +1,5 @@
 Miniaturas del popover Estilo generadas con IA en Higgsfield el 21 de noviembre de 2026
 (GPT Image 2.6, prueba gratuita del usuario). Misma casa en cada estilo; 240 x 180 WebP.
+
+fotorrealista.webp: detalle de la imagen de acceso de ObraCota, generada con FLUX.2 klein
+vía Cloudflare Workers AI el 22 de noviembre de 2026. Recorte 240 x 180.

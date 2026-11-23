@@ -162,11 +162,11 @@ export function EditGlobalPopover({ anchor, opener, edit, cost, applyReason, bus
           </>}
           {open === "environment" && <RadioGrid label="Entorno" options={ENVIRONMENTS} value={value("environment")} onChoose={choose("environment")} />}
           {open === "people" && <People edit={edit} onChoose={onChoose} onPrompt={onPrompt} />}
-          {open === "style" && <RadioGrid label="Estilo" options={GRAPHIC_STYLES} value={value("style")} onChoose={choose("style")} columns={4} variant="style"
+          {open === "style" && <><RadioGrid label="Estilo" options={GRAPHIC_STYLES} value={value("style")} onChoose={choose("style")} columns={4} variant="style"
             render={(option, checked) => <>
               <span className="edit-style-thumb"><StyleThumb slug={(option as (typeof GRAPHIC_STYLES)[number]).slug} />{checked && <i className="edit-style-check"><Check size={12} strokeWidth={3} aria-hidden="true" /></i>}</span>
               <span className="edit-style-label">{option.label}</span>
-            </>} />}
+            </>} /><p className="edit-popover-note">Miniaturas generadas con IA.</p></>}
         </div>
       </div>
       <div className="scene-foot">

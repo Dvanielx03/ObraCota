@@ -40,6 +40,9 @@ test("Escena combina momento, clima, entorno, personas y estilo con accesos ráp
   const styles=card.getByRole("radiogroup",{name:"Estilo"});
   await expect(styles.getByRole("radio")).toHaveCount(11);
   await expect(styles.getByRole("radio",{name:"Fotorrealista"})).toHaveAttribute("aria-checked","true");
+  const photo=styles.getByRole("radio",{name:"Fotorrealista"}).locator('img[src="/edit-styles/fotorrealista.webp"]');
+  await expect(photo).toBeVisible();
+  await expect.poll(()=>photo.evaluate((image: HTMLImageElement)=>image.naturalWidth)).toBe(240);
   await styles.getByRole("radio",{name:"Fotorrealista"}).focus();
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Space");
