@@ -3,6 +3,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import {PlanSheet} from "./plan-sheet";
 import { loadModel, type SceneModel } from "./model-source";
 import { walking, walkWorld, type WalkWorld } from "./walk";
+import { batchWalkGeometry, type WalkBatches } from "./walk-batches";
 import { exteriorPreview } from "./exterior-finish";
 import { sceneEnvironment } from "./scene-environment";
 import type { ElementInfo, GroupCaptureView, ViewerPort, ViewDirection,CameraPose} from "../domain/viewer.port";
@@ -55,6 +56,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   let root:T.Group|null = null, disposed = false, baseHeight = 1, baseWidth = 1;
   let activeModel:SceneModel|undefined, originalFile:File|null=null;
   let walk:ReturnType<typeof walking>|undefined, markFloor:((result:string|null)=>void)|undefined;
+  let walkBatches: WalkBatches | null = null;
   let selectedForWalk:string|null=null;
   // Keyed by the file on screen; null is the ReStage sample, which is opened without one.
   const walkModels=new Map<File|null,{model:SceneModel;world:WalkWorld}>();
@@ -532,8 +534,22 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       notify(error instanceof Error?error.message:"No se pudo iniciar el recorrido.");
       return;
     }
+    startWalkBatches();
     marker.hidden=true;span.visible=false;
     markFloor=undefined;canvas.style.cursor="grab";notify(null);
+  }
+  function startWalkBatches(){
+    if(!root || exterior.active())return;
+    const start=performance.now();
+    walkBatches=batchWalkGeometry(root);
+    if(!walkBatches)return;
+    scene.add(walkBatches.group);
+    performance.measure("obracota:walk-batches",{start,end:performance.now(),detail:{
+      sources:walkBatches.meshCount,batches:walkBatches.group.children.length,
+    }});
+  }
+  function releaseWalkBatches(){
+    walkBatches?.dispose();walkBatches=null;
   }
   const lose = (event:Event)=>{event.preventDefault();onLost();};
   const observer = new ResizeObserver(resize);
@@ -656,6 +672,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   function cancelWalk(){
     if(!walk && !markFloor && !walkModels.size)return;
     markFloor=undefined;walk?.dispose();walk=undefined;
+    releaseWalkBatches();
     if(activeModel && root!==activeModel.root){
       if(root)scene.remove(root);
       root=activeModel.root;scene.add(root);
@@ -710,8 +727,10 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       if(signal.aborted || session!==walk)throw new DOMException("Cancelado","AbortError");
       session.switch(entry.world);
       if(root!==entry.model.root){
+        releaseWalkBatches();
         if(root)scene.remove(root);
         root=entry.model.root;scene.add(root);
+        startWalkBatches();
       }
     },
     walkMove(key,held){walk?.move(key,held);},
