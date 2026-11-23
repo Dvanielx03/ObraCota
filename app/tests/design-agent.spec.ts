@@ -57,14 +57,14 @@ test("Proponer cambio al modelo deja un borrador del agente listo para aprobar",
     // The body the button builds keeps the marked piece's GlobalId; only that GlobalId is swapped for the door's, so the
     // real backend and the real engine run the case of the roadmap (a door's FireRating).
     let original:{version:string;notes:{globalId:string|null;name:string|null;text:string}[]}|null=null;
-    await page.route("**/api/projects/*/agent-runs",async route=>{
+    await page.route("**/api/projects/*/agent-runs/stream",async route=>{
       if(route.request().method()!=="POST")return route.fallback();
       original=route.request().postDataJSON();
       const notes=original!.notes.map(note=>({...note,globalId:door,name:"M_Single-Flush:0762 x 2032mm:150173"}));
       return route.continue({postData:JSON.stringify({...original,notes})});
     });
-    const sent=page.waitForRequest(request=>request.url().endsWith("/agent-runs") && request.method()==="POST");
-    const answered=page.waitForResponse(response=>response.url().endsWith("/agent-runs") && response.request().method()==="POST",{timeout:240_000});
+    const sent=page.waitForRequest(request=>request.url().endsWith("/agent-runs/stream") && request.method()==="POST");
+    const answered=page.waitForResponse(response=>response.url().endsWith("/agent-runs/stream") && response.request().method()==="POST",{timeout:240_000});
     await propose.click();
     await sent;
     expect(original!.version).toBe(v1);
@@ -73,7 +73,12 @@ test("Proponer cambio al modelo deja un borrador del agente listo para aprobar",
     expect(original!.notes[0].globalId).toMatch(/^[0-9A-Za-z_$]{22}$/);
     const panel=page.getByRole("region",{name:"Propuesta del agente"});
     await expect(panel).toContainText("El agente está preparando el cambio");
-    const run=await (await answered).json();
+    await expect(panel.and(page.locator('[aria-busy="true"]')).getByText("Leer la pieza marcada")).toBeVisible();
+    const response=await answered;
+    expect(response.headers()["content-type"]).toContain("text/event-stream");
+    const outcome=(await response.text()).match(/event: result\ndata: (.+)/)?.[1];
+    expect(outcome).toBeTruthy();
+    const run=JSON.parse(outcome!);
     expect(run.status,run.message).toBe("READY");
     expect(run.provider).toBe("fake");
 

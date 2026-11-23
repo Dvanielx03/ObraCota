@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { Check, CircleAlert, X } from "lucide-react";
 import { Spinner } from "@/shared/ui/loading";
-import { RUN_TITLES, toolLabel, type AgentRun } from "../domain/agent-run";
+import { RUN_TITLES, toolLabel, type AgentRun, type AgentStep } from "../domain/agent-run";
 import "./agent-run.css";
 
-export type AgentRunState = { state: "running"; notes: number } | { state: "done"; run: AgentRun; project: string } | { state: "error"; message: string };
+export type AgentRunState = { state: "running"; notes: number; steps: AgentStep[] }
+  | { state: "done"; run: AgentRun; project: string } | { state: "error"; message: string };
 
 /**
  * Steps of «Proponer cambio al modelo» (H4) over the canvas: while the agent works, what it is doing; when it ends,
@@ -14,6 +15,7 @@ export type AgentRunState = { state: "running"; notes: number } | { state: "done
  */
 export function AgentRunPanel({ value, onClose }: { value: AgentRunState; onClose: () => void }) {
   const title = value.state === "running" ? "El agente está preparando el cambio" : value.state === "error" ? "No se pudo proponer el cambio" : RUN_TITLES[value.run.status];
+  const steps = value.state === "running" ? value.steps : value.state === "done" ? value.run.steps : [];
   return <section className="agent-run" role="region" aria-label="Propuesta del agente" aria-busy={value.state === "running" || undefined}
     data-status={value.state === "done" ? value.run.status : value.state}>
     <header>
@@ -25,15 +27,16 @@ export function AgentRunPanel({ value, onClose }: { value: AgentRunState; onClos
     </header>
     {value.state === "running" && <p className="agent-run-note">Lee {value.notes === 1 ? "la pieza marcada" : "las piezas marcadas"}, prepara un borrador y verifica su vista previa. Puede tardar un par de minutos.</p>}
     {value.state === "error" && <p className="agent-run-note" role="alert">{value.message}</p>}
-    {value.state === "done" && <>
-      {value.run.provider === "fake" && <p className="agent-run-provider">Agente de prueba: sin IA y sin costo.</p>}
+    {value.state === "done" && value.run.provider === "fake" && <p className="agent-run-provider">Agente de prueba: sin IA y sin costo.</p>}
+    {steps.length > 0 &&
       <ol className="agent-run-steps" aria-label="Pasos del agente">
-        {value.run.steps.map((step) => <li key={step.step + "-" + step.seq} data-status={step.status}>
+        {steps.map((step) => <li key={step.step + "-" + step.seq} data-status={step.status}>
           {step.status === "OK" ? <Check size={14} strokeWidth={2.4} aria-hidden="true" /> : <X size={14} strokeWidth={2.4} aria-hidden="true" />}
           <span>{toolLabel(step.tool)}{step.status !== "OK" && <small>{step.detail || step.errorCode}</small>}</span>
           <span className="visually-hidden">{step.status === "OK" ? "hecho" : step.status === "REJECTED" ? "rechazado" : "falló"}</span>
         </li>)}
-      </ol>
+      </ol>}
+    {value.state === "done" && <>
       <p className="agent-run-note">{value.run.message}</p>
       {value.run.change && <div className="agent-run-actions">
         <Link href={"/proyectos/" + value.project + "/cambios#" + value.run.change}>Abrir la tarjeta del cambio</Link>

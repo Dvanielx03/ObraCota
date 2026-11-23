@@ -217,23 +217,25 @@ for(const model of MODELS)test(`Cualquier modelo · ${model.key} · ${basename(m
     const piece=doorOrWall(model.file);
     expect(piece,"el IFC no tiene puertas ni muros").not.toBeNull();
     // The mark keeps the clicked piece's GlobalId; only that GlobalId is swapped for a door's (or a wall's), as in design-agent.spec.
-    await page.route("**/api/projects/*/agent-runs",async route=>{
+    await page.route("**/api/projects/*/agent-runs/stream",async route=>{
       if(route.request().method()!=="POST")return route.fallback();
       const body=route.request().postDataJSON();
       return route.continue({postData:JSON.stringify({...body,notes:body.notes.map((n:object)=>({...n,globalId:piece!.guid}))})});
     });
     await expect(propose).not.toHaveAttribute("aria-disabled","true");
     start=Date.now();
-    const answered=page.waitForResponse(response=>response.url().endsWith("/agent-runs") && response.request().method()==="POST",{timeout:20*60_000});
+    const answered=page.waitForResponse(response=>response.url().endsWith("/agent-runs/stream") && response.request().method()==="POST",{timeout:20*60_000});
     await propose.click();
-    const run=await (await answered).json();
+    const outcome=(await (await answered).text()).match(/event: result\ndata: (.+)/)?.[1];
+    expect(outcome).toBeTruthy();
+    const run=JSON.parse(outcome!);
     timings.agentMs=Date.now()-start;
     timings.agent=run.status+" · "+piece!.type;
     expect(run.status,run.message).toBe("READY");
 
     log(model.key,"5 guardar");
     // «Guardar en el modelo» with the same finish: a READY material change (≤ 500 exterior pieces).
-    await page.unroute("**/api/projects/*/agent-runs");
+    await page.unroute("**/api/projects/*/agent-runs/stream");
     await editButton(page).click();
     await renderButton(page).click();
     await panel.getByRole("radio",{name:"Piedra"}).click();

@@ -156,6 +156,8 @@ public final class DesignAgentTools {
     }
 
     private Map<String, Object> types(Session session, String guid) {
+        var element = reading.element(session.agent, session.project, session.version, guid);
+        if ("IfcWindow".equals(element.get("class"))) return windowTypes(session, guid, element);
         DoorInspectionPort.Door door;
         try {
             door = changes.door(session.agent, session.project, session.version, guid);
@@ -175,6 +177,30 @@ public final class DesignAgentTools {
             return option;
         }).toList());
         return out;
+    }
+
+    /** Observed types in a bounded page of window instances. It does not test fit or authorize a window change. */
+    private Map<String, Object> windowTypes(Session session, String guid, Map<String, Object> element) {
+        var page = reading.elements(session.agent, session.project, session.version,
+            new ElementQuery("IfcWindow", null, null, null, ModelReading.ELEMENT_LIMIT, null));
+        var observed = new LinkedHashMap<String, Map<String, Object>>();
+        if (page.get("items") instanceof List<?> instances) {
+            for (var instance : instances) {
+                if (instance instanceof Map<?, ?> item && item.get("type") instanceof Map<?, ?> type &&
+                    type.get("guid") instanceof String id && GlobalId.valid(id)) {
+                    observed.putIfAbsent(id, Map.of("id", id, "name", Objects.requireNonNullElse(type.get("name"), id)));
+                }
+            }
+        }
+        var result = new LinkedHashMap<String, Object>();
+        result.put("element", guid);
+        result.put("currentType", element.get("type"));
+        result.put("types", observed.values().stream().toList());
+        result.put("windowInstances", page.get("total"));
+        result.put("truncated", page.get("next_cursor") != null);
+        result.put("readOnly", true);
+        result.put("note", "Tipos observados en instancias del IFC. La compatibilidad y el cambio de tipo de ventana quedan por verificar.");
+        return result;
     }
 
     // Drafting ----------------------------------------------------------------------------------------------------
@@ -326,8 +352,9 @@ public final class DesignAgentTools {
             new Tool(LIST_EXTERIOR, "Lists up to " + EXTERIOR_LIMIT + " envelope elements (walls, curtain walls, windows, doors, roofs, "
                 + "slabs) declared external in their common property set. Listed elements may then receive draft_set_material.",
                 object(Map.of())),
-            new Tool(LIST_TYPES, "Lists the door types of the model that could replace the type of a door, with their size and "
-                + "whether they fit the same opening.", object(Map.of("globalId", guid), "globalId")),
+            new Tool(LIST_TYPES, "Checks door types and whether they fit the same opening. For a window, lists the types "
+                + "observed in a bounded page of window instances for information only. Window compatibility is unknown and "
+                + "draft_change_type only applies to doors.", object(Map.of("globalId", guid), "globalId")),
             new Tool(SET_PROPERTY, "Adds to the draft the change of one property of a marked element (ifc.set_property). "
                 + "scope is occurrence (default) or type.", object(Map.of("globalId", guid,
                 "pset", Map.of("type", "string", "description", "Property set name, e.g. Pset_DoorCommon."),

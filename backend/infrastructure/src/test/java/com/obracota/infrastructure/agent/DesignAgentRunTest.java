@@ -10,7 +10,11 @@ import com.obracota.application.airun.port.AiRunJournal;
 import com.obracota.application.airun.usecase.AiBudget;
 import com.obracota.application.common.port.Transactions;
 import com.obracota.application.modelfile.usecase.ProjectFileCatalog;
+import com.obracota.application.modelchange.usecase.ModelChanges;
+import com.obracota.application.modelchange.usecase.ModelReading;
+import com.obracota.application.modelversion.usecase.ProjectVersions;
 import com.obracota.domain.agent.port.service.AgentModelPort;
+import com.obracota.domain.modelchange.port.ModelEnginePort;
 import com.obracota.domain.security.model.Actor;
 import com.obracota.infrastructure.agent.adapters.out.ai.GeminiAgentModelAdapter;
 import com.obracota.infrastructure.agent.adapters.out.ai.ScriptedAgentModelAdapter;
@@ -38,6 +42,8 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import static com.obracota.infrastructure.modelchange.ModelChangeStubs.DOOR;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -57,6 +63,8 @@ class DesignAgentRunTest {
     @Autowired JdbcTemplate db;
     @Autowired ProjectFileCatalog projects;
     @Autowired DesignAgentTools tools;
+    @Autowired ModelChanges changes;
+    @Autowired ProjectVersions projectVersions;
     @Autowired AgentToolJournal journal;
     @Autowired AiRunJournal aiRuns;
     @Autowired AiBudget budget;
@@ -136,6 +144,53 @@ class DesignAgentRunTest {
         assertEquals(4, journaled.size());
         assertEquals(0, db.queryForObject("select count(*) from ai_run where batch_id=?", Integer.class, UUID.fromString(run.get("id").asText())),
             "the fake provider writes no paid run");
+    }
+
+    @Test void theStreamSendsJournaledStepsBeforeTheResultWithoutPublishing() throws Exception {
+        var site = new Site();
+        var path = "/api/projects/" + site.project + "/agent-runs/stream";
+        var body = json.writeValueAsString(Map.of("version", site.version,
+            "notes", List.of(Map.of("globalId", DOOR, "name", "Puerta P80", "text", "Cambiar FireRating a EI 60"))));
+        var endpoint = post(path).contentType("application/json").accept("text/event-stream").content(body);
+        var response = site.perform(endpoint).andExpect(status().isOk()).andReturn().getResponse();
+        assertTrue(response.getContentType().startsWith("text/event-stream"));
+        var frames = response.getContentAsString().strip().split("\n\n");
+        assertEquals(5, frames.length);
+        var tools = new ArrayList<String>();
+        for (int i = 0; i < 4; i++) {
+            assertTrue(frames[i].startsWith("event: step\ndata: "));
+            tools.add(json.readTree(frames[i].substring("event: step\ndata: ".length())).get("tool").asText());
+        }
+        assertEquals(List.of("get_element", "draft_set_property", "preview_change", "submit_change"), tools);
+        assertTrue(frames[4].startsWith("event: result\ndata: "));
+        var result = json.readTree(frames[4].substring("event: result\ndata: ".length()));
+        assertEquals("READY", result.get("status").asText());
+        assertEquals(1, site.revisions());
+        assertEquals(0, remaining - budget.remaining());
+        mvc.perform(post(path).contentType("application/json").accept("text/event-stream").content(body)
+            .header("Authorization", register())).andExpect(status().isNotFound());
+        assertEquals(1, site.changes());
+    }
+
+    @Test void listsObservedWindowTypesWithoutClaimingCompatibility() throws Exception {
+        var site = new Site();
+        var window = "1hOSvn6df7F8_7GcBWlS8X";
+        var typeId = "1hOSvn6df7F8_7GcBWlS8Y";
+        var type = Map.of("guid", typeId, "name", "Ventana fija");
+        var engine = mock(ModelEnginePort.class);
+        when(engine.element(any(), eq(window))).thenReturn(Map.of("class", "IfcWindow", "type", type));
+        when(engine.elements(any(), eq(new ModelEnginePort.ElementQuery("IfcWindow", null, null, null, 50, null))))
+            .thenReturn(Map.of("items", List.of(Map.of("type", type), Map.of("type", type)), "total", 54, "next_cursor", "50"));
+        var catalog = new DesignAgentTools(changes, new ModelReading(projectVersions, engine));
+        var project = UUID.fromString(site.project);
+        var actor = Actor.agent(site.owner, project, UUID.randomUUID());
+        var session = new DesignAgentTools.Session(actor, project, UUID.fromString(site.version), List.of(window), "Consultar ventana");
+        var answer = catalog.execute(session, DesignAgentTools.LIST_TYPES, Map.of("globalId", window));
+        assertEquals(true, answer.get("readOnly"));
+        assertEquals(true, answer.get("truncated"));
+        assertEquals(List.of(Map.of("id", typeId, "name", "Ventana fija")), answer.get("types"));
+        assertEquals(0, site.changes());
+        assertEquals(1, site.revisions());
     }
 
     @Test void aScriptedGeminiSequenceEndsInReadyWithOriginAgentAndReservesTheBudget() throws Exception {

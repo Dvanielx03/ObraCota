@@ -16,6 +16,7 @@ import com.obracota.domain.modelversion.model.ModelVersion;
 import com.obracota.domain.security.model.Actor;
 import java.io.UncheckedIOException;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * «Proponer cambio al modelo» (H4, arquitectura A): the owner's notes on marked pieces go to the model, which reads the
@@ -124,6 +125,10 @@ public final class RunDesignAgent {
      * @throws AiBudget.Exhausted when the month has no room for the run (only with a paid provider)
      */
     public Result run(Actor person, UUID project, UUID version, List<Note> notes) {
+        return run(person, project, version, notes, step -> {});
+    }
+
+    public Result run(Actor person, UUID project, UUID version, List<Note> notes, Consumer<Step> progress) {
         requirePerson(person);
         if (version == null) throw new InvalidRequestApplicationException("VERSION_REQUIRED", "Falta la versión del modelo.");
         var written = validNotes(notes);
@@ -161,6 +166,7 @@ public final class RunDesignAgent {
                     ? refuse(run, step, seq, person, session, call, "TOO_MANY_CALLS", "Como máximo " + MAX_CALLS_PER_STEP + " llamadas por paso.")
                     : call(run, step, seq, person, session, call);
                 steps.add(outcome.step());
+                progress.accept(outcome.step());
                 responses.add(new Response(call.id(), call.name(), outcome.payload()));
             }
             if (session.ended()) return end(run, session, steps, turn.text());

@@ -371,6 +371,8 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
   // «Proponer cambio al modelo» (H4, D9): the same notes, sent to the design agent instead of the image model.
   const [agentInfo, setAgentInfo] = useState<AgentAvailability | null>(null);
   const [agentRun, setAgentRun] = useState<AgentRunState | null>(null);
+  const agentRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => agentRequest.current?.abort(), []);
   const agentProject = edit.on && !plan ? scope?.project : undefined;
   useEffect(() => {
     if (!agentProject) return;
@@ -386,17 +388,25 @@ export function WorkspaceTools({ viewer, plan, scope, pieces, edit, review, revi
     ?? (running ? "El agente está preparando el cambio…" : sending ? "Enviando la edición…" : undefined);
   const proposeTitle = "Proponer cambio al modelo" + (!agentInfo ? "" : agentInfo.reserveCents ? " · reserva " + formatUsd(agentInfo.reserveCents) : " · agente de prueba, sin costo");
   async function propose() {
-    if (!scope || running) return;
+    if (!scope || agentRequest.current) return;
+    const controller = new AbortController();
+    agentRequest.current = controller;
     const sent = agentNotes(marks);
-    setAgentRun({ state: "running", notes: sent.filter((note) => note.globalId).length });
+    setAgentRun({ state: "running", notes: sent.filter((note) => note.globalId).length, steps: [] });
     setOpenMark(null);
     try {
-      const run = await runDesignAgent(scope.project, scope.version, sent);
+      const run = await runDesignAgent(scope.project, scope.version, sent, step => {
+        if (!controller.signal.aborted) setAgentRun(current => current?.state === "running"
+          ? { ...current, steps: [...current.steps, step] } : current);
+      }, controller.signal);
+      if (controller.signal.aborted) return;
       setAgentRun({ state: "done", run, project: scope.project });
       // A draft ready for review takes the notes along, as «Enviar edición» does with its request.
       if (run.status === "READY") { setMarks([]); setAreaPose(null); setLost(null); }
     } catch (error) {
-      setAgentRun({ state: "error", message: error instanceof Error && error.message ? error.message : "No se pudo proponer el cambio." });
+      if (!controller.signal.aborted) setAgentRun({ state: "error", message: error instanceof Error && error.message ? error.message : "No se pudo proponer el cambio." });
+    } finally {
+      agentRequest.current = null;
     }
   }
 
