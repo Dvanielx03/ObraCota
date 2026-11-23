@@ -7,6 +7,7 @@ const EXTENSIONS = ["webp", "png"] as const;
 
 /** Own drawing per style while the picture is missing: a small house drawn in that style. */
 const LOOKS: Record<string, { sky: string; ground: string; wall: string; roof: string; line: string; width: number; dash?: string; soft?: boolean; tilt?: boolean }> = {
+  fotorrealista: { sky: "#A9CDEB", ground: "#8DA86F", wall: "#D9D2C5", roof: "#6B5B4E", line: "#4A4E57", width: .6 },
   "maqueta-blanca": { sky: "#ECEEF1", ground: "#E1E4E8", wall: "#FFFFFF", roof: "#F4F5F7", line: "#C9CDD4", width: 1 },
   maqueta: { sky: "#EFE9DF", ground: "#D9C7A7", wall: "#E8D5B5", roof: "#B98B5E", line: "#8A6A48", width: 1 },
   "color-plano": { sky: "#9BD3F0", ground: "#7CC47F", wall: "#F6C453", roof: "#E5694E", line: "transparent", width: 0 },

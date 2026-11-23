@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { ArrowUp, ImagePlus, Trash } from "lucide-react";
+import { ArrowUp, Boxes, ImagePlus, Trash } from "lucide-react";
 import { Spinner } from "@/shared/ui/loading";
 import { useDisabledReason } from "@/shared/ui/disabled-reason";
 import type { CameraPose, ViewerPort } from "@/viewer/domain/viewer.port";
@@ -68,7 +68,7 @@ function placeField(candidates: { left: number; top: number }[], width: number, 
  * Keyboard: Tab reaches the marks; Enter opens the field, Delete removes the mark, the arrows move
  * it (a point jumps to the piece under its new place) and Shift with the arrows resizes a zone.
  */
-export function EditMarksLayer({ viewer, host, marks, marking, open, focus, areaPose, sendReason, sendTitle, sending, onOpen, onPoint, onArea, onText, onRemove, onMove, onMiss, onCameraMoved, onSend }: {
+export function EditMarksLayer({ viewer, host, marks, marking, open, focus, areaPose, sendReason, sendTitle, sending, propose, onOpen, onPoint, onArea, onText, onRemove, onMove, onMiss, onCameraMoved, onSend }: {
   viewer: ViewerPort;
   /** The viewer's container (`.view`): the layer covers exactly its canvas. */
   host: HTMLElement;
@@ -86,6 +86,11 @@ export function EditMarksLayer({ viewer, host, marks, marking, open, focus, area
   sendTitle: string;
   /** The marks are on their way: the send button turns and says it is busy. */
   sending?: boolean;
+  /**
+   * «Proponer cambio al modelo» (H4, D9): the second button, next to «Enviar edición» (which asks for images). It sends
+   * the notes and the marked GlobalIds to the design agent, which leaves a draft change for the owner to approve.
+   */
+  propose?: { reason?: string; title: string; busy: boolean; run: () => void };
   onOpen: (id: number | null) => void;
   /** A click on the canvas at a client position (the caller probes the model). */
   onPoint: (clientX: number, clientY: number) => void;
@@ -99,6 +104,7 @@ export function EditMarksLayer({ viewer, host, marks, marking, open, focus, area
   onSend: () => void;
 }) {
   const sendOff = useDisabledReason(sendReason);
+  const proposeOff = useDisabledReason(propose?.reason);
   const layer = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: host.clientWidth, h: host.clientHeight });
   const [spots, setSpots] = useState<Record<number, Spot>>({});
@@ -308,6 +314,11 @@ export function EditMarksLayer({ viewer, host, marks, marking, open, focus, area
           <ImagePlus size={16} strokeWidth={2} aria-hidden="true" /></button>
         <button type="button" className="edit-field-icon" aria-label={"Eliminar la marca " + number(current.id)} title="Eliminar" onClick={() => remove(current.id)}>
           <Trash size={16} strokeWidth={2} aria-hidden="true" /></button>
+        {propose && <button type="button" className="edit-field-icon edit-field-propose" aria-label="Proponer cambio al modelo"
+          aria-disabled={propose.reason ? true : undefined} aria-describedby={proposeOff.describedBy} aria-busy={propose.busy || undefined}
+          title={propose.reason ? "Proponer cambio al modelo\n" + propose.reason : propose.title} onClick={() => { if (!propose.reason) propose.run(); }}>
+          {propose.busy ? <Spinner size={16} /> : <Boxes size={16} strokeWidth={2} aria-hidden="true" />}</button>}
+        {propose && proposeOff.note}
         <button type="button" className="edit-field-send" aria-label="Enviar edición" aria-disabled={sendReason ? true : undefined} aria-describedby={sendOff.describedBy} aria-busy={sending || undefined}
           title={sendReason ? "Enviar edición\n" + sendReason : sendTitle} onClick={() => { if (!sendReason) onSend(); }}>
           {sending ? <Spinner size={16} /> : <ArrowUp size={16} strokeWidth={2} aria-hidden="true" />}</button>

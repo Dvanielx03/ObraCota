@@ -7,6 +7,8 @@ import com.obracota.application.airun.usecase.AiBudget;
 import com.obracota.application.common.port.Transactions;
 import com.obracota.application.designoption.port.DesignOptionBatches;
 import com.obracota.application.designoption.usecase.DesignOptions;
+import com.obracota.application.designoption.usecase.Panoramas;
+import com.obracota.domain.assistant.port.service.ImageGenerationPort;
 import com.obracota.application.knowledge.port.CitationCodec;
 import com.obracota.application.knowledge.port.SpecificationPassages;
 import com.obracota.application.knowledge.usecase.AskDocument;
@@ -43,6 +45,13 @@ public class AiRunConfiguration {
             @org.springframework.beans.factory.annotation.Value("${IMAGE_PROVIDER:gemini}") String imageProvider) {
         // Cloudflare Workers AI images are inside its free daily allowance: they reserve nothing from the paid budget.
         return new DesignOptions(versions, batches, budget, tx, "cloudflare".equals(imageProvider) ? 0 : DesignOptions.RESERVE_CENTS);
+    }
+
+    @Bean Panoramas panoramas(ProjectVersions versions, ImageGenerationPort images, AiBudget budget, Transactions tx, ModelCatalog models,
+            @org.springframework.beans.factory.annotation.Value("${IMAGE_PROVIDER:gemini}") String imageProvider) {
+        // Same rule as the options: a free provider reserves nothing from the monthly AI budget.
+        return new Panoramas((project, user, version) -> versions.get(project, user, version), images, budget, tx,
+            "cloudflare".equals(imageProvider) ? 0 : DesignOptions.RESERVE_CENTS, models.forCapability("IMAGE").id());
     }
 
     @Bean PassageAdapter specificationPassages(JdbcTemplate db, ObjectMapper json) { return new PassageAdapter(db, json); }

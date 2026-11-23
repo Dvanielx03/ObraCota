@@ -83,15 +83,54 @@ public class CloudflareImages implements ImageGenerationPort {
         }
     }
 
-    private static byte[] multipart(String boundary, String prompt, int width, int height, byte[] jpeg) throws IOException {
+    @Override public boolean panoramas() { return true; }
+
+    /**
+     * A 2:1 picture (the 360° panorama) at {@code width} × {@code height}; the reference, when given, goes as
+     * {@code input_image_0}. Should the size be refused (HTTP 400), it is asked once more at 1536 × 768.
+     */
+    @Override public Image panorama(String model, byte[] reference, String prompt, int width, int height) {
+        if (account.isBlank() || token.isBlank()) throw new IllegalStateException("Configura CLOUDFLARE_ACCOUNT_ID y CLOUDFLARE_API_TOKEN para generar imágenes.");
+        try {
+            HttpResponse<String> response = run(prompt, width, height, reference);
+            if (response.statusCode() == 400 && width > 1536) response = run(prompt, 1536, 768, reference);
+            if (response.statusCode() == 429) throw new IllegalStateException("HTTP_429");
+            if (response.statusCode() / 100 != 2) throw new IllegalStateException("Cloudflare respondió " + response.statusCode());
+            String b64 = json.readTree(response.body()).at("/result/image").asText("");
+            if (b64.isEmpty()) throw new IllegalStateException("Cloudflare no devolvió una imagen.");
+            byte[] generated = Base64.getDecoder().decode(b64);
+            return new Image(generated, mimeOf(generated), new Consumption(null, null, null));
+        } catch (IOException e) {
+            throw new IllegalStateException("No se pudo contactar a Cloudflare.", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Generación interrumpida.", e);
+        }
+    }
+
+    private HttpResponse<String> run(String prompt, int width, int height, byte[] reference) throws IOException, InterruptedException {
+        String boundary = "obracota-" + UUID.randomUUID();
+        HttpRequest request = HttpRequest.newBuilder(base.resolve("accounts/" + account + "/ai/run/" + MODEL))
+            .timeout(Duration.ofSeconds(150))
+            .header("Authorization", "Bearer " + token)
+            .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+            .POST(HttpRequest.BodyPublishers.ofByteArray(multipart(boundary, prompt, width, height, reference))).build();
+        return http.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    /** Multipart body of a run; {@code jpeg} may be null (a picture from the prompt alone). */
+    static byte[] multipart(String boundary, String prompt, int width, int height, byte[] jpeg) throws IOException {
         var out = new ByteArrayOutputStream();
         field(out, boundary, "prompt", prompt);
         field(out, boundary, "width", Integer.toString(width));
         field(out, boundary, "height", Integer.toString(height));
-        out.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"input_image_0\"; filename=\"captura.jpg\"\r\n"
-            + "Content-Type: image/jpeg\r\n\r\n").getBytes(StandardCharsets.UTF_8));
-        out.write(jpeg);
-        out.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+        if (jpeg != null) {
+            out.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"input_image_0\"; filename=\"captura.jpg\"\r\n"
+                + "Content-Type: image/jpeg\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            out.write(jpeg);
+            out.write("\r\n".getBytes(StandardCharsets.UTF_8));
+        }
+        out.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
         return out.toByteArray();
     }
 

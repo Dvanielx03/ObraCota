@@ -3,6 +3,7 @@ package com.obracota.infrastructure.designoption;
 import com.obracota.application.airun.usecase.AiBudget;
 import com.obracota.application.designoption.port.DesignOptionBatches;
 import com.obracota.application.designoption.usecase.DesignOptions;
+import com.obracota.application.designoption.usecase.Panoramas;
 import com.obracota.infrastructure.assistant.adapters.out.ai.GeminiModels;
 import com.obracota.infrastructure.common.exception.ErrorResponse;
 import org.springframework.http.*;
@@ -18,9 +19,11 @@ import java.io.*;
 public class DesignOptionController {
     private final DesignOptions options;
     private final GeminiModels gemini;
-    public DesignOptionController(DesignOptions options,GeminiModels gemini) {
-        this.options=options;this.gemini=gemini;
+    private final Panoramas panoramas;
+    public DesignOptionController(DesignOptions options,GeminiModels gemini,Panoramas panoramas) {
+        this.options=options;this.gemini=gemini;this.panoramas=panoramas;
     }
+    public record PanoramaInput(String scene,String jpeg) {}
     public record Input(UUID id,String element,String name,String request,String jpeg,String mask) {}
     private boolean valid(String value,int max) {return value!=null && !value.isBlank() && value.length()<=max;}
     private byte[] screenshot(String encoded) {
@@ -57,6 +60,26 @@ public class DesignOptionController {
             return Map.of("id",id);
         } catch(AiBudget.Exhausted e) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Se alcanzó el presupuesto mensual de opciones.");
+        }
+    }
+    /**
+     * «Panorama 360° con IA»: a 2:1 equirectangular picture of the scene, returned at once and not stored. The current
+     * view (JPEG, optional) guides the look of the building.
+     */
+    @PostMapping("/panorama")
+    public ResponseEntity<byte[]> panorama(@PathVariable UUID project,@PathVariable UUID version,@AuthenticationPrincipal UUID user,@RequestBody PanoramaInput input) {
+        if(!valid(input.scene(),Panoramas.SCENE_LIMIT)) throw new IllegalArgumentException();
+        byte[] reference=input.jpeg()==null || input.jpeg().isBlank()?null:screenshot(input.jpeg());
+        try {
+            var image=panoramas.generate(project,version,user,input.scene(),reference);
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.parseMediaType(image.mime())).body(image.bytes());
+        } catch(Panoramas.Unavailable e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"El panorama 360° necesita el proveedor de imágenes gratuito (Cloudflare) en el servidor.");
+        } catch(AiBudget.Exhausted e) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Se alcanzó el presupuesto mensual de IA.");
+        } catch(IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,"HTTP_429".equals(e.getMessage())
+                ?"El proveedor de imágenes alcanzó su límite diario. Prueba más tarde.":"No se pudo generar el panorama. Prueba de nuevo.");
         }
     }
     @GetMapping("/{id}/images/{slot}")

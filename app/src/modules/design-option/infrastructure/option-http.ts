@@ -22,3 +22,9 @@ export function chooseOption(base: string, batch: string, slot: number): Promise
 export async function optionImage(path: string, signal?: AbortSignal): Promise<Blob> {
   return (await authenticatedResponse(path, { signal })).blob();
 }
+
+/** «Panorama 360° con IA»: a 2:1 equirectangular picture of the scene, generated on the server and kept only in memory here. */
+export interface PanoramaRequest { scene: string; jpeg?: string }
+export async function requestPanorama(base: string, body: PanoramaRequest, signal?: AbortSignal): Promise<Blob> {
+  return (await authenticatedResponse(base + "/panorama", { method: "POST", body: JSON.stringify(body), signal })).blob();
+}
