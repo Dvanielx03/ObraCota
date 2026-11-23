@@ -1,0 +1,10 @@
+.pilot-legal{max-width:760px;margin-inline:auto;padding:clamp(24px,5vw,72px) 24px;color:var(--ink);font:var(--type-body-relaxed)}
+.pilot-legal nav{display:flex;flex-wrap:wrap;gap:0 20px;border-bottom:1px solid var(--border);margin-bottom:32px}
+.pilot-legal nav a{display:inline-flex;align-items:center;min-height:44px}
+.pilot-legal a{text-decoration:underline;text-underline-offset:.2em;overflow-wrap:anywhere}
+.pilot-legal h1{font-size:clamp(28px,4vw,44px);line-height:1.12;margin:4px 0 20px}
+.pilot-legal h2{font-size:1.125rem;line-height:1.35;margin:28px 0 8px}
+.pilot-legal p,.pilot-legal li{margin-block:8px}
+.pilot-legal ul{padding-inline-start:24px}
+.pilot-legal .pilot-note{color:var(--muted)}
+.pilot-legal a:focus-visible{outline:2px solid var(--ring);outline-offset:3px}

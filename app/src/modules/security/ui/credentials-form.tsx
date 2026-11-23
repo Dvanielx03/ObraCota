@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { BusyButton } from "@/shared/ui/loading";
@@ -117,9 +118,7 @@ export function CredentialsForm({ registration = false, from, siteUrl }: {
           <BusyButton className="auth-submit" busy={busy} busyLabel={signingUp ? "Creando la cuenta…" : "Entrando…"}>{current.label}</BusyButton>
         </form>
 
-        <p className="auth-legal">ObraCota es un proyecto académico. {site
-          ? <>Consulta cómo tratamos tus datos en la <a href={site + "/privacidad"}>política de privacidad</a>.</>
-          : "Tus datos solo se usan para tu cuenta."}</p>
+        <p className="auth-legal">ObraCota es un proyecto académico. Consulta los <Link href="/terminos">términos del piloto</Link> y la <Link href="/privacidad">privacidad de la cuenta</Link>.</p>
       </div>
     </main>
 
