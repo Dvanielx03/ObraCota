@@ -49,6 +49,8 @@ public class VolumeStorage implements OriginalStorage {
     /** Bytes read to judge a header. The form reads the same window (file-header.ts, HEADER_BYTES). */
     public static final int HEAD=4096;
     private static final byte[] FBX_BINARY="Kaydara FBX Binary  \0".getBytes(StandardCharsets.US_ASCII);
+    /** Signature of an OLE compound file, the container Revit saves an RVT in. */
+    private static final byte[] OLE={(byte)0xD0,(byte)0xCF,0x11,(byte)0xE0,(byte)0xA1,(byte)0xB1,0x1A,(byte)0xE1};
     // Statements of a Wavefront OBJ (geometry, grouping, materials and free-form curves) or a comment.
     private static final java.util.regex.Pattern OBJ_LINE=java.util.regex.Pattern.compile(
         "^(#.*|(v|vt|vn|vp|f|l|p|o|g|s|mtllib|usemtl|cstype|deg|bmat|step|curv|curv2|surf|parm|trim|hole|scrv|sp|end|con|mg|bevel|c_interp|d_interp|lod|shadow_obj|trace_obj|ctech|stech|call|csh)(\\s.*)?)$");
@@ -57,8 +59,8 @@ public class VolumeStorage implements OriginalStorage {
         "^((v|vt|vn)\\s+[-+]?(\\d|\\.\\d).*|f\\s+-?\\d.*)$");
     /**
      * Whether the first bytes of an original match its declared format: the STEP header of an IFC, the
-     * AC10xx version of a DWG, the binary or ASCII signature of an FBX, or, for an OBJ (plain text with no
-     * signature), text without NUL bytes whose complete lines are all OBJ statements or comments, at least
+     * AC10xx version of a DWG, the OLE compound-file signature of a Revit RVT, the binary or ASCII
+     * signature of an FBX, or, for an OBJ (plain text with no signature), text without NUL bytes whose complete lines are all OBJ statements or comments, at least
      * one of them a vertex or a face. A head shorter than {@link #HEAD} is the whole file, so its last line
      * is complete; otherwise the last line may be cut and is not judged.
      */
@@ -67,6 +69,7 @@ public class VolumeStorage implements OriginalStorage {
         return switch(format) {
             case "IFC" -> text.startsWith("ISO-10303-21;");
             case "DWG" -> text.matches("(?s)^AC10[0-9]{2}.*");
+            case "RVT" -> head.length>=OLE.length && Arrays.equals(head,0,OLE.length,OLE,0,OLE.length);
             case "FBX" -> Arrays.equals(head,0,Math.min(head.length,FBX_BINARY.length),FBX_BINARY,0,FBX_BINARY.length) || text.startsWith("; FBX");
             case "OBJ" -> {
                 if(text.isBlank()) yield false;

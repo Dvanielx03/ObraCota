@@ -5,13 +5,18 @@
  */
 export const HEADER_BYTES = 4096;
 
-export const MODEL_EXTENSIONS = [".ifc", ".dwg", ".fbx", ".obj"] as const;
+export const MODEL_EXTENSIONS = [".ifc", ".dwg", ".rvt", ".fbx", ".obj"] as const;
 /** The `accept` of the file pickers that open or store a model. */
 export const MODEL_ACCEPT = MODEL_EXTENSIONS.join(",");
 /** Stable hook of the project upload input for the end-to-end suites; its visible label may change. */
 export const MODEL_UPLOAD_TEST_ID = "model-upload";
 
-const KNOWN: { test: (head: string) => boolean; what: string; hint: string }[] = [
+/** Signature of an OLE compound file: the container of a Revit RVT (and of old Office documents). */
+const OLE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
+const isOle = (bytes?: Uint8Array) => !!bytes && bytes.length >= OLE.length && OLE.every((byte, i) => bytes[i] === byte);
+
+const KNOWN: { test: (head: string, bytes?: Uint8Array) => boolean; what: string; hint: string }[] = [
+  { test: (_, bytes) => isOle(bytes), what: "un contenedor OLE (como un RVT de Revit o un documento antiguo de Office)", hint: "Si es un modelo de Revit, súbelo con su extensión .rvt." },
   { test: head => head.startsWith("PK"), what: "un archivo ZIP", hint: "Descomprímelo y sube el DWG, IFC, FBX u OBJ que contiene." },
   { test: head => head.startsWith("%PDF"), what: "un PDF", hint: "Sube el plano original en DWG o el modelo en IFC." },
   { test: head => head.startsWith("Rar!"), what: "un archivo RAR", hint: "Descomprímelo y sube el DWG, IFC, FBX u OBJ que contiene." },
@@ -37,10 +42,11 @@ export function looksLikeObj(head: string, complete: boolean): boolean {
   return judged.every(line => OBJ_LINE.test(line)) && judged.some(line => OBJ_GEOMETRY.test(line));
 }
 
-function matches(format: string, head: string, complete: boolean) {
+function matches(format: string, head: string, complete: boolean, bytes?: Uint8Array) {
   const text = head.replace(/^﻿/, "").trimStart();
   switch (format) {
     case "DWG": return /^AC10\d\d/.test(head);
+    case "RVT": return isOle(bytes);
     case "IFC": return text.startsWith("ISO-10303-21;");
     case "FBX": return head.startsWith("Kaydara FBX Binary  \0") || text.startsWith("; FBX");
     default: return looksLikeObj(head, complete);
@@ -48,16 +54,17 @@ function matches(format: string, head: string, complete: boolean) {
 }
 
 /**
- * Why a file cannot be a valid IFC, DWG, FBX or OBJ, or null when its header matches its extension.
+ * Why a file cannot be a valid IFC, DWG, RVT, FBX or OBJ, or null when its header matches its extension.
  * `complete` says the head is the whole file (shorter than HEADER_BYTES, as the server decides), so its
- * last line is whole.
+ * last line is whole. `bytes` are the same first bytes undecoded: the binary signature of an RVT does not
+ * survive the UTF-8 decoding of `head`, so without them an RVT is never valid.
  */
-export function headerProblem(name: string, head: string, complete = new TextEncoder().encode(head).length < HEADER_BYTES): string | null {
+export function headerProblem(name: string, head: string, complete = new TextEncoder().encode(head).length < HEADER_BYTES, bytes?: Uint8Array): string | null {
   const extension = name.toLowerCase().split(".").pop() ?? "";
-  const expected = ({ dwg: "DWG", ifc: "IFC", fbx: "FBX", obj: "OBJ" } as Record<string, string>)[extension];
-  if (!expected) return "Elige un archivo .ifc, .dwg, .fbx u .obj.";
-  if (matches(expected, head, complete)) return null;
-  const known = KNOWN.find(kind => kind.test(head));
+  const expected = ({ dwg: "DWG", ifc: "IFC", rvt: "RVT", fbx: "FBX", obj: "OBJ" } as Record<string, string>)[extension];
+  if (!expected) return "Elige un archivo .ifc, .dwg, .rvt, .fbx u .obj.";
+  if (matches(expected, head, complete, bytes)) return null;
+  const known = KNOWN.find(kind => kind.test(head, bytes));
   return known
     ? `«${name}» tiene extensión .${extension}, pero es ${known.what}. ${known.hint}`
     : `«${name}» no es un ${expected} válido: su cabecera no corresponde a ese formato.`;
