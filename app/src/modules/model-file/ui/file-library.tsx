@@ -52,7 +52,8 @@ function Library({project}:{project:string}) {
     const file=new FormData(form).get("original");
     if (!(file instanceof File)) return;
     setStatus(""); setError("");
-    const problem=headerProblem(file.name,await file.slice(0,HEADER_BYTES).text(),file.size<HEADER_BYTES);
+    const head=new Uint8Array(await file.slice(0,HEADER_BYTES).arrayBuffer());
+    const problem=headerProblem(file.name,new TextDecoder().decode(head),file.size<HEADER_BYTES,head);
     if (problem) { setError(problem); return; }
     setUploading({name:file.name,size:file.size});
     try {
@@ -74,8 +75,8 @@ function Library({project}:{project:string}) {
       <form className="account-form upload-form" onSubmit={upload}>
         {files.length>0 && <label>Guardar en<select disabled={busy} value={target} onChange={e=>setTarget(e.target.value)}>
           <option value="">Agrupar por nombre de archivo</option>{files.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select></label>}
-        <label>Archivo IFC, DWG, FBX u OBJ<input type="file" name="original" accept={MODEL_ACCEPT} disabled={busy} required data-testid={MODEL_UPLOAD_TEST_ID}/></label>
-        <p>Hasta 256 MiB. Cada entrega conserva su original. Si el DWG de un fabricante solo trae sólidos ACIS, sube su FBX u OBJ para verlo en 3D.</p>
+        <label>Archivo IFC, DWG, RVT, FBX u OBJ<input type="file" name="original" accept={MODEL_ACCEPT} disabled={busy} required data-testid={MODEL_UPLOAD_TEST_ID}/></label>
+        <p>Hasta 256 MiB. Cada entrega conserva su original. Los sólidos ACIS de un DWG guardado se calculan en el servidor y se ven en 3D. Un RVT de Revit se guarda tal cual; para verlo en 3D exporta también un IFC.</p>
         <BusyButton className="panel-action" busy={busy} busyLabel="Subiendo original…" spinnerSize={14}>Guardar versión</BusyButton>
       </form>
       <div className="upload-status" role="status">
