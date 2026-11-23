@@ -6,6 +6,8 @@ import {BusyButton,LoadingStatus,Skeleton} from "@/shared/ui/loading";
 import {operationLabel,statusLabel,type ModelChange} from "../domain/model-change";
 import {modelChangeRepository} from "../infrastructure/model-change-http";
 import {ChangeEstimate,formatDay} from "./change-estimate";
+import {AgentSteps} from "./agent-steps";
+import "./agent-run.css";
 import {VerifiedDownload} from "@/modules/model-version/ui/verified-download";
 import {ChangeAffected,ChangeDiff,ChangeFindings,ChangeRecipe,ChangeValidation,proposalHref} from "./change-report";
 
@@ -74,6 +76,7 @@ export function ChangeCard({change,onChange,locked,onWork}:{change:ModelChange;o
   const proposalReady=change.preview.available && change.reportCurrent && !!change.report?.ok;
   return <article id={change.id} className="change-card">
     <ChangeHeader change={change}/>
+    {change.agentRun && <AgentSteps project={change.project} run={change.agentRun}/>}
     <ChangeRecipe change={change} labels={labels}/>
     {change.report && !change.reportCurrent && <p className="change-note">La receta cambió después de esta vista previa. Previsualízala de nuevo para enviarla.</p>}
     {change.report && change.reportCurrent && !change.preview.available && (change.status==="DRAFT"||change.status==="READY") && change.report.ok &&

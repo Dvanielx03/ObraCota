@@ -1,0 +1,29 @@
+/* «Proponer cambio al modelo» (H4): the agent's steps over the canvas, top right of the stage. Tokens only (theme.css). */
+.agent-run{position:absolute;z-index:calc(var(--z-toolbar) + 6);top:calc(var(--stage-top,0px) + 12px);right:96px;width:min(360px,calc(100% - 32px));
+  display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid var(--border-soft);border-radius:var(--radius-xl);
+  background:var(--surface-float);backdrop-filter:blur(var(--blur-popover));color:var(--ink);box-shadow:var(--shadow-popover-strong);
+  pointer-events:auto;animation:agent-run-in .18s var(--ease-standard)}
+.agent-run header{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.agent-run[data-status=READY] header{color:var(--brand-ink)}
+.agent-run[data-status=FAILED] header,.agent-run[data-status=error] header,.agent-run[data-status=STOPPED_LIMIT] header{color:var(--error)}
+.agent-run h2{flex:1;min-width:0;margin:0;font:var(--type-title-sm);color:var(--ink)}
+.agent-run-close{display:grid;place-items:center;width:28px;height:28px;min-height:0;padding:0;border-radius:var(--radius-sm);color:var(--muted)}
+.agent-run-close:hover{background:var(--hover);color:var(--ink)}
+.agent-run-note{margin:0;font:var(--type-body);color:var(--ink)}
+.agent-run-provider{margin:0;font:var(--type-hint);color:var(--muted)}
+.agent-run-steps{display:flex;flex-direction:column;gap:4px;margin:0;padding:0;list-style:none;counter-reset:step}
+.agent-run-steps li{display:grid;grid-template-columns:16px minmax(0,1fr);align-items:start;gap:6px;font:var(--type-body);color:var(--ink)}
+.agent-run-steps li>svg{margin-top:3px;color:var(--brand-ink)}
+.agent-run-steps li[data-status=REJECTED]>svg,.agent-run-steps li[data-status=ERROR]>svg{color:var(--error)}
+.agent-run-steps small{display:block;font:var(--type-hint);color:var(--muted)}
+.agent-run-actions{display:flex;flex-wrap:wrap;gap:8px}
+.agent-run-actions a{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:var(--radius-pill);border:1px solid var(--border);
+  color:var(--ink);font:var(--type-hint);text-decoration:none}
+.agent-run-actions a:first-child{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.agent-run-actions a:hover{filter:brightness(1.05)}
+@keyframes agent-run-in{from{opacity:0;transform:translateY(-6px)}}
+@media(prefers-reduced-motion:reduce){.agent-run{animation:none}}
+@media(max-width:720px){.agent-run{right:16px;left:16px;width:auto}}
+.change-agent-steps{margin:0 0 12px;padding:8px 12px;border:1px solid var(--line);border-radius:8px}
+.change-agent-steps>summary{cursor:pointer;font:var(--type-label, var(--type-body));color:var(--ink)}
+.change-agent-steps>ol,.change-agent-steps>p{margin-top:8px}
