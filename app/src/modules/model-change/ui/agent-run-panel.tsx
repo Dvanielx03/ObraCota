@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Check, CircleAlert, X } from "lucide-react";
 import { Spinner } from "@/shared/ui/loading";
-import { RUN_TITLES, toolLabel, type AgentRun, type AgentStep } from "../domain/agent-run";
+import { agentProviderLabel, RUN_TITLES, toolLabel, type AgentRun, type AgentStep } from "../domain/agent-run";
 import "./agent-run.css";
 
 export type AgentRunState = { state: "running"; notes: number; steps: AgentStep[] }
@@ -14,7 +14,11 @@ export type AgentRunState = { state: "running"; notes: number; steps: AgentStep[
  * it herself. Nothing in this panel publishes.
  */
 export function AgentRunPanel({ value, onClose }: { value: AgentRunState; onClose: () => void }) {
-  const title = value.state === "running" ? "El agente está preparando el cambio" : value.state === "error" ? "No se pudo proponer el cambio" : RUN_TITLES[value.run.status];
+  const title = value.state === "running" ? "El agente está preparando el cambio"
+    : value.state === "error" ? "No se pudo proponer el cambio"
+    : value.run.status === "NO_CHANGE" && value.run.change ? "Borrador sin enviar" : RUN_TITLES[value.run.status];
+  const provider = value.state === "done" && (value.run.provider === "fake"
+    ? "Agente de prueba: sin IA y sin costo." : agentProviderLabel(value.run.provider, value.run.model));
   const steps = value.state === "running" ? value.steps : value.state === "done" ? value.run.steps : [];
   return <section className="agent-run" role="region" aria-label="Propuesta del agente" aria-busy={value.state === "running" || undefined}
     data-status={value.state === "done" ? value.run.status : value.state}>
@@ -27,7 +31,7 @@ export function AgentRunPanel({ value, onClose }: { value: AgentRunState; onClos
     </header>
     {value.state === "running" && <p className="agent-run-note">Lee {value.notes === 1 ? "la pieza marcada" : "las piezas marcadas"}, prepara un borrador y solicita su vista previa. Si el motor está ocupado, la verificación espera en cola.</p>}
     {value.state === "error" && <p className="agent-run-note" role="alert">{value.message}</p>}
-    {value.state === "done" && value.run.provider === "fake" && <p className="agent-run-provider">Agente de prueba: sin IA y sin costo.</p>}
+    {provider && <p className="agent-run-provider">{provider}</p>}
     {steps.length > 0 &&
       <ol className="agent-run-steps" aria-label="Pasos del agente">
         {steps.map((step) => <li key={step.step + "-" + step.seq} data-status={step.status}>

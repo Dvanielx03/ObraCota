@@ -45,9 +45,9 @@ export function useOperationLabels(change:ModelChange){
   },[change]);
 }
 
-/** Header (§7.2 section 1): description, status chip, who proposed it (AI always labelled) and the base. */
+/** Header (§7.2 section 1): the origin. The run journal identifies which provider was used. */
 export function ChangeHeader({change}:{change:ModelChange}){
-  const origin=change.origin==="AGENT"?"Propuesta por el agente · generado con IA":"Propuesta por "+(change.author?.email??"una persona");
+  const origin=change.origin==="AGENT"?"Propuesta por el agente":"Propuesta por "+(change.author?.email??"una persona");
   return <div className="change-head">
     <div className="change-title"><h2>{change.description}</h2><span className="change-chip" data-status={change.status}>{statusLabel(change.status)}</span></div>
     <p className="change-meta"><span>{origin}</span><span>Base v{change.baseRevision} · {change.baseName}</span>

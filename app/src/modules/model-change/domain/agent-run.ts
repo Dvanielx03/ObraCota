@@ -58,6 +58,13 @@ export const RUN_TITLES: Record<AgentRunStatus, string> = {
   FAILED: "El agente no pudo terminar",
 };
 
+export function agentProviderLabel(provider: string, model: string): string | undefined {
+  if (provider === "fake") return "Agente de prueba · sin IA";
+  if (provider === "gemini") return "Generado con IA · " + model;
+  if (provider === "unknown") return undefined;
+  return model || provider;
+}
+
 /** The notes that go to the agent: only marks with text; a point carries its piece when it has a GlobalId (IFC). */
 export function agentNotes(marks: readonly ({ kind: "point"; guid?: string; name: string; text: string } | { kind: "area"; text: string })[]): AgentNote[] {
   return marks.filter((mark) => mark.text.trim()).map((mark) => mark.kind === "point"

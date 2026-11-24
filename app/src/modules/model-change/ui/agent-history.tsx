@@ -1,17 +1,19 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { RUN_HISTORY_LABELS, type AgentRunSummary } from "../domain/agent-run";
+import { agentProviderLabel, RUN_HISTORY_LABELS, type AgentRunSummary } from "../domain/agent-run";
 import { agentRunHistory } from "../infrastructure/agent-run-http";
 import "./agent-run.css";
 
 const date = new Intl.DateTimeFormat("es-CO", { dateStyle: "short", timeStyle: "short" });
 
 export function AgentRunMeta({ run }: { run: AgentRunSummary }) {
+  const label = run.status === "NO_CHANGE" && run.change ? "Borrador sin enviar" : RUN_HISTORY_LABELS[run.status];
+  const provider = agentProviderLabel(run.provider, run.model);
   return <div className="agent-history-meta">
-    <strong>{RUN_HISTORY_LABELS[run.status]}</strong>
+    <strong>{label}</strong>
     <time dateTime={run.startedAt}>{date.format(new Date(run.startedAt))}</time>
-    {run.provider !== "unknown" && <small>{run.provider === "fake" ? "Agente de prueba" : run.model}</small>}
+    {provider && <small>{provider}</small>}
   </div>;
 }
 

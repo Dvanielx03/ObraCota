@@ -183,7 +183,7 @@ public final class RunDesignAgent {
             }
             history.add(turn.message());
             var calls = turn.calls();
-            if (calls.isEmpty()) return end(run, session, steps, turn.text());
+            if (calls.isEmpty()) return end(run, session, steps);
             var responses = new ArrayList<Part>();
             int seq = 0;
             for (var call : calls) {
@@ -196,11 +196,12 @@ public final class RunDesignAgent {
                 progress.accept(outcome.step());
                 responses.add(new Response(call.id(), call.name(), outcome.payload()));
             }
-            if (session.ended()) return end(run, session, steps, turn.text());
+            if (session.ended()) return end(run, session, steps);
             history.add(Message.user(responses));
         }
+        var next = session.change() == null ? "No se creó un borrador." : "El borrador quedó guardado sin enviar.";
         return new Result(run, Status.STOPPED_LIMIT, model.provider(), modelId, session.change(),
-            "El agente llegó al tope de " + MAX_STEPS + " pasos sin enviar el cambio. Revisa el borrador o vuelve a intentarlo.", steps);
+            "El agente llegó al tope de " + MAX_STEPS + " pasos. " + next, steps);
     }
 
     // Steps -------------------------------------------------------------------------------------------------------
@@ -258,16 +259,16 @@ public final class RunDesignAgent {
         return new Outcome(new Step(step, seq, safeName(call.name()), AgentToolJournal.Status.REJECTED, code, detail), payload);
     }
 
-    private Result end(UUID run, DesignAgentTools.Session session, List<Step> steps, String text) {
-        var said = text == null || text.isBlank() ? null : text.strip();
+    private Result end(UUID run, DesignAgentTools.Session session, List<Step> steps) {
         if (session.submitted())
             return new Result(run, Status.READY, model.provider(), modelId, session.change(),
-                Objects.requireNonNullElse(said, "El borrador está listo para que lo revises y lo apruebes."), steps);
+                "El borrador está listo para que lo revises y lo apruebes.", steps);
         if (session.discarded())
             return new Result(run, Status.DISCARDED, model.provider(), modelId, session.change(),
-                Objects.requireNonNullElse(said, "El agente descartó la propuesta."), steps);
-        return new Result(run, Status.NO_CHANGE, model.provider(), modelId, session.change(),
-            Objects.requireNonNullElse(said, "El agente terminó sin proponer un cambio."), steps);
+                "El agente descartó la propuesta.", steps);
+        var message = session.change() != null ? "El borrador quedó guardado sin enviar a aprobación."
+            : "La solicitud no produjo un borrador. Pide una operación compatible sobre una pieza marcada del IFC.";
+        return new Result(run, Status.NO_CHANGE, model.provider(), modelId, session.change(), message, steps);
     }
 
     // Texts -------------------------------------------------------------------------------------------------------

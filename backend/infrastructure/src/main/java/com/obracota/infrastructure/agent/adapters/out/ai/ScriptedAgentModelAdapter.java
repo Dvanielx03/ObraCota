@@ -32,11 +32,19 @@ public final class ScriptedAgentModelAdapter implements AgentModelPort {
 
     private static final Pattern MARKED = Pattern.compile("pieza ([0-9A-Za-z_$]{22})");
     private static final Pattern NOTE = Pattern.compile("(?im)^\\d+\\.\\s*cambiar\\s+(?:el\\s+|la\\s+)?([A-Za-z][A-Za-z0-9_]*)\\s+(?:a|por)\\s+(.+?)\\s*\\[");
+    private static final Pattern SINGLE_PROPERTY_NOTE = Pattern.compile(
+        "(?i)\\n1\\.[ \\t]+cambiar[ \\t]+(?:el[ \\t]+|la[ \\t]+)?[A-Za-z][A-Za-z0-9_]*[ \\t]+(?:a|por)[ \\t]+[^\\r\\n]+ \\[marca sobre la pieza [0-9A-Za-z_$]{22}\\]\\n\\nDatos del modelo");
 
     private final List<ScriptedTurn> script;
+    private final boolean singlePropertyOnly;
     private int calls;
 
-    public ScriptedAgentModelAdapter(List<ScriptedTurn> script) { this.script = List.copyOf(script); }
+    public ScriptedAgentModelAdapter(List<ScriptedTurn> script) { this(script, false); }
+
+    private ScriptedAgentModelAdapter(List<ScriptedTurn> script, boolean singlePropertyOnly) {
+        this.script = List.copyOf(script);
+        this.singlePropertyOnly = singlePropertyOnly;
+    }
 
     /** Read the marked piece, set the property of the note, preview and submit: the H4 Playwright case. */
     public static ScriptedAgentModelAdapter defaultScript() {
@@ -46,7 +54,7 @@ public final class ScriptedAgentModelAdapter implements AgentModelPort {
                 "value", "{{value}}", "valueType", "{{valueType}}", "scope", "occurrence")),
             ScriptedTurn.call("preview_change", Map.of()),
             ScriptedTurn.call("submit_change", Map.of("summary", "Propuesta del agente de prueba: {{property}} = {{value}}.")),
-            ScriptedTurn.say("Borrador listo para tu revisión (agente de prueba, sin IA).")));
+            ScriptedTurn.say("Fin del guion.")), true);
     }
 
     /** How many times the model was asked: a test checks that a failure is never repeated. */
@@ -63,6 +71,8 @@ public final class ScriptedAgentModelAdapter implements AgentModelPort {
         calls++;
         int index = (int) request.history().stream().filter(message -> message.role() == Role.MODEL).count();
         var none = new Consumption(0, 0, 0);
+        if (singlePropertyOnly && index == 0 && !SINGLE_PROPERTY_NOTE.matcher(firstText(request.history())).find())
+            return new Turn(new Message(Role.MODEL, List.of(), null), none);
         if (index >= script.size()) return new Turn(new Message(Role.MODEL, List.of(new Text("Fin del guion.")), null), none);
         var turn = script.get(index);
         if (turn.failure() != null) throw new Failure(turn.failure(), none);
@@ -76,8 +86,7 @@ public final class ScriptedAgentModelAdapter implements AgentModelPort {
 
     private static Map<String, String> context(List<Message> history) {
         var values = new HashMap<String, String>();
-        var first = history.isEmpty() ? "" : history.getFirst().parts().stream().filter(Text.class::isInstance).map(part -> ((Text) part).text())
-            .findFirst().orElse("");
+        var first = firstText(history);
         var marked = MARKED.matcher(first);
         if (marked.find()) values.put("marked", marked.group(1));
         var note = NOTE.matcher(first);
@@ -106,6 +115,11 @@ public final class ScriptedAgentModelAdapter implements AgentModelPort {
             values.put("pset", "Pset_" + ifcClass.substring(3) + "Common");
         values.putIfAbsent("pset", "Pset_DoorCommon");
         return values;
+    }
+
+    private static String firstText(List<Message> history) {
+        return history.isEmpty() ? "" : history.getFirst().parts().stream().filter(Text.class::isInstance)
+            .map(part -> ((Text) part).text()).findFirst().orElse("");
     }
 
     private static String kind(Object ifcType) {
