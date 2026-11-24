@@ -2,16 +2,17 @@ import {expect,test} from "@playwright/test";
 import * as T from "three";
 import {walking,walkWorld} from "../src/viewer/infrastructure/walk";
 
-test("La cápsula avanza, se detiene ante un muro y conserva los ojos a escala",()=>{
+for(const [label,ifcType,height] of [["un muro","IFCWALL",3],["un mueble","IFCFURNITURE",.7]] as const){
+test(`La cápsula avanza, se detiene ante ${label} y conserva los ojos a escala`,()=>{
   const root=new T.Group();
   const slab=new T.Mesh(new T.BoxGeometry(8,.2,8));
   slab.userData.ifcType="IFCSLAB";
   slab.position.y=-.1;
   root.add(slab);
-  const wall=new T.Mesh(new T.BoxGeometry(8,3,.2));
-  wall.userData.ifcType="IFCWALL";
-  wall.position.set(0,1.5,-2);
-  root.add(wall);
+  const obstacle=new T.Mesh(new T.BoxGeometry(8,height,.2));
+  obstacle.userData.ifcType=ifcType;
+  obstacle.position.set(0,height/2,-2);
+  root.add(obstacle);
   const world=walkWorld({root,name:"Ensayo geométrico",schema:"IFC4",sample:false,elements:[],coordination:new T.Matrix4().elements});
   class Canvas extends EventTarget {
     clientWidth=640;
@@ -40,6 +41,7 @@ test("La cápsula avanza, se detiene ante un muro y conserva los ojos a escala",
     route.dispose();
   }finally{
     Object.assign(globalThis,originals);
-    slab.geometry.dispose();wall.geometry.dispose();
+    slab.geometry.dispose();obstacle.geometry.dispose();
   }
 });
+}

@@ -3,7 +3,7 @@ import {Capsule} from "three/addons/math/Capsule.js";
 import {Octree} from "three/addons/math/Octree.js";
 import type {SceneModel} from "./model-source";
 
-const bodies=/^(IFC(WALL|SLAB|ROOF|DOOR|WINDOW|CURTAINWALL|FURNISHINGELEMENT|COLUMN|BEAM|MEMBER|PLATE|STAIR|RAMP|GEOGRAPHICELEMENT|BUILDINGELEMENTPROXY|FOOTING))/;
+const bodies=/^(IFC(WALL|SLAB|ROOF|DOOR|WINDOW|CURTAINWALL|FURNISHINGELEMENT|FURNITURE|COLUMN|BEAM|MEMBER|PLATE|STAIR|RAMP|GEOGRAPHICELEMENT|BUILDINGELEMENTPROXY|FOOTING))/;
 const radius=.23,eye=1.65;
 /**
  * Collision triangles the walk indexes at most. The octree is built on the main thread (with the bounding-box split
