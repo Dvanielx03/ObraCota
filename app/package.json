@@ -7,7 +7,7 @@
     "dev": "next dev -p 3201",
     "build": "next build",
     "start": "next start -p 3201",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --project tsconfig.check.json",
     "lint": "eslint",
     "test": "playwright test"
   },
