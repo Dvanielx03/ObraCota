@@ -42,6 +42,8 @@ const CENTER_ZONE = 0.24;
 export interface WorkspaceToolsHandle {
   /** Runs a tool as its button would; returns why it cannot run, if so. */
   run(tool: ToolShortcut): string | undefined;
+  /** Gives the next drag to the camera, keeping the current edit and its marks. */
+  navigate(): void;
   /** Closes the open panel and leaves Editar (asking first if notes would be lost), then calls `then`. */
   release(then: () => void): void;
 }
@@ -228,10 +230,11 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
   closeReview.current = onCloseReview;
   useEffect(() => { if (tool) closeReview.current?.(); }, [tool]);
 
-  useEffect(() => {
-    viewer()?.setMarking(marking);
+  useLayoutEffect(() => {
+    const port = viewer();
+    port?.setMarking(marking);
+    return () => port?.setMarking(false);
   }, [viewer, marking]);
-  useEffect(() => () => viewer()?.setMarking(false), [viewer]);
   // A panel whose subject disappears closes by itself.
   useEffect(() => {
     if ((tool === "render" && unavailable) || (((tool === "compare" && !comparing) || tool === "download") && !batch && !state.loading)) setTool(null);
@@ -479,7 +482,14 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
   const capture = useCallback(() => viewer()?.capture() ?? "", [viewer]);
   const ids = pieces.map((piece) => piece.id);
   const untouched = isNeutral(adjust) && isFullFrame(framing);
-  const startWalk = () => { setTool(null); guard(() => { clearEdit(); walk.onStart(); }); };
+  const startWalk = () => {
+    setTool(null);
+    guard(() => {
+      clearEdit();
+      if (edit.on) edit.onExit();
+      walk.onStart();
+    });
+  };
   /** «Recorrer esta escena en 3D»: the scene goes around the model, then the walk starts where it can. */
   const walkScene = (request: string) => {
     if (!walk.onScene?.(request)) { flash("No se pudo construir la escena en la vista 3D."); return; }
@@ -510,6 +520,10 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
       if (now.walkReason) return now.walkReason;
       now.startWalk();
       return undefined;
+    },
+    navigate() {
+      setActive(null);
+      setOpenMark(null);
     },
     release(then) {
       const now = latest.current;

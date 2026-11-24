@@ -110,8 +110,8 @@ export function EditMarksLayer({ viewer, host, marks, marking, open, focus, area
   const [spots, setSpots] = useState<Record<number, Spot>>({});
   const [draft, setDraft] = useState<Area | null>(null);
   const want = useRef<MarkFocus | null>(null);
-  const latest = useRef({ marks, marking, areaPose, onPoint, onArea, onOpen, onMiss, onCameraMoved });
-  latest.current = { marks, marking, areaPose, onPoint, onArea, onOpen, onMiss, onCameraMoved };
+  const latest = useRef({ marks, areaPose, onPoint, onArea, onOpen, onMiss, onCameraMoved });
+  latest.current = { marks, areaPose, onPoint, onArea, onOpen, onMiss, onCameraMoved };
 
   useLayoutEffect(() => {
     const observer = new ResizeObserver(() => setSize({ w: host.clientWidth, h: host.clientHeight }));
@@ -152,14 +152,18 @@ export function EditMarksLayer({ viewer, host, marks, marking, open, focus, area
   }, [pointKey, viewer, size.w, size.h]);
 
   // Left button on the canvas: a click asks for a point, a drag draws a zone. Other buttons go to the camera.
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!marking) {
+      setDraft(null);
+      return;
+    }
     let start: { x: number; y: number; id: number } | null = null;
     const fraction = (event: PointerEvent) => {
       const rect = host.getBoundingClientRect();
       return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height };
     };
     function down(event: PointerEvent) {
-      if (!latest.current.marking || event.button !== 0 || !event.isPrimary) return;
+      if (event.button !== 0 || !event.isPrimary) return;
       if ((event.target as Element).closest?.(".edit-layer")) return;
       start = { x: event.clientX, y: event.clientY, id: event.pointerId };
     }
@@ -189,17 +193,22 @@ export function EditMarksLayer({ viewer, host, marks, marking, open, focus, area
       if (zone) { want.current = { id: zone.id, target: "field", at: Date.now() }; latest.current.onOpen(zone.id); return; }
       latest.current.onPoint(event.clientX, event.clientY);
     }
-    function cancel() { start = null; setDraft(null); }
+    function cancel(event: PointerEvent) {
+      if (event.pointerId !== start?.id) return;
+      start = null;
+      setDraft(null);
+    }
     host.addEventListener("pointerdown", down);
     host.addEventListener("pointermove", move);
     host.addEventListener("pointerup", up);
     host.addEventListener("pointercancel", cancel);
+    host.addEventListener("lostpointercapture", cancel);
     return () => {
       host.removeEventListener("pointerdown", down); host.removeEventListener("pointermove", move);
       host.removeEventListener("pointerup", up); host.removeEventListener("pointercancel", cancel);
+      host.removeEventListener("lostpointercapture", cancel);
     };
-  }, [host]);
-  useEffect(() => { if (!marking) setDraft(null); }, [marking]);
+  }, [host, marking]);
   useEffect(() => {
     host.toggleAttribute("data-marking", marking);
     return () => host.removeAttribute("data-marking");

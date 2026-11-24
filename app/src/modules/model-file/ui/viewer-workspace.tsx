@@ -186,7 +186,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   }
   function exitEdit(){
     setTab("reading");setPrismaStep(null);setGrouping(false);
-    setAssistant(false);
+    setEditFocus(null);setColor(null);setAssistant(false);
   }
   // In Editar the model shows the piece of the open mark (DU-17), or the whole selection while a colour is previewed.
   const [editFocus,setEditFocus]=useState<string|null>(null);
@@ -274,7 +274,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
         last.current=file;setPan(false);
         setPrismaStep(null);
         const design=!previewing && !next.drawing && next.environment!=="plan" && new URLSearchParams(window.location.search).get("panel")==="asistente";
-        setAssistant(design);setGrouping(false);setColor(null);
+        setAssistant(design);setGrouping(false);setEditFocus(null);setColor(null);
         setTab("reading");setModel(next);setOpenedBytes(file?.size??0);
         setGuide(step=>step==="done"?"off":step==="note"||step==="review"?"select":step);
         const target=file && file===initialFile ? new URLSearchParams(window.location.search).get("element") : null;
@@ -306,11 +306,16 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   },[open,pick,session]);
   function closeModel() {
     setPrismaStep(null);setQuick(null);
-    setAssistant(false);setIds([]);setColor(null);
+    setAssistant(false);setIds([]);setEditFocus(null);setColor(null);
     request.current?.abort();viewer.current?.clear();last.current=null;
     setModel(null);setSelected(null);setError("");setStatus("");
   }
-  function togglePan() {viewer.current?.pan(!pan);setPan(!pan);}
+  function cameraMode(panning:boolean) {
+    tools.current?.navigate();
+    if(windowMode)viewer.current?.windowZoom();
+    viewer.current?.pan(panning);
+    setPan(panning);
+  }
   const plan=model?.environment==="plan";
   const settling = holding && !status && !error && !!model;
   const ready = !!model && !status && !error && !holding;
@@ -355,6 +360,10 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   // The header's "Presentar" drives the presentation that lives in the saved-view strip.
   const strip=useRef<SceneStripHandle>(null),presentButton=useRef<HTMLButtonElement>(null);
   const tools=useRef<WorkspaceToolsHandle>(null),rail=useRef<VersionRailHandle>(null);
+  function openFromPicker(file:File){
+    const start=()=>void open(file);
+    if(tools.current)tools.current.release(start);else start();
+  }
   const [viewCount,setViewCount]=useState(0);
   // During the presentation the header and the dock are inert; the focus goes back to "Presentar" after it.
   const [presenting,setPresenting]=useState(false);
@@ -473,7 +482,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     <ViewerHeader returnHref={returnHref} returnLabel={returnLabel} projectName={storedVersion || proposal?projectName:undefined}
       fileName={model?.name || "Visor de modelos"} pending={!model} meta={model?(plan?"Plano 2D":"Vista 3D")+" · "+model.schema:undefined}
       badge={proposal && showingInitial?{label:proposal.label,detail:proposal.description}:undefined}
-      onFile={file=>void open(file)} input={input} openDisabled={touring || (!viewer.current && !!error)} inert={presenting}
+      onFile={openFromPicker} input={input} openDisabled={touring || (!viewer.current && !!error)} inert={presenting}
       exportMenu={<ExportMenu disabledReason={exportReason} viewCount={viewCount} onNotice={say} stored={!!storedVersion && !proposal}
         context={()=>{const list=strip.current?.snapshot();return list && model?{views:list.views,project:projectName,file:model.name,version:revision?.label,stored:storedVersion}:null;}}
         camera={{pose:readPose,apply:next=>applyPose(next),capture:()=>viewer.current?.capture("png",EXPORT_MAX_SIDE)??null}}
@@ -501,7 +510,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
             {engine && status && <button type="button" onClick={()=>{request.current?.abort();setStatus("");setHolding(false);}}>Cancelar</button>}
           </ModelPreparing>
           : !ready && <div className="feedback" role="status" data-kind={error?"error":"empty"}>
-          {error ? <CubeIcon size={32}/> : <EmptyArt width={220}/>}<h2>{error?"No se pudo abrir":"Abrir un modelo"}</h2>
+          {error ? <CubeIcon size={32}/> : <EmptyArt width={220}/>}<h2>{failure?.reason==="revit"?"Visualización del RVT":error?"No se pudo abrir":"Abrir un modelo"}</h2>
           {error ? <p>{error}</p> : <p>Sube un IFC, DWG, RVT, FBX u OBJ de tu equipo, o recorre el edificio de ejemplo.</p>}
           {failure && <StoredPreview failure={failure} stored={proposal?undefined:storedVersion}/>}
           <div>{viewer.current ? <><button onClick={()=>input.current?.click()}>Elegir archivo</button>
@@ -557,11 +566,11 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
             sceneReason:model.sceneWalk && prismaAvailable?undefined:"Necesita un modelo 3D con unidades verificables (IFC, DWG 3D con unidad declarada o FBX); un OBJ no declara unidades",
             onStart:startWalk,onScene:showScene}}
           camera={<RovingToolbar label="Controles de la cámara" className="tools">
-            {!plan && <><IconTool icon={Rotate3d} aria-label="Orbitar" aria-pressed={!pan} onClick={()=>{if(pan)togglePan();}}/>
-            <IconTool icon={Hand} aria-label="Desplazar" aria-pressed={pan} onClick={()=>{if(!pan)togglePan();}}/><ToolSeparator/></>}
+            {!plan && <><IconTool icon={Rotate3d} aria-label="Orbitar" aria-pressed={!pan} onClick={()=>cameraMode(false)}/>
+            <IconTool icon={Hand} aria-label="Desplazar" aria-pressed={pan} onClick={()=>cameraMode(true)}/><ToolSeparator/></>}
             <IconTool icon={Plus} aria-label="Acercar" onClick={()=>viewer.current?.zoom(1.25)}/>
             <IconTool icon={Minus} aria-label="Alejar" onClick={()=>viewer.current?.zoom(0.8)}/>
-            <IconTool icon={SquareDashed} aria-label="Zoom ventana" title="Zoom ventana · arrastra un rectángulo, Esc para cancelar" aria-pressed={windowMode} onClick={()=>{setWindowMode(!windowMode);viewer.current?.windowZoom();}}/>
+            <IconTool icon={SquareDashed} aria-label="Zoom ventana" title="Zoom ventana · arrastra un rectángulo, Esc para cancelar" aria-pressed={windowMode} onClick={()=>{tools.current?.navigate();setWindowMode(!windowMode);viewer.current?.windowZoom();}}/>
             <IconTool icon={Maximize} aria-label={plan?"Encuadrar plano":"Encuadrar modelo"} title="Extensión completa · doble clic central" onClick={()=>viewer.current?.extents()}/>
             <IconTool icon={House} aria-label="Restablecer cámara" title={plan?"Volver a la vista inicial del plano · Inicio":"Restablecer isométrica · Inicio"} onClick={()=>viewer.current?.fit()}/>
           </RovingToolbar>}/>}

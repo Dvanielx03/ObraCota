@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";
+import { modelShown } from "./support/visor";
 
 /**
  * A Revit RVT kept as a project original (layer 1 of RVT support): uploaded through the project's form,
@@ -47,14 +48,21 @@ test("Un RVT de Revit se guarda tal cual y el visor explica cómo verlo", async 
     await expect(page.getByRole("button", { name: "Descargar versión 1" })).toBeVisible();
     // The viewer does not crash: it tells what the file is and how to see it.
     await page.getByRole("link", { name: "Abrir versión 1 en el visor" }).click();
-    await expect(page.getByText("No se pudo abrir")).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByRole("heading", { name: "Visualización del RVT" })).toBeVisible({ timeout: 120_000 });
     const card = page.locator(".stage .feedback[data-kind=error]");
     const reason = card.locator(":scope > p");
     await expect(reason).toContainText("Revit 2025");
     await expect(reason).toContainText("Exportar › IFC");
     const details = card.locator("figure.open-failure-preview");
     await expect(details).toContainText("Original de Revit 2025");
-    await expect(details).toContainText("El original sigue descargable desde el historial de versiones.");
+    const download = page.waitForEvent("download");
+    await details.getByRole("button", { name: "Descargar RVT original" }).click();
+    const artifact = await download;
+    expect(artifact.suggestedFilename()).toBe(basename(source));
+    const downloaded = readFileSync((await artifact.path())!);
+    expect(downloaded.subarray(0, 8).toString("hex")).toBe("d0cf11e0a1b11ae1");
+    expect(createHash("sha256").update(downloaded).digest("hex")).toBe(sha);
+    await expect(details.getByRole("status").filter({ hasText: "huella SHA-256 comprobada" })).toBeVisible();
     // The personal path Revit records is never shown.
     await expect(page.locator("body")).not.toContainText("Last Save Path");
     await expect(page.locator("body")).not.toContainText(/[A-Z]:\\/);
@@ -64,7 +72,10 @@ test("Un RVT de Revit se guarda tal cual y el visor explica cómo verlo", async 
       const size = await image.evaluate(async (img: HTMLImageElement) => { await img.decode(); return [img.naturalWidth, img.naturalHeight]; });
       expect(size[0]).toBeGreaterThan(8);
     }
-    await info.attach("visor", { body: await page.screenshot(), contentType: "image/png" });
+    await page.screenshot({ path: info.outputPath("rvt-original.png") });
+    await page.getByRole("button", { name: "Explorar ReStage" }).click();
+    await modelShown(page);
+    await expect(page.getByRole("toolbar", { name: "Controles de la cámara" })).toBeVisible();
   } finally {
     await page.request.delete(base, { headers });
   }

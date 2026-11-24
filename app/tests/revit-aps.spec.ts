@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { modelShown } from "./support/visor";
 
@@ -29,7 +29,7 @@ test("Un RVT guardado se convierte a IFC con Autodesk y se abre en el visor", as
     await page.getByRole("button", { name: "Guardar versión" }).click();
     expect((await uploading).status()).toBe(201);
     await page.getByRole("link", { name: "Abrir versión 1 en el visor" }).click();
-    await expect(page.getByText("No se pudo abrir")).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByRole("heading", { name: "Visualización del RVT" })).toBeVisible({ timeout: 120_000 });
     const card = page.locator(".stage .feedback[data-kind=error]");
     await expect(card).toContainText("el RVT original no cambia");
     await card.getByRole("button", { name: "Convertir a IFC con Autodesk" }).click();
@@ -40,8 +40,20 @@ test("Un RVT guardado se convierte a IFC con Autodesk y se abre en el visor", as
     await open.click();
     await expect(page).toHaveURL(new RegExp(`/proyectos/${project}/visor/[0-9a-f-]{36}$`));
     await modelShown(page);
+    const ifcVersion = new URL(page.url()).pathname.split("/").at(-1)!;
+    const ifc = await page.request.get(`/api/projects/${project}/versions/${ifcVersion}/original`, { headers });
+    expect(ifc.status()).toBe(200);
+    const content = await ifc.body();
+    expect(content.subarray(0, 4096).toString("utf8")).toMatch(/ISO-10303-21;[\s\S]+FILE_SCHEMA\(\('IFC/i);
+    expect(content.subarray(-256).toString("utf8")).toMatch(/END-ISO-10303-21;\s*$/);
     const files = await (await page.request.get(`/api/projects/${project}/files`, { headers })).json();
     expect(files.map((file: { format: string }) => file.format).sort()).toEqual(["IFC", "RVT"]);
+    const originalFile = files.find((file: { format: string }) => file.format === "RVT");
+    const [originalVersion] = await (await page.request.get(`/api/projects/${project}/files/${originalFile.id}/versions`, { headers })).json();
+    const original = await page.request.get(`/api/projects/${project}/versions/${originalVersion.id}/original`, { headers });
+    expect(original.status()).toBe(200);
+    const sha256 = (file: Buffer) => createHash("sha256").update(file).digest("hex");
+    expect(sha256(await original.body())).toBe(sha256(readFileSync(source)));
     await info.attach("visor", { body: await page.screenshot(), contentType: "image/png" });
   } finally {
     await page.request.delete("/api/projects/" + project, { headers });

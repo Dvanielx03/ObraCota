@@ -63,7 +63,8 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   const originals = new Map<T.Mesh|T.LineSegments|T.Points,T.Material|T.Material[]>();
   const highlightedLines=new T.LineBasicMaterial({color:0xff6900});
   const highlightedPoints=new T.PointsMaterial({color:0xff6900,size:4,sizeAttenuation:false});
-  const highlight = new T.MeshStandardMaterial({color:0xff6900,side:T.DoubleSide,emissive:0x3b2003});
+  // A selection is an annotation colour. Imported normals and scene lighting must not tint it.
+  const highlight = new T.MeshBasicMaterial({color:0xff6900,side:T.DoubleSide,toneMapped:false});
   const bounds = new T.Box3();
   const cssAxes = new T.Matrix4().makeScale(1,-1,1);
   const cubeRotation = new T.Matrix4();
@@ -428,9 +429,13 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     controls.update();draw();
   }
   let pointer:T.Vector2|null = null;
-  let windowMode=false, corner:T.Vector2|null=null, lastMiddle:{time:number;x:number;y:number}|null=null;
+  let windowMode=false, corner:T.Vector2|null=null, windowPointer:number|undefined;
+  let lastMiddle:{time:number;x:number;y:number}|null=null;
   const box = document.createElement("div");box.className="zoom-rectangle";box.hidden=true;container.append(box);
-  function exitWindow() {windowMode=false;corner=null;box.hidden=true;canvas.style.cursor="";onWindowEnd();}
+  function exitWindow() {
+    if(windowPointer!==undefined && canvas.hasPointerCapture(windowPointer))canvas.releasePointerCapture(windowPointer);
+    windowMode=false;corner=null;windowPointer=undefined;box.hidden=true;canvas.style.cursor="";onWindowEnd();
+  }
   function point(e:PointerEvent) {
     const r=canvas.getBoundingClientRect();
     return new T.Vector2(T.MathUtils.clamp(e.clientX-r.left,0,r.width),T.MathUtils.clamp(e.clientY-r.top,0,r.height));
@@ -438,7 +443,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   function down(e:PointerEvent) {
     canvas.focus({preventScroll:true});
     if (windowMode && e.button===0) {
-      e.stopImmediatePropagation();canvas.setPointerCapture(e.pointerId);corner=point(e);return;
+      e.stopImmediatePropagation();canvas.setPointerCapture(e.pointerId);windowPointer=e.pointerId;corner=point(e);return;
     }
     if (e.button===1) {
       e.preventDefault();
@@ -455,12 +460,12 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   function move(e:PointerEvent) {
     if(pointer && Math.hypot(e.clientX-pointer.x,e.clientY-pointer.y)>4)pointer=null;
     if(lastMiddle && Math.hypot(e.clientX-lastMiddle.x,e.clientY-lastMiddle.y)>5)lastMiddle=null;
-    if(!corner)return;
+    if(!corner || e.pointerId!==windowPointer)return;
     const p=point(e);box.hidden=false;
     Object.assign(box.style,{left:Math.min(p.x,corner.x)+"px",top:Math.min(p.y,corner.y)+"px",width:Math.abs(p.x-corner.x)+"px",height:Math.abs(p.y-corner.y)+"px"});
   }
   function finishWindow(e:PointerEvent) {
-    if(!corner)return;
+    if(!corner || e.pointerId!==windowPointer)return;
     e.stopImmediatePropagation();
     const p=point(e), width=Math.abs(p.x-corner.x), height=Math.abs(p.y-corner.y);
     if(width>4 && height>4){
@@ -649,6 +654,13 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     controls.mouseButtons.RIGHT=marking?T.MOUSE.ROTATE:T.MOUSE.PAN;
     controls.touches.ONE=panning?T.TOUCH.PAN:T.TOUCH.ROTATE;
   }
+  function setMarking(on:boolean){
+    if(on && windowMode)exitWindow();
+    marking=on;
+    pointer=null;
+    applyButtons();
+    canvas.toggleAttribute("data-marking",on);
+  }
   const projected=new T.Vector3(),toPoint=new T.Vector3(),viewDirection=new T.Vector3();
   function project(points:readonly (readonly [number,number,number])[],owners?:readonly (string|undefined)[]){
     if(!root || walk)return points.map(()=>null);
@@ -705,6 +717,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       // unless a scene around it («Recorrer esta escena en 3D») gives it a ground.
       if(activeModel.walk===false && environment.groundLevel()===null){mark("Este modelo no tiene un piso para recorrer.");return;}
       if(windowMode)exitWindow();
+      setMarking(false);
       endPulse();stopTween();
       markFloor=mark;controls.enabled=false;canvas.style.cursor="crosshair";canvas.focus();
     },
@@ -751,8 +764,8 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       controls.minZoom=plan?1:.0001;controls.maxZoom=plan?128:1e7;
       controls.enableRotate=!plan;
       panning=false;
+      setMarking(false);
       if(plan){controls.mouseButtons.LEFT=T.MOUSE.PAN;controls.mouseButtons.RIGHT=T.MOUSE.PAN;controls.touches.ONE=T.TOUCH.PAN;}
-      else applyButtons();
       canvas.setAttribute("aria-label",plan?"Plano 2D. Arrastra para desplazar y usa la rueda para acercar.":"Vista tridimensional del modelo. Usa el explorador para seleccionar con teclado.");
       if(plan){
         // Survey drawings may contain distant reference marks. Sample proportionally
@@ -792,6 +805,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     clear() {
       stopTween();cancelWalk();activeModel=undefined;originalFile=null;
       if(windowMode)exitWindow();
+      setMarking(false);
       select(null);exterior.reset();environment.reset();
       sheet=undefined;annotations.clear();
       if (root) {scene.remove(root);release(root);root=null;}
@@ -806,10 +820,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     },
     project,
     onFrame(listener){frameListeners.add(listener);return ()=>{frameListeners.delete(listener);};},
-    setMarking(on){
-      marking=on;applyButtons();
-      if(on){pointer=null;canvas.setAttribute("data-marking","");}else canvas.removeAttribute("data-marking");
-    },
+    setMarking,
     dispose() {
       stopTween();cancelWalk();
       endPulse();motion.removeEventListener("change",pulsePreference);

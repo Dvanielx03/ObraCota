@@ -136,6 +136,6 @@ export function readRevit(bytes: Uint8Array): RevitInfo {
 export function revitReason(info: RevitInfo, stored: boolean) {
   const what = "Archivo de Revit" + (info.release ? " " + info.release : "");
   return stored
-    ? what + " guardado tal cual. ObraCota aún no dibuja RVT en 3D: en Revit usa Archivo › Exportar › IFC y sube el IFC a este mismo proyecto para verlo y editarlo."
-    : what + ". ObraCota aún no dibuja RVT en 3D: en Revit usa Archivo › Exportar › IFC y abre el IFC aquí para verlo y editarlo.";
+    ? what + " guardado como original. Para ver la geometría, convierte a IFC si Autodesk está disponible o usa Archivo › Exportar › IFC en Revit y sube el IFC a este proyecto."
+    : what + " abierto desde tu equipo. Para ver la geometría, usa Archivo › Exportar › IFC en Revit y abre ese IFC aquí. También puedes guardar el RVT en un proyecto para usar la conversión con Autodesk cuando esté configurada.";
 }

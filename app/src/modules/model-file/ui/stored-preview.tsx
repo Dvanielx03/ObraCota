@@ -2,6 +2,7 @@
 import { useSyncExternalStore } from "react";
 import { openFailures, type OpenFailure } from "@/viewer/domain/open-failure";
 import { RevitTranslationAction } from "@/modules/model-version/ui/revit-translation";
+import { VerifiedDownload } from "@/modules/model-version/ui/verified-download";
 
 /**
  * Under the reason a file could not be drawn: the thumbnail a DWG keeps (the picture AutoCAD shows in
@@ -15,9 +16,11 @@ export function StoredPreview({ failure, stored }: { failure: OpenFailure; store
     {failure.preview && <img src={failure.preview} alt={"Vista previa guardada en " + failure.file}/>}
     <figcaption><strong>Original de Revit{failure.revit?.release ? " " + failure.revit.release : ""}</strong>
       {failure.revit?.build && <span>Compilación {failure.revit.build}.</span>}
-      <span>{failure.preview ? "Imagen PNG que Revit guardó con el archivo: se ve, pero no se puede girar ni medir. "
-        : ""}{failure.revit?.stored ? "El original sigue descargable desde el historial de versiones." : ""}</span>
-      {failure.revit?.stored && stored && <RevitTranslationAction project={stored.project} version={stored.version}/>}</figcaption>
+      {failure.preview && <span>Miniatura guardada por Revit.</span>}
+      {failure.revit?.stored && stored && <>
+        <VerifiedDownload project={stored.project} version={stored.version} label="Descargar RVT original"/>
+        <RevitTranslationAction project={stored.project} version={stored.version}/>
+      </>}</figcaption>
   </figure>;
   if (!failure.preview) return null;
   return <figure className="open-failure-preview">
