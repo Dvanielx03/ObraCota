@@ -194,11 +194,11 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
   const saveReason = edit.sample ? edit.sample : !scope ? "Guarda primero una versión del modelo" : !shown || !exterior?.pieces ? "Elige un acabado y míralo en el modelo 3D"
     : edit.changeLimit ? edit.changeLimit : !exteriorGuids.length ? "Solo un IFC guarda materiales en el modelo" + (edit.nonIfc ? " (este es " + edit.nonIfc + "); la vista previa sí se ve aquí" : "") : exteriorGuids.length > FINISH_PIECES_LIMIT ? "Hay más de " + FINISH_PIECES_LIMIT + " piezas exteriores"
     : undefined;
-  const saveFinish = useCallback(async () => {
+  async function saveFinish() {
     if (!scope || !shown) throw new Error("Elige un acabado y míralo en el modelo 3D.");
     const change = await saveFinishChange(scope.project, scope.version, finishMaterial(shown.material, shown.tone), exteriorGuids);
     return { href: "/proyectos/" + change.project + "/cambios#" + change.id, ready: change.status === "READY", material: change.recipe.operations[0]?.op === "ifc.set_material" ? change.recipe.operations[0].material : "" };
-  }, [scope, shown, exteriorGuids]);
+  }
   const toggleLivePreview = useCallback(() => {
     if (livePreview) resetExterior();
     setLivePreview(!livePreview);
