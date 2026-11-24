@@ -2,7 +2,8 @@
 import { changeLimitReason } from "@/modules/model-change/domain/change-limit";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CubeIcon, SidebarSimpleIcon, XIcon } from "@phosphor-icons/react";
-import { Circle, Footprints, Hand, House, ListChecks, Maximize, Minus, Plus, Rotate3d, Square, SquareDashed, X } from "lucide-react";
+import { Circle, Footprints, Hand, House, ListChecks, Maximize, Minus, Paintbrush, Plus, Rotate3d, Square, SquareDashed, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type {CameraPose,ModelInfo,ViewerPort} from "@/viewer/domain/viewer.port";
 import { ViewCube } from "./view-cube";
 import {SidebarWidth} from "./sidebar-width";
@@ -34,6 +35,7 @@ import { EmptyArt, ModelPreparing, Spinner } from "@/shared/ui/loading";
 import { ENTRY_SETTLING_PHASE, remainingHold } from "../domain/entry-hold";
 import { RECORDING_FPS, RECORDING_LIMIT_MS, recordingClock, recordingName, recordingType, startRecording, type WalkRecording } from "@/viewer/infrastructure/walk-recording";
 import { saveBlob } from "@/modules/scene-view/infrastructure/export-files";
+import { WalkFinishEditor } from "@/modules/model-change/ui/walk-finish-editor";
 
 /** "Duplex.ifc · 2,3 MB": the file being opened, under the phase of the wait. */
 function fileLine(file: File | null): string {
@@ -122,6 +124,14 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
     try{localStorage.setItem(PANEL_KEY,next?"open":"closed");}catch{/* Remembered for this visit only. */}
   }
   const [walk,setWalk]=useState<"idle"|"mark"|"active">("idle");
+  const router=useRouter();
+  const [walkEditor,setWalkEditor]=useState(false),[walkApplying,setWalkApplying]=useState(false);
+  const [walkPublished,setWalkPublished]=useState<{version:string;file:File;href:string}|null>(null);
+  const walkEditButton=useRef<HTMLButtonElement>(null);
+  function closeWalkEditor(){
+    setWalkEditor(false);
+    requestAnimationFrame(()=>walkEditButton.current?.focus({preventScroll:true}));
+  }
   // «Recorrer esta escena en 3D»: the scene built around the model, kept across the walk until «Restablecer».
   const [walkScene,setWalkScene]=useState<WalkScene|null>(null);
   useEffect(()=>{setWalkScene(null);},[model]);
@@ -144,12 +154,20 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   useEffect(()=>setRecordType(recordingType()),[]);
   const finishRecording=useRef<()=>void>(()=>undefined);
   const stopWalk=useCallback(()=>{
+    if(walkApplying)return;
     finishRecording.current();
+    if(walkPublished){
+      // Keep the approved model on screen while its permanent route opens.
+      setWalkLoading("Abriendo la revisión publicada…");
+      router.replace(walkPublished.href);
+      return;
+    }
     walkRequest.current?.abort();
     viewer.current?.cancelWalk();
     walkEnded.current=true;
+    setWalkEditor(false);
     setPanel(beforeWalk.current);setWalk("idle");setWalkError("");setWalkLoading("");setWalkOlder(false);
-  },[]);
+  },[router,walkApplying,walkPublished]);
   // Leaving the walk gives the focus back to RECORRIDO once the bottom bar is back.
   useEffect(()=>{
     if(walk!=="idle" || !walkEnded.current)return;
@@ -345,6 +363,12 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   // Whether the open model is the one the page was opened with (and not a file chosen afterwards): the stored
   // notes and the walk comparison only make sense over it.
   const showingInitial = !!initialFile && last.current === initialFile;
+  const walkBase = walkPublished?.file ?? initialFile;
+  const walkEditReason = !showingInitial || !storedVersion || proposal || !/^IFC/i.test(model?.schema??"")
+    ? "Abre una versión IFC guardada en el proyecto para editar acabados."
+    : walkOlder ? "Vuelve a la revisión nueva para editar."
+      : walkScene ? "Restablece la escena para revisar los acabados del IFC."
+        : changeLimitReason(walkBase?.size??0);
   const serverNotes = showingInitial ? storedNotes : undefined;
   // The ReStage sample (a public GLB): with a session the server keeps a project of its own for it, so Renderizar
   // and the panorama work and persist as on a saved version; without one they ask to sign in.
@@ -529,12 +553,24 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           aria-hidden={notice.tone==="error"?undefined:true}>{notice.text}</p>}
         {!plan && !touring && <div className="cube-host" hidden={!ready}><ViewCube flat={false} orient={view=>viewer.current?.orient(view)}/></div>}
         {touring && <p className="walk-hint" role="status" data-tone={walkError?"error":undefined}>{walkError||(walkLoading?<><Spinner size={12}/>{walkLoading}</>:null)||(walk==="mark"?"Elige un punto libre en el piso. Pulsa Intro para probar el centro.":<><span className="walk-keyboard">Arrastra para mirar · WASD o flechas para caminar</span><span className="walk-touch">Arrastra para mirar. Mantén pulsada una flecha para caminar.</span></>)}</p>}
+        {walk==="active" && walkPublished && !walkEditor && <p className="walk-save" role="status">Nueva revisión publicada. <a href={walkPublished.href}>Abrir versión en el visor</a></p>}
+        {walk==="active" && walkEditor && viewer.current && storedVersion && walkBase && <WalkFinishEditor viewer={viewer.current}
+          project={storedVersion.project} version={walkPublished?.version??storedVersion.version} base={walkBase}
+          onApplying={setWalkApplying} onClose={closeWalkEditor} onApplied={(version,file)=>{
+            const href=`/proyectos/${storedVersion.project}/visor/${version}?anterior=${walkPublished?.version??storedVersion.version}`;
+            setWalkApplying(false);setWalkPublished({version,file,href});closeWalkEditor();
+          }}/>}
         {/* The walk keeps the bottom bar (reference §1): RECORRIDO active, the version switch and a ghost «Salir». */}
         {touring && <div className="workspace-bars walk-bars">
           <span aria-hidden="true"/>
           <RovingToolbar label="Controles del recorrido" className="tool-bar walk-bar">
-            <ModeButton icon={Footprints} label="Recorrido" aria-pressed={true} title="Salir del recorrido · Esc" onClick={stopWalk}/>
-            {showingInitial && loadPrevious && walk==="active" && <><ToolSeparator/>
+            <ModeButton icon={Footprints} label="Recorrido" aria-pressed={true} disabledReason={walkApplying?"Guardando la revisión IFC":undefined} title="Salir del recorrido · Esc" onClick={stopWalk}/>
+            {walk==="active" && <><ToolSeparator/>
+              <button type="button" data-tool="" ref={walkEditButton} className="tool-mode" aria-expanded={walkEditor}
+                aria-disabled={!!walkEditReason || !!walkLoading || walkEditor} title={walkEditReason??"Seleccionar y cambiar el acabado de una pieza"}
+                onClick={()=>{if(!walkEditReason && !walkLoading && !walkEditor)setWalkEditor(true);}}>
+                <Paintbrush size={16} aria-hidden="true"/>Editar acabado</button></>}
+            {showingInitial && loadPrevious && walk==="active" && !walkEditor && !walkPublished && <><ToolSeparator/>
               <button type="button" data-tool="" className="tool-mode" aria-disabled={walkLoading?true:undefined} aria-pressed={walkOlder} title={walkLabels?"Ver «"+walkLabels.older+"» desde el mismo punto":"Ver la versión anterior desde el mismo punto"} onClick={()=>{if(!walkLoading)void compareWalk(true);}}>{walkLabels?.older??"Anterior"}</button>
               <button type="button" data-tool="" className="tool-mode" aria-disabled={walkLoading?true:undefined} aria-pressed={!walkOlder} title={walkLabels?"Volver a «"+walkLabels.newer+"»":"Volver a esta versión"} onClick={()=>{if(!walkLoading)void compareWalk(false);}}>{walkLabels?.newer??"Nueva"}</button>
             </>}
@@ -545,7 +581,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
                 {recordClock!==null?<Square size={14} strokeWidth={2.4} aria-hidden="true"/>:<Circle size={14} strokeWidth={2.4} aria-hidden="true"/>}
                 {recordClock!==null?<>Detener <span className="walk-record-clock">{recordClock}</span></>:"Grabar"}</button></>}
             <ToolSeparator/>
-            <button type="button" data-tool="" className="walk-exit" title="Salir del recorrido · Esc" onClick={stopWalk}><X size={16} strokeWidth={2} aria-hidden="true"/>Salir</button>
+            <button type="button" data-tool="" className="walk-exit" aria-disabled={walkApplying || undefined} title="Salir del recorrido · Esc" onClick={stopWalk}><X size={16} strokeWidth={2} aria-hidden="true"/>Salir</button>
           </RovingToolbar>
         </div>}
         {walk==="active" && <div className="walk-pad" aria-label="Dirección del recorrido">{([["forward","Adelante","↑"],["left","Izquierda","←"],["back","Atrás","↓"],["right","Derecha","→"]]).map(([direction,label,icon])=><button key={direction} data-direction={direction} aria-label={label}

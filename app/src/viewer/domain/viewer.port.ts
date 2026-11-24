@@ -35,6 +35,9 @@ export interface ViewerPort {
   enterWalk(mark:(result:string|null)=>void):void;
   cancelWalk():void;
   switchWalk(file:File,signal:AbortSignal,status:(text:string)=>void):Promise<void>;
+  /** The visible piece at the centre of the first-person camera. */
+  walkTarget(): ElementInfo | null;
+  walkHighlight(id: string | null, color?: string): void;
   walkMove(key:string,held:boolean):void;
   /**
    * A live video track of the canvas at up to `fps` frames per second (`HTMLCanvasElement.captureStream`), to record

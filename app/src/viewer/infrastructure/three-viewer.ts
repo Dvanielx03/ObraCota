@@ -57,6 +57,9 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   let activeModel:SceneModel|undefined, originalFile:File|null=null;
   let walk:ReturnType<typeof walking>|undefined, markFloor:((result:string|null)=>void)|undefined;
   let walkBatches: WalkBatches | null = null;
+  let walkModel: SceneModel | undefined;
+  let walkSelection: string | null = null;
+  let walkOrbitSelection: string | null = null;
   let selectedForWalk:string|null=null;
   // Keyed by the file on screen; null is the ReStage sample, which is opened without one.
   const walkModels=new Map<File|null,{model:SceneModel;world:WalkWorld}>();
@@ -539,6 +542,8 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       notify(error instanceof Error?error.message:"No se pudo iniciar el recorrido.");
       return;
     }
+    walkModel=activeModel;
+    walkOrbitSelection=selectedForWalk;
     startWalkBatches();
     marker.hidden=true;span.visible=false;
     markFloor=undefined;canvas.style.cursor="grab";notify(null);
@@ -555,6 +560,32 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   }
   function releaseWalkBatches(){
     walkBatches?.dispose();walkBatches=null;
+  }
+  function walkTarget(): ElementInfo | null {
+    if(!walk || !walkModel || !root)return null;
+    walk.camera.updateMatrixWorld();
+    root.updateWorldMatrix(true,true);
+    const ray=new T.Raycaster();
+    ray.near=walk.camera.near;ray.far=walk.camera.far;
+    ray.setFromCamera(new T.Vector2(),walk.camera);
+    const hit=ray.intersectObject(root,true).find(({object})=>{
+      if(!(object instanceof T.Mesh))return false;
+      const displayed=Array.isArray(object.material)?object.material.some(material=>material.visible):object.material.visible;
+      if(!displayed)return false;
+      for(let node:T.Object3D|null=object;node;node=node.parent){
+        if(!node.visible && !(node===object && walkBatches?.sources.has(object)))return false;
+      }
+      return true;
+    });
+    return walkModel.elements.find(piece=>piece.id===hit?.object.userData.elementId)??null;
+  }
+  function walkHighlight(id:string|null,color?:string){
+    if(!walk || (!walkSelection && !id))return;
+    if(!walkSelection)releaseWalkBatches();
+    walkSelection=id;
+    select(id,undefined,color);
+    if(!id)startWalkBatches();
+    walk.redraw();
   }
   const lose = (event:Event)=>{event.preventDefault();onLost();};
   const observer = new ResizeObserver(resize);
@@ -683,7 +714,9 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   }
   function cancelWalk(){
     if(!walk && !markFloor && !walkModels.size)return;
+    if(walkSelection){select(null);walkSelection=null;}
     markFloor=undefined;walk?.dispose();walk=undefined;
+    walkModel=undefined;
     releaseWalkBatches();
     if(activeModel && root!==activeModel.root){
       if(root)scene.remove(root);
@@ -691,6 +724,8 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     }
     for(const {model} of walkModels.values())if(model!==activeModel)release(model.root);
     walkModels.clear();
+    if(walkOrbitSelection)select(walkOrbitSelection);
+    walkOrbitSelection=null;
     controls.enabled=true;canvas.style.cursor="";draw();
   }
   return {
@@ -721,7 +756,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       endPulse();stopTween();
       markFloor=mark;controls.enabled=false;canvas.style.cursor="crosshair";canvas.focus();
     },
-    cancelWalk,
+    cancelWalk,walkTarget,walkHighlight,
     stream(fps){
       try{return typeof canvas.captureStream==="function"?canvas.captureStream(fps):null;}catch{return null;}
     },
@@ -740,11 +775,13 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       if(signal.aborted || session!==walk)throw new DOMException("Cancelado","AbortError");
       session.switch(entry.world);
       if(root!==entry.model.root){
+        if(walkSelection){select(null);walkSelection=null;}
         releaseWalkBatches();
         if(root)scene.remove(root);
         root=entry.model.root;scene.add(root);
         startWalkBatches();
       }
+      walkModel=entry.model;
     },
     walkMove(key,held){walk?.move(key,held);},
     async open(file,signal,status,source) {

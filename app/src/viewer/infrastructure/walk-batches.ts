@@ -10,6 +10,7 @@ const INSTANCE_BYTES = 16 * Float32Array.BYTES_PER_ELEMENT;
 export interface WalkBatches {
   group: T.Group;
   meshCount: number;
+  sources: ReadonlySet<T.Mesh>;
   dispose(): void;
 }
 
@@ -141,5 +142,5 @@ export function batchWalkGeometry(root: T.Object3D): WalkBatches | null {
   }
   if(!hidden.length)return null;
   hidden.forEach(mesh=>mesh.visible=false);
-  return {group,meshCount:hidden.length,dispose};
+  return {group,meshCount:hidden.length,sources:new Set(hidden),dispose};
 }
