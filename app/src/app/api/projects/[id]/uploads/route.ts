@@ -14,5 +14,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     method: "POST", body: request.body, headers, duplex: "half", signal: request.signal, redirect: "error",
   };
   const response = await fetch(target, init);
-  return new Response(response.body, { status: response.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  const replyHeaders = new Headers({ "Content-Type": "application/json", "Cache-Control": "no-store" });
+  // The backend can reject the header or authorization before it reads the whole request body.
+  // A client must use a fresh connection for its next request in that case.
+  if (!response.ok) replyHeaders.set("Connection", "close");
+  return new Response(response.body, { status: response.status, headers: replyHeaders });
 }

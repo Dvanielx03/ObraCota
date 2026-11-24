@@ -219,6 +219,7 @@ test("Un FBX con extensión .obj se rechaza con un motivo claro", async ({ page 
     expect(uploads).toBe(0);
     const direct = await page.request.post("/api/projects/" + project + "/uploads", { params: { name: "PK60.obj" }, headers: { ...headers, "Content-Type": "application/octet-stream" }, data: readFileSync(source) });
     expect(direct.status()).toBe(400);
+    expect(direct.headers().connection).toBe("close");
     expect(await (await page.request.get("/api/projects/" + project + "/files", { headers })).json()).toEqual([]);
   } finally {
     await page.request.delete("/api/projects/" + project, { headers });
