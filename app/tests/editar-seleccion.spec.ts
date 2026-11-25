@@ -104,6 +104,7 @@ test("La petición contiene el grupo IFC y una máscara con la misma cámara",as
 test("Editar consulta solo las fichas de la pieza y versión abiertas",async({page})=>{
   const file=process.env.DUPLEX_IFC,pdf=process.env.DUPLEX_DOOR_PDF;
   test.skip(!file||!pdf,"Indica DUPLEX_IFC y DUPLEX_DOOR_PDF");
+  test.setTimeout(360000);
   const auth=await page.request.post("/api/auth/register",{headers:{"X-ObraCota-Client":"web"},data:{email:randomUUID()+"@example.test",password:randomUUID()}});
   const headers={Authorization:"Bearer "+(await auth.json()).accessToken};
   const project=await page.request.post("/api/projects",{headers,data:{name:"Fichas en Editar"}});
@@ -116,7 +117,7 @@ test("Editar consulta solo las fichas de la pieza y versión abiertas",async({pa
     await page.goto("/proyectos/"+id+"/visor/"+version+"?panel=asistente&element="+door);
     const panel=selectionPanel(page);
     await panel.getByText("Consultar fichas de la selección").click();
-    await expect(panel.getByRole("link",{name:"Abrir ficha original"})).toBeVisible();
+    await expect(panel.getByText(/Lista para (búsqueda de texto|consultar)/)).toBeVisible({timeout:240000});
     await expect(panel.getByLabel("Pregunta sobre la ficha")).toBeVisible();
     await panel.getByLabel("Buscar pieza para la propuesta").fill("146596");
     await panel.getByRole("button",{name:/146596 · 6652$/}).click({timeout:10000});

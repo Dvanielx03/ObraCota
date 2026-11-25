@@ -43,14 +43,18 @@ class AskDocumentTest {
         final List<Passage> embedded = new ArrayList<>();
         List<Passage> evidence = List.of(PAGE_3);
         float[] rankedWith;
+        Index index = new Index("LEGACY", null);
+        String search;
         @Override public List<Source> sources(UUID project) { return List.of(); }
         @Override public boolean belongs(UUID project, UUID document) { return owned; }
+        @Override public Index index(UUID document) { return index; }
         @Override public List<Map<String, Object>> history(UUID document) { return List.of(); }
         @Override public int split(UUID document) { return passages; }
         @Override public void ask(UUID id, UUID document, String question) { questions.add(id); }
         @Override public List<Passage> unembedded(UUID document, String model, String question) { return List.of(PAGE_3); }
         @Override public void embed(UUID document, Passage passage, float[] vector, String model) { embedded.add(passage); }
         @Override public List<Passage> ranked(UUID document, String question, String model, float[] vector) {
+            search = question;
             rankedWith = vector;
             return evidence;
         }
@@ -111,6 +115,27 @@ class AskDocumentTest {
         assertEquals(List.of("start:embedding-model", "finish", "start:chat-model", "finish"), journal.events);
         assertEquals(List.of(PAGE_3), store.embedded);
         assertEquals(answer, store.answers.get(store.questions.getFirst()));
+    }
+
+    @Test void literalSectionLookupKeepsTheUntranslatedQuoteAndItsSection() {
+        store.index = new SpecificationPassages.Index("INDEXED", "local-embed");
+        store.evidence = List.of(new SpecificationPassages.Passage(4, 1,
+            "Sticking Profile: Square. Core: Wood.", "Door details"));
+        var assistant = new AskDocument(catalog(true), store, new JacksonCitationCodec(new ObjectMapper()),
+            (model, prompt) -> fail("A literal lookup does not call generation"),
+            (model, texts) -> {
+                assertEquals("local-embed", model);
+                return List.of(new float[]{1, 0});
+            }, journal, null, DIRECT, "local-chat", null);
+        var found = assistant.ask(PROJECT, USER, DOCUMENT, "¿Qué dice el apartado Sticking profile? Cita literalmente.");
+        assertEquals("Sticking profile", store.search);
+        assertEquals("ANSWERED", found.status());
+        assertEquals("híbrida", found.retrieval());
+        assertEquals(List.of(new SpecificationPassages.Evidence(4, "Sticking Profile: Square. Core: Wood.", "Door details")), found.evidence());
+        assertEquals(0, month.reserved);
+        var absent = assistant.ask(PROJECT, USER, DOCUMENT, "¿Qué dice el apartado Fecha de elección? Cita literalmente.");
+        assertEquals("INSUFFICIENT", absent.status());
+        assertTrue(absent.evidence().isEmpty());
     }
 
     @Test void aQuoteThatIsNotInThePassageIsInsufficient() {

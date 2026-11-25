@@ -6,17 +6,26 @@ import java.util.UUID;
 
 /** The PDF specifications of a project split into passages, with their embeddings and the answers given about them. */
 public interface SpecificationPassages {
-    record Source(UUID id, String filename, UUID version, String model, int revision, String element) {}
+    record Source(UUID id, String filename, UUID version, String model, int revision, String element,
+                  String status, String error, boolean originalAvailable, int ocrPages) {}
 
-    record Passage(int page, int offset, String content) {}
+    record Index(String status, String model) {}
 
-    record Evidence(int page, String quote) {}
+    record Passage(int page, int offset, String content, String section) {
+        public Passage(int page, int offset, String content) { this(page, offset, content, null); }
+    }
+
+    record Evidence(int page, String quote, String section) {
+        public Evidence(int page, String quote) { this(page, quote, null); }
+    }
 
     record Answer(String status, String answer, List<Evidence> evidence, String retrieval) {}
 
     List<Source> sources(UUID project);
 
     boolean belongs(UUID project, UUID document);
+
+    default Index index(UUID document) { return new Index("LEGACY", null); }
 
     /** The last ten answered questions about the document, newest first. */
     List<Map<String, Object>> history(UUID document);

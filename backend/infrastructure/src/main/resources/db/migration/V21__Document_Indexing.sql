@@ -1,0 +1,11 @@
+alter table element_specification alter column original drop not null;
+alter table element_specification add column index_status varchar(16) not null default 'LEGACY';
+alter table element_specification add column index_error varchar(64);
+alter table element_specification add column index_model varchar(100);
+alter table element_specification add column created_at timestamp with time zone not null default current_timestamp;
+alter table element_specification add column uploaded_by uuid;
+alter table element_specification add column ocr_pages integer not null default 0;
+alter table specification_page add column section_title varchar(255);
+create index specification_index_queue on element_specification(index_status,created_at);
+insert into ai_model values ('embeddinggemma:300m-qat-q4_0','DOC_EMBED');
+insert into ai_model values ('qwen2.5:0.5b-instruct','DOC_CHAT');

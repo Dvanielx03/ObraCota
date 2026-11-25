@@ -34,10 +34,12 @@ Se eligió el lector WASM por privacidad, ejecución local y compatibilidad con 
 | `TEST_DWG`, `TEST_DWG_REVISION` | DWG 2D y una revisión del mismo archivo |
 | `TEST_DWG_3D` | DWG con geometría visible a distintas cotas ([ejemplo](https://github.com/LibreDWG/libredwg/blob/master/test/test-data/2000/entities-3d.dwg)) |
 | `BIMOBJECT_DIR` | Carpeta con DWG, FBX y OBJ de fabricante (`bimobject-dwg.spec.ts`, `fbx-obj.spec.ts`) |
-| `TEST_LIVE_RAG=1` | Asistente documental contra Gemini real (gasta; requiere autorización) |
+| `TEST_LIVE_RAG=1` | Asistente documental con EmbeddingGemma y Qwen2.5 en Ollama local |
 | `TEST_LIVE_GEMINI=1` | Opciones visuales contra Gemini real (gasta; requiere autorización) |
 | `TEST_NO_GEMINI=1` | Opciones visuales contra un servidor sin clave de Gemini: comprueba el aviso y usa respuestas de ensayo |
 | `TEST_HARDWARE_GPU=1` | Usa la gráfica del equipo en lugar de SwiftShader |
 | `EVIDENCE_DIR` | Carpeta donde se guardan las capturas de evidencia |
 
 Para probar el recorrido entre aplicaciones con Compose en marcha, desde esta carpeta ejecuta `npx playwright test tests/panel.spec.ts`. Las capturas se escriben en el directorio de resultados de Playwright.
+
+Para la prueba documental, levanta el perfil `rag` y carga los modelos según [Arquitectura del backend](../backend/docs/ARCHITECTURE.md#asistente-documental). Con los archivos Duplex configurados, ejecuta `npx playwright test tests/document-index.spec.ts tests/document-assistant.spec.ts --workers=1`. La primera prueba crea un PDF de solo imagen y verifica OCR, autorización y citas sin conservar el PDF.

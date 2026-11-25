@@ -5,8 +5,8 @@ import {basename} from "node:path";
 
 test("Respuesta documental real con cita, historial y aislamiento del proyecto",async({page},info)=>{
   const ifc=process.env.DUPLEX_IFC,pdf=process.env.DUPLEX_DOOR_PDF;
-  test.skip(!ifc||!pdf||process.env.TEST_LIVE_RAG!=="1","Requiere los archivos Duplex y autorización para Gemini.");
-  test.setTimeout(300000);
+  test.skip(!ifc||!pdf||process.env.TEST_LIVE_RAG!=="1","Requiere los archivos Duplex y Ollama local con los modelos documentales.");
+  test.setTimeout(360000);
   const auth=await page.request.post("/api/auth/register",{headers:{"X-ObraCota-Client":"web"},data:{email:randomUUID()+"@example.test",password:randomUUID()}});
   const headers={Authorization:"Bearer "+(await auth.json()).accessToken};
   const project=await page.request.post("/api/projects",{headers,data:{name:"Ensayo documental Duplex"}});
@@ -25,18 +25,18 @@ test("Respuesta documental real con cita, historial y aislamiento del proyecto",
     async function ask(question:string){
       await page.getByLabel("Pregunta sobre la ficha").fill(question);
       const response=page.waitForResponse(r=>r.url().endsWith("/assistant")&&r.request().method()==="POST",{timeout:180000});
-      await page.getByRole("button",{name:"Consultar con Gemini"}).click();
+      await page.getByRole("button",{name:"Consultar ficha"}).click();
       const res=await response;expect(res.status()).toBe(200);
       return res.json();
     }
     const answer=await ask("¿Qué dice la ficha en el apartado Sticking profile? Cita literalmente esas palabras y su contenido.");
     await info.attach("respuesta",{body:JSON.stringify(answer),contentType:"application/json"});
     expect(answer.status,JSON.stringify(answer)).toBe("ANSWERED");
-    const cite=page.getByRole("link",{name:basename(pdf!)+" · pág. "+answer.evidence[0].page});
+    const cite=page.locator("blockquote cite").filter({hasText:basename(pdf!)+" · pág. "+answer.evidence[0].page});
     await expect(cite).toBeVisible();
     await expect(page.locator("blockquote").first()).toContainText(answer.evidence[0].quote);
-    const original=await cite.evaluate(async a=>Array.from(new Uint8Array(await (await fetch((a as HTMLAnchorElement).href)).arrayBuffer())));
-    expect(Buffer.from(original).equals(readFileSync(pdf!))).toBeTruthy();
+    const original=await page.request.get(api+"/versions/"+versionId+"/specifications/"+document,{headers});
+    expect(original.status()).toBe(404);
     await page.reload();await expect(cite).toBeVisible();
     await page.screenshot({path:info.outputPath("consulta-con-fuente.png")});
     await page.getByRole("link",{name:"Localizar elemento en el visor"}).click();

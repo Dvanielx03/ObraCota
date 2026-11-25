@@ -16,6 +16,8 @@ RUN --mount=type=cache,target=/root/.m2 /opt/maven/bin/mvn -B -ntp verify
 
 FROM eclipse-temurin:21.0.13_9-jre-jammy AS runtime
 WORKDIR /srv
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng clamav \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/infrastructure/target/infrastructure-0.1.0.jar app.jar
 RUN mkdir -p /srv/originals && chown 10001 /srv/originals
 USER 10001

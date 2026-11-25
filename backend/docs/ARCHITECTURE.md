@@ -38,13 +38,21 @@ Para repetir las pruebas, la construcción de Docker ejecuta Maven, incluido el 
 
 ## Asistente documental
 
-El asistente de cada proyecto consulta una ficha PDF vinculada a una versión y un elemento. La consulta requiere autenticación y el backend comprueba la pertenencia de la ficha al proyecto antes de recuperar sus páginas. La carga de un PDF extrae el texto localmente. La primera pregunta autoriza el envío de la pregunta y fragmentos de esa ficha al proveedor.
+El asistente consulta una ficha PDF vinculada a una versión y un elemento. El backend comprueba la propiedad del proyecto y la pertenencia de la ficha. V21 registra la huella, el autor, la fecha y el estado de cada carga. En Compose, los archivos nuevos van a un directorio temporal en memoria. El trabajador valida el PDF, extrae texto con PDFBox y usa Tesseract en páginas sin texto. Mantiene página, orden y sección cuando el PDF incluye marcadores. La copia temporal se elimina antes de publicar el índice. Las fichas anteriores a V21 conservan su descarga.
 
-El backend divide las páginas en pasajes de 1.400 caracteres con 200 de solapamiento. Por consulta indexa como máximo 16 pasajes pendientes, priorizados por coincidencia léxica. Almacena sus vectores de 768 dimensiones junto con el modelo de embeddings. PostgreSQL combina el rango léxico de los pasajes y el de distancia coseno de los vectores disponibles mediante fusión recíproca. La consulta vectorial opera sobre los pasajes del documento seleccionado. Una ficha extensa puede tener cobertura semántica parcial en sus primeras consultas. Si Gemini falla al generar embeddings, sigue disponible la recuperación por palabras.
+El trabajador divide las páginas en pasajes de 1.400 caracteres con hasta 200 de solapamiento. EmbeddingGemma genera vectores de 768 dimensiones en Ollama antes de marcar la ficha como lista. La pregunta usa el mismo modelo con un prefijo de búsqueda. PostgreSQL combina coincidencia textual y distancia coseno mediante fusión de rangos. Si falta el modelo, el índice permite buscar por texto.
 
-Gemini recibe hasta seis pasajes. La aplicación acepta una respuesta si lleva una cita que puede localizar literalmente en uno de esos pasajes y en la página indicada. La ingeniera puede abrir la página y contrastar la interpretación o localizar la pieza en el visor. El historial conserva pregunta, respuesta y cita por ficha. Un escaneo sin texto requiere una versión con texto extraíble.
+Qwen2.5 recibe pasajes acotados. `AskDocument` acepta una cita si coincide literalmente con el texto recuperado de la página indicada. Las solicitudes de cita literal por apartado pueden recuperar directamente ese fragmento. Se conserva historial por ficha y se identifica el PDF por nombre, página y sección. El diario conserva los intentos locales. Este flujo no reserva el presupuesto de proveedores.
 
-La reserva administrativa es de cinco centavos de USD por consulta admitida, compartiendo con las opciones visuales el mismo `AiBudget`. El flujo vive en el caso de uso `AskDocument`; el SQL de pasajes y pgvector, en `PassageAdapter`, y la lectura de la cita, en `JacksonCitationCodec`. El diario registra cada llamada y el consumo disponible. Una reserva no es una medición de facturación. La prueba `document-assistant.spec.ts` usa `TEST_LIVE_RAG=1`, `DUPLEX_IFC` y `DUPLEX_DOOR_PDF` para verificar el servicio real.
+Para iniciar la inferencia documental local:
+
+```sh
+docker compose --profile rag up -d --build --wait
+docker compose --profile rag exec -T ollama ollama pull embeddinggemma:300m-qat-q4_0
+docker compose --profile rag exec -T ollama ollama pull qwen2.5:0.5b-instruct
+```
+
+En un VPS, servir el panel por HTTPS y mantener actualizadas las firmas de ClamAV. Montar su directorio de firmas con acceso de lectura, definir `DOCUMENT_CLAMAV_DATABASE` con la ruta dentro del contenedor y activar `DOCUMENT_REQUIRE_MALWARE_SCAN=true`. En local, ese ajuste es opcional y la validación estructural sigue activa. El servidor requiere una nueva carga para volver a extraer u obtener por OCR el contenido del PDF.
 
 ## Cambios de modelo
 

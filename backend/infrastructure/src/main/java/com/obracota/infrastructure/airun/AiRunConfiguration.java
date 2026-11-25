@@ -14,17 +14,17 @@ import com.obracota.application.knowledge.port.SpecificationPassages;
 import com.obracota.application.knowledge.usecase.AskDocument;
 import com.obracota.application.modelfile.usecase.ProjectFileCatalog;
 import com.obracota.application.modelversion.usecase.ProjectVersions;
-import com.obracota.domain.assistant.port.service.ChatModelPort;
-import com.obracota.domain.knowledge.port.service.EmbeddingPort;
 import com.obracota.infrastructure.aimodel.ModelCatalog;
 import com.obracota.infrastructure.designoption.adapters.out.DesignOptionBatchAdapter;
 import com.obracota.infrastructure.knowledge.adapters.out.JacksonCitationCodec;
 import com.obracota.infrastructure.knowledge.adapters.out.PassageAdapter;
+import com.obracota.infrastructure.knowledge.adapters.out.LocalDocumentModels;
 import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 /**
  * Beans of the paid AI features: the single monthly budget and the two use cases that spend it. The UTC clock is built
@@ -58,10 +58,19 @@ public class AiRunConfiguration {
 
     @Bean JacksonCitationCodec citationCodec(ObjectMapper json) { return new JacksonCitationCodec(json); }
 
+    @Bean ThreadPoolTaskScheduler documentScheduler() {
+        var scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setThreadNamePrefix("document-index-");
+        return scheduler;
+    }
+
+    @Bean ThreadPoolTaskScheduler taskScheduler() {
+        return new ThreadPoolTaskScheduler();
+    }
+
     @Bean AskDocument askDocument(ProjectFileCatalog projects, SpecificationPassages passages, CitationCodec codec,
-                                  ChatModelPort chat, EmbeddingPort embeddings, AiRunJournal journal, AiBudget budget,
-                                  Transactions tx, ModelCatalog models) {
-        return new AskDocument(projects, passages, codec, chat, embeddings, journal, budget, tx,
-            models.forCapability("CHAT").id(), models.forCapability("EMBEDDING").id());
+                                  LocalDocumentModels local, AiRunJournal journal, Transactions tx) {
+        return new AskDocument(projects, passages, codec, local::complete, local::embedQuery, local::embedQuery,
+            journal, null, tx, LocalDocumentModels.CHAT, null);
     }
 }

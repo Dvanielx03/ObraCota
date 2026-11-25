@@ -1,5 +1,5 @@
 import {expect,test} from "@playwright/test";
-import {randomUUID,createHash} from "node:crypto";
+import {randomUUID} from "node:crypto";
 import {readFileSync} from "node:fs";
 
 test("El IFC ensanchado conserva el ancho divergente como evidencia separada",async({page})=>{
@@ -20,7 +20,7 @@ test("El IFC ensanchado conserva el ancho divergente como evidencia separada",as
 test("Duplex conserva medidas y ficha con cita verificable por puerta y versión",async({page},info)=>{
   const ifc=process.env.DUPLEX_IFC, pdf=process.env.DUPLEX_DOOR_PDF;
   test.skip(!ifc||!pdf,"Indica DUPLEX_IFC y DUPLEX_DOOR_PDF del conjunto de buildingSMART.");
-  test.setTimeout(150000);
+  test.setTimeout(360000);
   const auth=await page.request.post("/api/auth/register",{headers:{"X-ObraCota-Client":"web"},data:{email:randomUUID()+"@example.test",password:randomUUID()}});
   const headers={Authorization:"Bearer "+(await auth.json()).accessToken};
   const project=await page.request.post("/api/projects",{headers,data:{name:"Comprobación de fichas"}});
@@ -45,22 +45,16 @@ test("Duplex conserva medidas y ficha con cita verificable por puerta y versión
     await view.getByText("Envolvente de la geometría visible").click();
     await expect(view).toContainText("2,108");
     await view.getByLabel("Vincular ficha PDF").setInputFiles({name:"0762x2032Door_ProductData.pdf",mimeType:"application/pdf",buffer:readFileSync(pdf!)});
-    await expect(view.locator("blockquote").first()).toBeVisible();
+    await expect(view.locator("blockquote").first()).toBeVisible({timeout:240000});
     await view.getByLabel("Buscar en la ficha").fill("Sticking profile");await view.getByRole("button",{name:"Consultar"}).click();
-    const citation=view.locator("blockquote").filter({has:page.getByRole("button",{name:"0762x2032Door_ProductData.pdf · pág. 1",exact:true})});
+    const citation=view.locator("blockquote").filter({has:page.getByText("0762x2032Door_ProductData.pdf · pág. 1",{exact:true})});
     await expect(citation).toContainText(/sticking profile/i);
-    await citation.getByRole("button").click();
-    const source=view.getByRole("link",{name:"Abrir PDF en la página 1",exact:true});
-    await expect(source).toBeVisible();
-    const actual=await source.evaluate(async el=>{
-      const bytes=await (await fetch((el as HTMLAnchorElement).href)).arrayBuffer();
-      return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),b=>b.toString(16).padStart(2,"0")).join("");
-    });
-    expect(actual).toBe(createHash("sha256").update(readFileSync(pdf!)).digest("hex"));
     const version=new URL(page.url()).pathname.split("/").pop();
     const endpoint="/api/projects/"+id+"/versions/"+version+"/specifications";
     const metadata=await (await page.request.get(endpoint,{headers,params:{element:"1hOSvn6df7F8_7GcBWlS8Z"}})).json();
     expect(metadata.documents).toHaveLength(1);
+    expect(metadata.documents[0].originalAvailable).toBe(false);
+    expect((await page.request.get(endpoint+"/"+metadata.documents[0].id,{headers})).status()).toBe(404);
     const visitor=await fetch(new URL("/api/auth/register",page.url()),{method:"POST",headers:{"X-ObraCota-Client":"web","Content-Type":"application/json"},body:JSON.stringify({email:randomUUID()+"@example.test",password:randomUUID()})});
     const forbidden=await page.request.get(endpoint+"/"+metadata.documents[0].id,{headers:{Authorization:"Bearer "+(await visitor.json()).accessToken}});
     expect(forbidden.status()).toBe(404);

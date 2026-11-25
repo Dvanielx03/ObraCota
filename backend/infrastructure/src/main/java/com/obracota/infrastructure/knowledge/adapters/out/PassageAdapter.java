@@ -15,7 +15,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 public class PassageAdapter implements SpecificationPassages {
     private static final String SOURCES = """
-        select d.id,d.filename,v.id,v.name,v.revision,d.element_key from element_specification d
+        select d.id,d.filename,v.id,v.name,v.revision,d.element_key,d.index_status,d.index_error,d.original is not null,d.ocr_pages
+        from element_specification d
         join model_version v on d.version_id=v.id join model_file f on v.file_id=f.id where f.project_id=?
         """;
     private static final String LEX = "ts_rank(words,to_tsquery('simple',array_to_string(tsvector_to_array(to_tsvector('simple',?)),' | ')))";
@@ -31,12 +32,18 @@ public class PassageAdapter implements SpecificationPassages {
     @Override
     public List<Source> sources(UUID project) {
         return db.query(SOURCES + " order by v.name,v.revision desc,d.filename,d.id", (r, n) -> new Source(
-            r.getObject(1, UUID.class), r.getString(2), r.getObject(3, UUID.class), r.getString(4), r.getInt(5), r.getString(6)), project);
+            r.getObject(1, UUID.class), r.getString(2), r.getObject(3, UUID.class), r.getString(4), r.getInt(5), r.getString(6),
+            r.getString(7), r.getString(8), r.getBoolean(9), r.getInt(10)), project);
     }
 
     @Override
     public boolean belongs(UUID project, UUID document) {
         return !db.query(SOURCES + " and d.id=?", (r, n) -> r.getString(1), project, document).isEmpty();
+    }
+
+    @Override public Index index(UUID document) {
+        return db.queryForObject("select index_status,index_model from element_specification where id=?",
+            (row,n) -> new Index(row.getString(1),row.getString(2)),document);
     }
 
     @Override
@@ -78,10 +85,13 @@ public class PassageAdapter implements SpecificationPassages {
             case when embedding_model=? then embedding <=> ?::vector end as distance
             from specification_passage where document_id=?), ranked as (
             select *, rank() over(order by lexical desc) as lr,rank() over(order by distance nulls last) as vr from scores)
-            select page_number,offset_chars,content from ranked where lexical>0 or distance is not null
-            order by (case when lexical>0 then 1.0/(60+lr) else 0 end + case when distance is not null then 1.0/(60+vr) else 0 end) desc,page_number,offset_chars limit 6
-            """.formatted(LEX), (r, n) -> new Passage(r.getInt(1), r.getInt(2), r.getString(3)),
-            question, model, vector == null ? null : Arrays.toString(vector), document);
+            select ranked.page_number,offset_chars,ranked.content,p.section_title from ranked
+            left join specification_page p on p.document_id=? and p.page_number=ranked.page_number
+            where lexical>0 or distance is not null
+            order by (case when lexical>0 then 1.0/(60+lr) else 0 end + case when distance is not null then 1.0/(60+vr) else 0 end) desc,
+                ranked.page_number,offset_chars limit 6
+            """.formatted(LEX), (r, n) -> new Passage(r.getInt(1), r.getInt(2), r.getString(3),r.getString(4)),
+            question, model, vector == null ? null : Arrays.toString(vector), document,document);
     }
 
     @Override
