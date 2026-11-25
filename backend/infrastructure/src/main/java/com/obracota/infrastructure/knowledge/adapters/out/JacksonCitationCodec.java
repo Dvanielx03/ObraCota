@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.obracota.application.knowledge.port.CitationCodec;
 import com.obracota.application.knowledge.port.SpecificationPassages.Passage;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,7 +18,11 @@ public class JacksonCitationCodec implements CitationCodec {
     @Override
     public String evidence(String question, List<Passage> passages) {
         try {
-            return json.writeValueAsString(Map.of("question", question, "passages", passages));
+            // Question first, then the passages, always in this order: the prompt of a question does not vary.
+            var evidence = new LinkedHashMap<String, Object>();
+            evidence.put("question", question);
+            evidence.put("passages", passages);
+            return json.writeValueAsString(evidence);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("The evidence could not be written as JSON", e);
         }

@@ -41,6 +41,35 @@ public class PassageAdapter implements SpecificationPassages {
         return !db.query(SOURCES + " and d.id=?", (r, n) -> r.getString(1), project, document).isEmpty();
     }
 
+    @Override
+    public boolean versionBelongs(UUID project, UUID version) {
+        return !db.queryForList("select v.id from model_version v join model_file f on v.file_id=f.id where f.project_id=? and v.id=?",
+            UUID.class, project, version).isEmpty();
+    }
+
+    @Override
+    public List<Source> piece(UUID project, UUID version, String element) {
+        return db.query(SOURCES + " and v.id=? and d.element_key=? order by d.created_at,d.filename,d.id", (r, n) -> new Source(
+            r.getObject(1, UUID.class), r.getString(2), r.getObject(3, UUID.class), r.getString(4), r.getInt(5), r.getString(6),
+            r.getString(7), r.getString(8), r.getBoolean(9), r.getInt(10)), project, version, element);
+    }
+
+    @Override
+    public List<Map<String, Object>> pieceHistory(UUID version, String element) {
+        return db.queryForList("""
+            select question,result from document_answer a where result is not null and (
+              (a.version_id=? and a.element_key=?)
+              or a.document_id in (select id from element_specification where version_id=? and element_key=?))
+            order by created_at desc limit 10
+            """, version, element, version, element);
+    }
+
+    @Override
+    public void askPiece(UUID id, UUID version, String element, String question) {
+        db.update("insert into document_answer(id,document_id,question,result,created_at,version_id,element_key) values(?,null,?,null,current_timestamp,?,?)",
+            id, question, version, element);
+    }
+
     @Override public Index index(UUID document) {
         return db.queryForObject("select index_status,index_model from element_specification where id=?",
             (row,n) -> new Index(row.getString(1),row.getString(2)),document);

@@ -1,6 +1,6 @@
 import {useState} from "react";
 import type {ElementInfo} from "@/viewer/domain/viewer.port";
-import {Specifications} from "@/modules/knowledge/ui/door-evidence";
+import {Specifications} from "@/modules/knowledge/ui/specifications";
 
 const decimal=new Intl.NumberFormat("es-CO",{maximumFractionDigits:6,useGrouping:false});
 function xy(point:number[],offset=0){

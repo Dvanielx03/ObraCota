@@ -70,7 +70,7 @@ public class AiRunConfiguration {
 
     @Bean AskDocument askDocument(ProjectFileCatalog projects, SpecificationPassages passages, CitationCodec codec,
                                   LocalDocumentModels local, AiRunJournal journal, Transactions tx) {
-        return new AskDocument(projects, passages, codec, local::complete, local::embedQuery, local::embedQuery,
-            journal, null, tx, LocalDocumentModels.CHAT, null);
+        return new AskDocument(projects, passages, codec, local::complete, local::completeQuoteFirst, local::embedQuery,
+            local::embedQuery, journal, null, tx, LocalDocumentModels.CHAT, null);
     }
 }

@@ -36,6 +36,7 @@ import { ENTRY_SETTLING_PHASE, remainingHold } from "../domain/entry-hold";
 import { RECORDING_FPS, RECORDING_LIMIT_MS, recordingClock, recordingName, recordingType, startRecording, type WalkRecording } from "@/viewer/infrastructure/walk-recording";
 import { saveBlob } from "@/modules/scene-view/infrastructure/export-files";
 import { WalkFinishEditor } from "@/modules/model-change/ui/walk-finish-editor";
+import type { SheetSource } from "@/modules/knowledge/domain/element-identity";
 
 /** "Duplex.ifc · 2,3 MB": the file being opened, under the phase of the wait. */
 function fileLine(file: File | null): string {
@@ -370,6 +371,12 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
       : walkScene ? "Restablece la escena para revisar los acabados del IFC."
         : changeLimitReason(walkBase?.size??0);
   const serverNotes = showingInitial ? storedNotes : undefined;
+  // «Ficha técnica»: sheets are linked to the GlobalId of a piece in a saved IFC version. The sample GLB, a file
+  // opened from the computer and an unpublished proposal say why they take none and what to do instead.
+  const sheetSource:SheetSource|undefined = !model ? undefined : model.sample ? {kind:"sample"}
+    : proposal && showingInitial ? {kind:"proposal"}
+    : serverNotes && storedVersion ? (/^IFC/i.test(model.schema) ? {kind:"saved",scope:storedVersion} : {kind:"saved-other",format:model.schema})
+    : {kind:"local",format:model.schema,uploadHref:storedVersion?"/proyectos/"+storedVersion.project+"/archivos":"/proyectos"};
   // The ReStage sample (a public GLB): with a session the server keeps a project of its own for it, so Renderizar
   // and the panorama work and persist as on a saved version; without one they ask to sign in.
   const sampleOpen = !!model?.sample;
@@ -521,7 +528,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
         onMaskPrepared={()=>setPrismaStep(step=>step==="edit-package"||step==="edit-save"?"edit-import":step)}
         onMaskImported={()=>setPrismaStep(step=>step==="edit-import"||step==="edit-package"?"edit-save":step)}
         onMaskSaved={()=>setPrismaStep(step=>step==="edit-save"?"done":step)}/>:
-       <Explorer scope={serverNotes ? storedVersion : undefined} tab={tab} changeTab={setTab} onNoteSaved={()=>{if(!paused)setGuide(step=>step==="note"?"review":step);}} key={(serverNotes?"server:":"local:")+(model?.versionId??model?.name)} version={model?.versionId ?? (serverNotes ? "server" : undefined)} elements={model?.elements || []} loading={!!status && !model} selected={chosen} drawing={model?.drawing} drawingName={model?.name} locate={(id,preview)=>{pick(id);if(preview && guide!=="select")setTab("reading");viewer.current?.locate(id);}}/>}<SidebarWidth/></aside>
+       <Explorer scope={serverNotes ? storedVersion : undefined} sheet={sheetSource} tab={tab} changeTab={setTab} onNoteSaved={()=>{if(!paused)setGuide(step=>step==="note"?"review":step);}} key={(serverNotes?"server:":"local:")+(model?.versionId??model?.name)} version={model?.versionId ?? (serverNotes ? "server" : undefined)} elements={model?.elements || []} loading={!!status && !model} selected={chosen} drawing={model?.drawing} drawingName={model?.name} locate={(id,preview)=>{pick(id);if(preview && guide!=="select")setTab("reading");viewer.current?.locate(id);}}/>}<SidebarWidth/></aside>
       <section className="stage" data-plan={plan || undefined} aria-label={plan?"Mesa de planos":"Modelo 3D"}>
         {!touring && <div className="stagebar"><button className="explorer-toggle" aria-label={panel?"Ocultar explorador":"Mostrar explorador"} aria-expanded={panel} aria-controls="explorer" onClick={()=>showExplorer(!panel)}><SidebarSimpleIcon/></button><span>{plan?"Plano 2D":"Vista 3D"}</span>
           {model && <><small>{model.schema}</small><button className="close" aria-label="Cerrar modelo" onClick={closeModel}><XIcon/></button></>}

@@ -1,71 +1,12 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useState} from "react";
 import type {ElementInfo} from "@/viewer/domain/viewer.port";
-import {authenticated,authenticatedResponse} from "@/core/http/http-client";
-import {documentStatus,isIndexPending,type DocumentIndex} from "../domain/document-index";
 
-type Scope={project:string;version:string};
-type Citation={document:string;filename:string;page:number;excerpt:string};
-type Evidence={documents:({id:string;filename:string}&DocumentIndex)[];citations:Citation[]};
-
-export function Specifications({scope,element,drawing=false,initialQuery="acabado"}:{scope:Scope;element:string;drawing?:boolean;initialQuery?:string}){
-  const base="projects/"+scope.project+"/versions/"+scope.version+"/specifications";
-  const [term,setTerm]=useState(initialQuery),[query,search]=useState(initialQuery);
-  const [resolved,setResolved]=useState<{url:string;value:Evidence}>(),[revision,refresh]=useState(0);
-  const urlQuery=base+"?"+new URLSearchParams({element,q:query});
-  const result=resolved?.url===urlQuery?resolved.value:undefined;
-  const [busy,setBusy]=useState(false),[error,notify]=useState(""),[opened,setOpened]=useState<{blob:Blob;page:number}|null>(null);
-  const [url,setUrl]=useState("");
-  useEffect(()=>{
-    if(!opened){setUrl("");return;}
-    const object=URL.createObjectURL(opened.blob);setUrl(object+"#page="+opened.page);
-    return ()=>URL.revokeObjectURL(object);
-  },[opened]);
-  useEffect(()=>{
-    const control=new AbortController();
-    authenticated<Evidence>(urlQuery,{signal:control.signal})
-      .then(value=>{if(!control.signal.aborted)setResolved({url:urlQuery,value});}).catch(()=>{if(!control.signal.aborted)notify("No se pudo consultar la ficha.");});
-    return ()=>control.abort();
-  },[urlQuery,revision]);
-  useEffect(()=>{
-    if(!result?.documents.some(isIndexPending))return;
-    const timer=window.setTimeout(()=>refresh(n=>n+1),2000);
-    return ()=>window.clearTimeout(timer);
-  },[result]);
-  async function attach(file:File){
-    if(file.size>4*1024*1024){notify("El máximo por ficha es 4 MiB.");return;}
-    setBusy(true);notify("");
-    try{
-      await authenticated(base+"?"+new URLSearchParams({element,name:file.name}),{method:"POST",headers:{"Content-Type":"application/pdf"},body:file});
-      refresh(n=>n+1);
-    }catch{notify("No se pudo vincular el PDF. Usa un documento legible, sin contraseña, de hasta 100 páginas.");}
-    finally{setBusy(false);}
-  }
-  async function open(id:string,page:number){
-    setBusy(true);notify("");setOpened(null);
-    try{const response=await authenticatedResponse(base+"/"+id);setOpened({blob:await response.blob(),page});}
-    catch{notify("No se pudo abrir el documento.");}finally{setBusy(false);}
-  }
-  return <div><label>{drawing?"Vincular PDF a esta selección":"Vincular ficha PDF a esta puerta"}<input type="file" accept="application/pdf,.pdf" disabled={busy} onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(file)void attach(file);}}/></label>
-    <p>Conserva el PDF en tu equipo. El servidor procesa una copia temporal y conserva el texto indexado.</p>
-    {result?.documents.length===0 && <p>{drawing?"La selección no tiene un PDF vinculado en esta versión.":"Esta puerta aún no tiene una ficha vinculada en esta versión."}</p>}
-    {!!result?.documents.length && <ul aria-live="polite">{result.documents.map(d=><li key={d.id}>
-      {d.originalAvailable?<button disabled={busy} onClick={()=>open(d.id,1)}>{d.filename}</button>:<span>{d.filename}</span>}
-      {" · "}{documentStatus(d)}</li>)}</ul>}
-    <form onSubmit={e=>{e.preventDefault();notify("");search(term.trim());refresh(n=>n+1);}}>
-      <label>Buscar en la ficha<input value={term} required maxLength={160} onChange={e=>setTerm(e.target.value)}/></label><button>Consultar</button>
-    </form>
-    {query.trim() && result?.documents.some(d=>d.status==="LEGACY"||d.status==="INDEXED"||d.status==="TEXT_ONLY") && !result.citations.length && <p>Sin coincidencias en el texto indexado. Puedes revisar el PDF en tu equipo.</p>}
-    {query.trim() && !!result?.citations.length && <><p>{drawing?"Coincidencias en los documentos vinculados.":"Coincidencias documentales. Un catálogo puede ofrecer varios acabados para una misma medida."}</p>
-      {result.citations.map(c=><blockquote key={c.document+c.page}>{c.excerpt}<footer>
-        {result.documents.find(d=>d.id===c.document)?.originalAvailable
-          ?<button disabled={busy} onClick={()=>open(c.document,c.page)}>{c.filename} · pág. {c.page}</button>
-          :<cite>{c.filename} · pág. {c.page}</cite>}</footer></blockquote>)}</>}
-    {url && <a href={url} target="_blank" rel="noopener noreferrer">Abrir PDF en la página {opened?.page}</a>}
-    {error && <p role="alert">{error}</p>}
-  </div>;
-}
-export function DoorEvidence({item,scope}:{item:ElementInfo;scope?:Scope}){
+/**
+ * Nominal measures and finish an IfcDoor declares, read in the browser. The technical sheet of any piece, doors
+ * included, lives apart in «Ficha técnica» (element-sheet.tsx): it does not depend on these measures.
+ */
+export function DoorEvidence({item}:{item:ElementInfo}){
   const [expanded,setExpanded]=useState(false);
   const e=item.evidence;
   if(!e)return null;
@@ -78,7 +19,6 @@ export function DoorEvidence({item,scope}:{item:ElementInfo;scope?:Scope}){
       {e.widths.filter(w=>e.width!==null && Math.abs(w.value-e.width)>Math.max(1e-8,Math.abs(w.value)*1e-6)).map(w=>
         <p key={w.source}>Discrepancia de ancho: {fmt(w.value)} en {w.source}.</p>)}
       <h3>Acabado en el IFC</h3>{e.finishes.length?e.finishes.map(f=><p key={f.source}>{f.value} · {f.source}</p>):<p>El IFC no declara un acabado verificable para esta puerta.</p>}
-      <h3>Ficha técnica</h3>{scope?<Specifications scope={scope} element={item.guid||item.id}/>:<p>Abre una versión guardada en un proyecto para vincular su ficha.</p>}
     </>}
   </details>;
 }

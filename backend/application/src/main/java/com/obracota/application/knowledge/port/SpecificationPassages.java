@@ -15,15 +15,43 @@ public interface SpecificationPassages {
         public Passage(int page, int offset, String content) { this(page, offset, content, null); }
     }
 
-    record Evidence(int page, String quote, String section) {
-        public Evidence(int page, String quote) { this(page, quote, null); }
+    /**
+     * A quote verified verbatim against the indexed text of {@code document}, with its page, section (when the PDF has
+     * one) and the measurement it states ({@code datum}, e.g. «28 MPa») when there is one.
+     */
+    record Evidence(int page, String quote, String section, UUID document, String filename, String datum) {
+        public Evidence(int page, String quote) { this(page, quote, null, null, null, null); }
+        public Evidence(int page, String quote, String section) { this(page, quote, section, null, null, null); }
     }
 
-    record Answer(String status, String answer, List<Evidence> evidence, String retrieval) {}
+    /**
+     * {@code status}: ANSWERED, DISCREPANCY (authorised sources disagree; every one is cited), INSUFFICIENT, NO_SOURCES,
+     * INDEX_PENDING, INDEX_FAILED, EMPTY or UNAVAILABLE. {@code omitted} counts the sentences of the PDF left out because
+     * they read as instructions to the assistant. {@code version} and {@code element} name the piece a piece question
+     * was about.
+     */
+    record Answer(String status, String answer, List<Evidence> evidence, String retrieval, String datum, int omitted,
+                  UUID version, String element) {
+        public Answer(String status, String answer, List<Evidence> evidence, String retrieval) {
+            this(status, answer, evidence, retrieval, null, 0, null, null);
+        }
+    }
 
     List<Source> sources(UUID project);
 
     boolean belongs(UUID project, UUID document);
+
+    /** Whether the version is one of the project's. */
+    default boolean versionBelongs(UUID project, UUID version) { throw new UnsupportedOperationException(); }
+
+    /** The specifications linked to one piece of one version of the project, in any index state. */
+    default List<Source> piece(UUID project, UUID version, String element) { throw new UnsupportedOperationException(); }
+
+    /** The last ten answered questions about the piece (including older questions about one of its documents). */
+    default List<Map<String, Object>> pieceHistory(UUID version, String element) { throw new UnsupportedOperationException(); }
+
+    /** Records a question about a piece before any provider call. */
+    default void askPiece(UUID id, UUID version, String element, String question) { throw new UnsupportedOperationException(); }
 
     default Index index(UUID document) { return new Index("LEGACY", null); }
 

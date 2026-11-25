@@ -39,15 +39,18 @@ test("Duplex conserva medidas y ficha con cita verificable por puerta y versión
     await upload();await page.getByRole("link",{name:"Abrir versión 1 en el visor"}).click();
     await door("150173");
     const view=page.locator(".door-evidence");
+    // The technical sheet is its own section of Propiedades: the door measures keep only what the IFC declares.
+    const sheet=page.locator(".element-sheet");
     await expect(view).toContainText("0,762 m");
     await expect(view).toContainText("2,032 m");
     await expect(view).toContainText("El IFC no declara un acabado verificable");
     await view.getByText("Envolvente de la geometría visible").click();
     await expect(view).toContainText("2,108");
-    await view.getByLabel("Vincular ficha PDF").setInputFiles({name:"0762x2032Door_ProductData.pdf",mimeType:"application/pdf",buffer:readFileSync(pdf!)});
-    await expect(view.locator("blockquote").first()).toBeVisible({timeout:240000});
-    await view.getByLabel("Buscar en la ficha").fill("Sticking profile");await view.getByRole("button",{name:"Consultar"}).click();
-    const citation=view.locator("blockquote").filter({has:page.getByText("0762x2032Door_ProductData.pdf · pág. 1",{exact:true})});
+    await expect(view.getByLabel("Vincular ficha PDF a esta pieza")).toHaveCount(0);
+    await sheet.getByLabel("Vincular ficha PDF a esta pieza").setInputFiles({name:"0762x2032Door_ProductData.pdf",mimeType:"application/pdf",buffer:readFileSync(pdf!)});
+    await expect(sheet.locator("blockquote").first()).toBeVisible({timeout:240000});
+    await sheet.getByLabel("Buscar en la ficha").fill("Sticking profile");await sheet.getByRole("button",{name:"Consultar",exact:true}).click();
+    const citation=sheet.locator("blockquote").filter({has:page.getByText("0762x2032Door_ProductData.pdf · pág. 1",{exact:true})});
     await expect(citation).toContainText(/sticking profile/i);
     const version=new URL(page.url()).pathname.split("/").pop();
     const endpoint="/api/projects/"+id+"/versions/"+version+"/specifications";
@@ -59,11 +62,11 @@ test("Duplex conserva medidas y ficha con cita verificable por puerta y versión
     const forbidden=await page.request.get(endpoint+"/"+metadata.documents[0].id,{headers:{Authorization:"Bearer "+(await visitor.json()).accessToken}});
     expect(forbidden.status()).toBe(404);
     await page.screenshot({path:info.outputPath("ficha-verificada.png")});
-    await view.getByLabel("Buscar en la ficha").fill("sinresultado-uuid");await view.getByRole("button",{name:"Consultar"}).click();
-    await expect(view).toContainText("Sin coincidencias");
-    await door("146596");await expect(view).toContainText("aún no tiene una ficha");
-    await page.reload();await door("150173");await expect(view.locator("blockquote").first()).toBeVisible();
+    await sheet.getByLabel("Buscar en la ficha").fill("sinresultado-uuid");await sheet.getByRole("button",{name:"Consultar",exact:true}).click();
+    await expect(sheet).toContainText("Sin coincidencias");
+    await door("146596");await expect(sheet).toContainText("aún no tiene una ficha");
+    await page.reload();await door("150173");await expect(sheet.locator("blockquote").first()).toBeVisible();
     await page.goto(files);await upload();await page.getByRole("link",{name:"Abrir versión 2 en el visor"}).click();
-    await door("150173");await expect(view).toContainText("aún no tiene una ficha");
+    await door("150173");await expect(sheet).toContainText("aún no tiene una ficha");
   }finally{await page.request.delete("/api/projects/"+id,{headers});}
 });

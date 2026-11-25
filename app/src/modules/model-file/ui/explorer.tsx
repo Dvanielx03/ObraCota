@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CaretRightIcon, CubeIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
 import type {ElementInfo,ModelInfo} from "@/viewer/domain/viewer.port";
 import {DoorEvidence} from "@/modules/knowledge/ui/door-evidence";
+import {ElementSheet} from "@/modules/knowledge/ui/element-sheet";
+import type {SheetSource} from "@/modules/knowledge/domain/element-identity";
 import {DrawingEvidence} from "./drawing-evidence";
 import {ReviewNotes} from "./review-notes";
 import {ElementProperties} from "./element-properties";
@@ -12,7 +14,9 @@ import "./drawing-query.css";
 export type SidebarTab="reading"|"properties";
 /** Widths of the placeholder rows while the first model opens: levels and their pieces. */
 const TREE_SKELETON=[["62%",0],["78%",22],["70%",22],["84%",22],["56%",0],["74%",22],["66%",22]] as const;
-export function Explorer({tab,changeTab,elements,selected,drawing,drawingName,locate,version,onNoteSaved,options,scope,loading}:{scope?:{project:string;version:string};options?:import("react").ReactNode;tab:SidebarTab;changeTab:(tab:SidebarTab)=>void;onNoteSaved:()=>void;version?:string;locate:(id:string,preview?:boolean)=>void;drawing?:ModelInfo["drawing"];drawingName?:string;elements:ElementInfo[];selected:ElementInfo|null;
+export function Explorer({tab,changeTab,elements,selected,drawing,drawingName,locate,version,onNoteSaved,options,scope,sheet,loading}:{scope?:{project:string;version:string};
+  /** Where the open model came from, for the «Ficha técnica» of the selected piece (not used on a DWG plan). */
+  sheet?:SheetSource;options?:import("react").ReactNode;tab:SidebarTab;changeTab:(tab:SidebarTab)=>void;onNoteSaved:()=>void;version?:string;locate:(id:string,preview?:boolean)=>void;drawing?:ModelInfo["drawing"];drawingName?:string;elements:ElementInfo[];selected:ElementInfo|null;
   /** A model is opening and there is no tree yet: placeholder rows instead of the empty hint. */
   loading?:boolean}) {
   const [query,setQuery] = useState("");
@@ -113,7 +117,9 @@ export function Explorer({tab,changeTab,elements,selected,drawing,drawingName,lo
       </dl>{scope && selected.guid && !drawing && <ElementProperties scope={scope} guid={selected.guid}/>}
       {selected.annotation && <details><summary>Texto de origen</summary><code>{selected.annotation.raw}</code></details>}
       <button className="locate" onClick={()=>locate(selected.id)}>Volver a encuadrar</button></> : <p>Selecciona un resultado para consultar sus propiedades.</p>}
-      {selected?.evidence && <DoorEvidence key={"evidence:"+selected.id} item={selected} scope={scope}/>}
+      {selected?.evidence && <DoorEvidence key={"evidence:"+selected.id} item={selected}/>}
+      {selected && !drawing && sheet && <ElementSheet key={"sheet:"+(sheet.kind==="saved"?sheet.scope.version:sheet.kind)+":"+(selected.guid??"")+":"+selected.id}
+        source={sheet} item={selected} locate={()=>{changeTab("properties");locate(selected.id);}}/>}
       {drawing && selected && <DrawingEvidence key={"dwg:"+selected.id} item={selected} units={drawing.units} scope={scope}/>}
       {options}
       {version && <ReviewNotes onSaved={onNoteSaved} key={version} version={version} selected={selected} elements={elements} locate={id=>{setQuery("");locate(id);}}/>}

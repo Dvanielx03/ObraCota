@@ -27,7 +27,8 @@ Se eligió el lector WASM por privacidad, ejecución local y compatibilidad con 
 | Variable | Qué habilita |
 |---|---|
 | `TEST_IFC` | IFC propio para el visor, la entrega y las versiones; la prueba de Editar con máscara exige el IFC completo de ReStage y falla con un mensaje claro si es otro |
-| `RESTAGE_IFC` | IFC completo de ReStage para el recorrido (`walk.spec.ts`) |
+| `RESTAGE_IFC` | IFC completo de ReStage para el recorrido (`walk.spec.ts`) y la visibilidad de «Ficha técnica» |
+| `RAME_IFC` | Rame Tower para la ficha escaneada de `ficha-tecnica-rag.spec.ts` (por defecto, la copia de `landing/modelos-fuente`) |
 | `DUPLEX_IFC` | Duplex A: cambios de modelo, vistas guardadas, edición y opciones |
 | `DUPLEX_WIDER_IFC` | Variante del Duplex con una puerta más ancha (`door-evidence.spec.ts`) |
 | `DUPLEX_DOOR_PDF` | Ficha PDF de la puerta para el asistente documental |
@@ -42,4 +43,4 @@ Se eligió el lector WASM por privacidad, ejecución local y compatibilidad con 
 
 Para probar el recorrido entre aplicaciones con Compose en marcha, desde esta carpeta ejecuta `npx playwright test tests/panel.spec.ts`. Las capturas se escriben en el directorio de resultados de Playwright.
 
-Para la prueba documental, levanta el perfil `rag` y carga los modelos según [Arquitectura del backend](../backend/docs/ARCHITECTURE.md#asistente-documental). Con los archivos Duplex configurados, ejecuta `npx playwright test tests/document-index.spec.ts tests/document-assistant.spec.ts --workers=1`. La primera prueba crea un PDF de solo imagen y verifica OCR, autorización y citas sin conservar el PDF.
+Para la prueba documental, levanta el perfil `rag` y carga los modelos según [Arquitectura del backend](../backend/docs/ARCHITECTURE.md#asistente-documental). Con los archivos Duplex configurados, ejecuta `npx playwright test tests/document-index.spec.ts tests/document-assistant.spec.ts --workers=1`. La primera prueba crea un PDF de solo imagen y verifica OCR, autorización y citas sin conservar el PDF. `tests/ficha-tecnica-rag.spec.ts` cubre «Ficha técnica» en cualquier pieza IFC, el PDF digital y el escaneado, la discrepancia entre fichas, el texto con forma de instrucción y el aislamiento por cuenta, versión y pieza. Construye sus PDF con `tests/support/rag-pdf.ts`.

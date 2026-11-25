@@ -120,6 +120,28 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .door-evidence blockquote {margin:1rem 0;padding-inline-start:.6rem;border-inline-start:2px solid var(--border);}
 .door-evidence blockquote footer {display:block;height:auto;}
 
+/* «Ficha técnica» of any IFC piece in Propiedades: sheets of the GlobalId and the verified answers about them. */
+.element-sheet{margin-block:1rem;border-top:1px solid var(--border);padding-top:.75rem;overflow-wrap:anywhere;display:grid;gap:.6rem}
+.element-sheet h3{font-size:14px;margin:0}
+.element-sheet h4{font-size:13px;margin:0}
+.element-sheet label{display:grid;gap:.4rem}
+.element-sheet input,.element-sheet textarea{width:100%;min-width:0;box-sizing:border-box}
+.element-sheet textarea{min-height:4.5em;resize:vertical;background:var(--field);color:var(--ink);font:inherit;padding:7px;border:1px solid var(--border-strong);border-radius:var(--radius-md)}
+.element-sheet ul{margin:0;padding-inline-start:1.1rem}
+.element-sheet blockquote,.piece-answer blockquote{margin:.5rem 0;padding-inline-start:.6rem;border-inline-start:2px solid var(--border)}
+.element-sheet blockquote footer,.piece-answer blockquote footer{display:block;height:auto;margin-top:.3rem;font-size:12px;color:var(--muted)}
+.piece-assistant{display:grid;gap:.6rem}
+/* The viewer does not load the panel stylesheet: the sheet's actions get the viewer's primary button here. */
+.element-sheet form{display:grid;gap:.5rem}
+.element-sheet .panel-action{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:max-content;min-height:34px;padding:0 12px;border:1px solid var(--primary);border-radius:var(--radius-sm);background:var(--primary);color:var(--on-primary);font:inherit;font-weight:650;text-decoration:none;cursor:pointer}
+.element-sheet .panel-action:disabled,.element-sheet .panel-action[aria-disabled=true]{opacity:.55;cursor:not-allowed}
+.element-sheet .panel-action:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.piece-answer{display:grid;gap:.4rem;border-top:1px solid var(--border);padding-top:.6rem}
+.piece-answer[data-status=DISCREPANCY]{border-inline-start:3px solid var(--ring);padding-inline-start:.6rem}
+.piece-answer-kind{font-size:12px;color:var(--muted)}
+.link-button{display:inline;min-height:0;height:auto;padding:0;border:0;background:none;color:inherit;font:inherit;text-decoration:underline;cursor:pointer}
+.link-button:hover{background:none}
+
 /* First-person walk: the bottom bar stays with RECORRIDO active, the version switch and a ghost «Salir»
    (reference §1 and the «Salir del creador» button: 14/700 #646A78 with an X); the hint is a centred
    pill over the bar (radius 9999, black at 70 %, 12/500), as the reference's hints are. */

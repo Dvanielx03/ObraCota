@@ -1,8 +1,11 @@
 package com.obracota.infrastructure.knowledge;
 
+import com.obracota.application.common.exception.InvalidRequestApplicationException;
 import com.obracota.application.common.exception.NotFoundApplicationException;
+import com.obracota.application.knowledge.ElementIdentity;
 import com.obracota.application.knowledge.SpecificationSearch;
 import com.obracota.application.modelversion.usecase.ProjectVersions;
+import com.obracota.domain.modelversion.model.ModelVersion;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,21 +32,28 @@ public class SpecificationController {
         return new Document(row.getObject(1, UUID.class), row.getString(2), row.getString(3), row.getString(4), row.getBoolean(5));
     }
     public record Evidence(List<Document> documents,List<SpecificationSearch.Citation> citations){}
-    private void check(UUID project,UUID version,UUID user,String element){
-        versions.get(project,user,version);
-        if(element.isBlank() || element.length()>512)throw new IllegalArgumentException();
+    /** The version must be the user's and {@code element} an identity of its format (see {@link ElementIdentity}). */
+    private ModelVersion check(UUID project,UUID version,UUID user,String element){
+        var found=versions.get(project,user,version);
+        ElementIdentity.require(found.format(),element);
+        return found;
     }
     @PostMapping(consumes="application/pdf") @Transactional
     public Document attach(@PathVariable UUID project,@PathVariable UUID version,@AuthenticationPrincipal UUID user,
         @RequestParam String element,@RequestParam String name,HttpServletRequest request) throws IOException,NoSuchAlgorithmException {
-        check(project,version,user,element);
-        if(name.isBlank() || name.length()>255 || name.contains("/") || name.contains("\\") || name.chars().anyMatch(Character::isISOControl))throw new IllegalArgumentException();
-        // Read at most one byte past the limit. Rejecting the header alone can reset the proxied connection
-        // before a client uploading at the boundary receives the 413 response.
+        // Read at most one byte past the limit before any rejection. Rejecting the header alone can reset the proxied
+        // connection before a client uploading at the boundary receives the response (413, 400 or 404).
         var bytes=request.getInputStream().readNBytes(LIMIT+1);
+        var found=check(project,version,user,element);
+        if(name.isBlank() || name.length()>255 || name.contains("/") || name.contains("\\") || name.chars().anyMatch(Character::isISOControl))throw new IllegalArgumentException();
         if(bytes.length>LIMIT)throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,"El máximo por ficha es 4 MiB.");
         if(bytes.length<8 || !new String(bytes,0,5,java.nio.charset.StandardCharsets.US_ASCII).equals("%PDF-"))
             throw new IllegalArgumentException("El archivo debe tener una cabecera PDF válida.");
+        // The GlobalId must be one of this revision's elements: a sheet is never linked to a piece the IFC lacks.
+        if("IFC".equals(found.format()))try(var ifc=versions.storage().read(project,version)){
+            if(!ElementIdentity.declares(ifc,element))
+                throw new InvalidRequestApplicationException("ELEMENT_NOT_IN_VERSION","El GlobalId no existe en esta versión del IFC.");
+        }
         String hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         db.queryForObject("select id from model_version where id=? for update",UUID.class,version);
         var existing=db.query("""

@@ -10,6 +10,7 @@ import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,11 +57,28 @@ public class LocalDocumentModels {
         return vectors;
     }
 
+    /** A reply in the order answer, quote, page. */
     public ChatModelPort.Reply complete(String model, String prompt) {
-        var format = Map.of("type", "object", "additionalProperties", false,
-            "properties", Map.of("answer", Map.of("type", "string"), "quote", Map.of("type", "string"),
-                "page", Map.of("type", "integer")),
-            "required", List.of("answer", "quote", "page"));
+        return complete(model, prompt, List.of("answer", "quote", "page"));
+    }
+
+    /** A second reading that copies the quote before answering: the assistant asks it when the first reply fails its checks. */
+    public ChatModelPort.Reply completeQuoteFirst(String model, String prompt) {
+        return complete(model, prompt, List.of("quote", "answer", "page"));
+    }
+
+    /**
+     * The JSON schema fixes the order in which the model writes the fields (Ollama turns it into a grammar), so it is
+     * built with ordered maps: the same question always meets the same prompt and grammar.
+     */
+    private ChatModelPort.Reply complete(String model, String prompt, List<String> order) {
+        var properties = new LinkedHashMap<String, Object>();
+        for (var field : order) properties.put(field, Map.of("type", "page".equals(field) ? "integer" : "string"));
+        var format = new LinkedHashMap<String, Object>();
+        format.put("type", "object");
+        format.put("properties", properties);
+        format.put("required", order);
+        format.put("additionalProperties", false);
         var response = call("/api/chat", Map.of("model", model, "stream", false, "format", format,
             "messages", List.of(Map.of("role", "user", "content", prompt)),
             "options", Map.of("temperature", 0, "num_ctx", 4096, "num_predict", 144)));
