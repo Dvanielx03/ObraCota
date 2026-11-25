@@ -65,7 +65,8 @@ test("Un PDF vinculado a Rebose permanece en la selección correcta del DWG",asy
     await fixture.setContent("<p>Control de prueba. Transcripción de la etiqueta 2C81E: Rebose.</p>");
     const buffer=await fixture.pdf(); await fixture.close();
     await page.getByLabel("Vincular PDF a esta selección").setInputFiles({name:"Transcripcion-ensayo.pdf",mimeType:"application/pdf",buffer});
-    const cite=page.getByRole("button",{name:"Transcripcion-ensayo.pdf · pág. 1",exact:true});
+    // Since V21 the server keeps only the indexed text, so the citation is a <cite> instead of a download button.
+    const cite=page.locator("blockquote cite").filter({hasText:/^Transcripcion-ensayo\.pdf · pág\. 1$/});
     await expect(cite).toBeVisible();
     await select("2BD4A");
     await expect(page.getByText("La selección no tiene un PDF vinculado en esta versión.")).toBeVisible();
