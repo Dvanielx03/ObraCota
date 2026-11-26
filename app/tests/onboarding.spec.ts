@@ -84,11 +84,12 @@ test("Omitir la bienvenida lleva al panel y se puede repetir desde Cuenta", asyn
   await page.getByRole("link", { name: "Repetir la bienvenida" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("¿Qué te describe mejor?");
 
-  // Elegir «Mi archivo» termina en la lista de proyectos, donde se crea y se sube.
+  // Elegir «Mi archivo» lleva a crear el primer proyecto (?nuevo=1). Sin sesión, la lista invita a entrar o registrarse.
   await page.getByRole("radio", { name: "Otro" }).click();
   await page.getByRole("radio", { name: /Plano/ }).click();
   await page.getByRole("radio", { name: /Mi archivo/ }).click();
-  await expect(page).toHaveURL(/\/proyectos$/);
+  await expect(page).toHaveURL(/\/proyectos\?nuevo=1$/);
+  await expect(page.getByRole("link", { name: "crea una cuenta" })).toBeVisible();
   expect(await page.evaluate(stored)).toMatchObject({ role: "other", firstReview: "drawing", start: "own", skipped: false });
 });
 
@@ -106,4 +107,17 @@ test("Las opciones caben y no hay desplazamiento a 1366 × 768 ni a 1920 × 1080
     expect(fit.overflowY).toBeLessThanOrEqual(0);
     expect(fit.smallest).toBeGreaterThanOrEqual(44);
   }
+});
+
+test("Con sesión, «Mi archivo» crea el proyecto y abre su página de subida", async ({ page }) => {
+  await page.goto("/registro");
+  await page.getByLabel("Correo electrónico").fill("mi-archivo-" + randomUUID() + "@example.test");
+  await page.getByLabel("Contraseña").fill(randomUUID());
+  await page.getByRole("button", { name: "Crear cuenta" }).click();
+  await expect(page).toHaveURL(/\/bienvenida$/);
+  await page.getByRole("radio", { name: "Otro" }).click();
+  await page.getByRole("radio", { name: /Plano/ }).click();
+  await page.getByRole("radio", { name: /Mi archivo/ }).click();
+  await expect(page).toHaveURL(/\/proyectos\/[\da-f-]{36}\/archivos$/, { timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Archivos y versiones" })).toBeVisible();
 });

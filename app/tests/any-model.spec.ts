@@ -19,8 +19,10 @@ import {png} from "./support/png";
  *      empieza sobre el suelo de la escena, se camina y el visor de panorama abre una imagen de prueba sin usar cuota.
  *   3. Con la escena y un acabado, una captura por modelo en los resultados de la prueba.
  *   4. Editar: una marca sobre una pieza. En un IFC, «Proponer cambio al modelo» con el agente de prueba (fake) deja un
- *      cambio READY que se aprueba (versión 2) y «Guardar en el modelo» crea el cambio de material; fuera del IFC, los
- *      dos botones explican por qué no aplican.
+ *      cambio READY que se aprueba (versión 2) y «Guardar en el modelo» crea el cambio de material, a cualquier tamaño
+ *      (propiedades y materiales se verifican entidad por entidad hasta 256 MiB). En un DWG o DXF «Proponer cambio al
+ *      modelo» queda disponible (revisiones dwg.*; aquí no se ejecuta: la nota FireRating no es un cambio de plano) y
+ *      «Guardar en el modelo» explica por qué no aplica; en FBX u OBJ los dos botones lo explican.
  * Las tareas largas del hilo principal (PerformanceObserver «longtask») se miden por fase y se adjuntan al informe.
  */
 const MODELS=(["MODEL_A","MODEL_B","MODEL_C"] as const).map(key=>({key,file:process.env[key]??""}));
@@ -67,8 +69,9 @@ for(const model of MODELS)test(`Cualquier modelo · ${model.key} · ${basename(m
   test.skip(!model.file || !existsSync(model.file),"Indica "+model.key+" con un modelo 3D");
   test.setTimeout(45*60_000);
   const ifc=/\.ifc$/i.test(model.file);
-  // The IFC engine verifies model changes up to 32 MiB (ENGINE_PREVIEW_MAX_BYTES): a larger IFC says so in both buttons.
-  const changeable=ifc && statSync(model.file).size<=33_554_432;
+  // The agent and «Guardar en el modelo» draft properties and materials, which the IFC engine verifies entity by entity up to
+  // the upload limit (ENGINE_DATA_PREVIEW_MAX_BYTES, 256 MiB): every IFC takes them, ReStage (190 MB) included.
+  const changeable=ifc;
   const timings:Record<string,number|string>={size:(statSync(model.file).size/1e6).toFixed(1)+" MB"};
   await page.addInitScript(()=>{
     const store:{start:number;duration:number}[]=[];
@@ -119,7 +122,6 @@ for(const model of MODELS)test(`Cualquier modelo · ${model.key} · ${basename(m
       await expect(save).toBeDisabled();
       timings.saveReason=(await save.getAttribute("title"))??"";
       if(!ifc)expect(timings.saveReason).toContain("Solo un IFC guarda materiales");
-      else if(!changeable)expect(timings.saveReason).toContain("el motor verifica cambios en el IFC hasta 32 MiB");
     }
     await panel.getByRole("button",{name:"Restablecer materiales"}).click();
     await expect.poll(async()=>difference(page,neutral,await canvas.screenshot(hidden)),{timeout:15_000}).toBeLessThan(.01);
@@ -207,10 +209,20 @@ for(const model of MODELS)test(`Cualquier modelo · ${model.key} · ${basename(m
     const note=layer.getByRole("textbox",{name:"Describe el cambio de la marca 1"});
     await note.fill("Cambiar FireRating a EI 60");
     const propose=layer.getByRole("button",{name:"Proponer cambio al modelo"});
+    if(/\.(dwg|dxf)$/i.test(model.file)){
+      // A drawing takes the agent (dwg.* revisions as DXF): the format never turns the button off. The fake agent's FireRating
+      // note is NO_CHANGE on a plan, so it is not run here: dwg-revision.spec.ts covers the drawing's revision. A mark on a
+      // 3D solid without a DWG handle (Jalis) keeps it off only for the missing identifier, which the title says.
+      const title=(await propose.getAttribute("title"))??"";
+      expect(title).not.toContain("solo modelos IFC");
+      if(await propose.getAttribute("aria-disabled")==="true")expect(title).toContain("identificador");
+      timings.agent=(await propose.getAttribute("aria-disabled")==="true"?"sin identificador · ":"disponible · ")+title;
+      return;
+    }
     if(!changeable){
       await expect(propose).toHaveAttribute("aria-disabled","true");
       timings.agent=(await propose.getAttribute("title"))??"";
-      expect(timings.agent).toContain(ifc?"el motor verifica cambios en el IFC hasta 32 MiB":"solo modelos IFC");
+      expect(timings.agent).toContain("solo modelos IFC");
       return;
     }
     const availability=await (await page.request.get(base+"/agent-runs",{headers:project.headers})).json();

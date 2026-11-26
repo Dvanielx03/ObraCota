@@ -31,7 +31,7 @@ test("Un RVT de Revit se guarda tal cual y el visor explica cómo verlo", async 
   const base = "/api/projects/" + project;
   try {
     await page.goto("/proyectos/" + project + "/archivos");
-    await expect(page.getByText("Archivo IFC, DWG, RVT, FBX u OBJ")).toBeVisible();
+    await expect(page.getByText("Archivo IFC, DWG, DXF, RVT, FBX u OBJ")).toBeVisible();
     await page.getByTestId("model-upload").setInputFiles(source);
     const uploading = page.waitForResponse(r => r.url().includes("/uploads?"), { timeout: 180_000 });
     await page.getByRole("button", { name: "Guardar versión" }).click();

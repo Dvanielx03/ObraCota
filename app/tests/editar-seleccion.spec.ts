@@ -82,14 +82,14 @@ test("La petición contiene el grupo IFC y una máscara con la misma cámara",as
     await page.getByRole("toolbar",{name:"Acciones del modelo"}).getByRole("button",{name:"Renderizar opciones visuales"}).click();
     const render=page.getByRole("dialog",{name:"Renderizar opciones visuales"});
     await expect(render.getByRole("radio",{name:"2 piezas"})).toHaveAttribute("aria-checked","true");
-    await expect(render.getByText("Al enviar se comparte con Gemini el encuadre actual y la máscara de las piezas seleccionadas.")).toBeVisible();
+    await expect(render.getByText(/Al enviar se comparte con (Cloudflare|Gemini) el encuadre actual y la máscara de las piezas seleccionadas; Gemini solo recibe el texto del pedido./)).toBeVisible();
     await render.getByLabel("Cambio solicitado").fill("Prueba controlada de color");
     await render.getByRole("button",{name:"Renderizar: enviar captura y generar tres opciones"}).click();
     // Mientras la tanda se genera, el lápiz del panel «Selección» se mueve; al fallar, se detiene.
     const mascot=panel.locator("svg").first();
     await expect(mascot).toHaveCSS("animation-name",/survey/);
     await render.getByRole("button",{name:"Ver",exact:true}).click();
-    await expect(render.getByText(/Revisa la cuota/)).toBeVisible();
+    await expect(render.getByText(/límite de solicitudes o de cuota/)).toBeVisible();
     await expect(mascot).toHaveCSS("animation-name","none");
     expect(payload!.element.startsWith("group:")).toBeTruthy();
     expect(JSON.parse(payload!.element.slice(6))).toHaveLength(2);
