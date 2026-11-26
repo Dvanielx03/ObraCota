@@ -9,8 +9,9 @@
   A full preview holds the lock of its base for the whole build (validate, both IfcDiff passes and the
   quantities read it), so every lease waits at most ``ENGINE_BUSY_WAIT_S`` for it and then answers 503
   ``ENGINE_BUSY``: a reading of that model never waits without bound behind a preview (R3).
-- ``preview_limit_reason`` says why an original is too large for a preview (``ENGINE_PREVIEW_MAX_BYTES``).
-  Reading such a model still works; only the operations are marked as not available.
+- ``preview_limit_reason`` says why an original is too large for a preview (``ENGINE_PREVIEW_MAX_BYTES``, or
+  ``ENGINE_DATA_PREVIEW_MAX_BYTES`` for a recipe that changes no geometry); ``geometry_limit_reason`` says it for a
+  change of geometry of an IFC. Reading such a model still works; only the operations are marked as not available.
 """
 import hashlib
 import os
@@ -71,15 +72,38 @@ def require_original(project, version, sha256: str) -> Path:
     return path
 
 
-def preview_limit_reason(path) -> Optional[str]:
-    """Why the original at ``path`` gets no preview, or None when it fits under ``ENGINE_PREVIEW_MAX_BYTES``.
+def _megabytes(size: int) -> int:
+    return max(1, round(size / 1_000_000))
 
-    The size is told in decimal megabytes, rounded: ReStage (189,817,172 bytes) reads «190 MB».
+
+def preview_limit_reason(path, geometry_free: bool = False) -> Optional[str]:
+    """Why the original at ``path`` gets no preview, or None when it fits.
+
+    The limit is ``ENGINE_PREVIEW_MAX_BYTES``, or ``ENGINE_DATA_PREVIEW_MAX_BYTES`` for a recipe that changes no
+    geometry (``geometry_free``). The size is told in decimal megabytes, rounded: ReStage (189,817,172 bytes) reads
+    «190 MB». DWG revisions and /diff keep this wording; an IFC recipe that changes geometry has its own
+    (``geometry_limit_reason``).
     """
+    size = os.stat(path).st_size
+    if size <= (settings.ENGINE_DATA_PREVIEW_MAX_BYTES if geometry_free else settings.ENGINE_PREVIEW_MAX_BYTES):
+        return None
+    return f"El modelo supera el tamaño que H1 puede verificar ({_megabytes(size)} MB)."
+
+
+def geometry_limit_reason(path) -> Optional[str]:
+    """Why an IFC original takes no change of geometry (``ifc.change_type``), or None under ``ENGINE_PREVIEW_MAX_BYTES``.
+
+    The same sentence as the backend and the app: the size, the limit, and what still works on that model."""
     size = os.stat(path).st_size
     if size <= settings.ENGINE_PREVIEW_MAX_BYTES:
         return None
-    return f"El modelo supera el tamaño que H1 puede verificar ({max(1, round(size / 1_000_000))} MB)."
+    return geometry_limit_text(size)
+
+
+def geometry_limit_text(size: int) -> str:
+    limit = settings.ENGINE_PREVIEW_MAX_BYTES / 1_048_576
+    return (f"El modelo pesa {_megabytes(size)} MB: el motor verifica cambios de geometría en el IFC, como el cambio de "
+            f"tipo, hasta {limit:g} MiB. Las propiedades y los materiales sí se cambian en este modelo.")
 
 
 def _open_ifc(path: Path) -> ifcopenshell.file:

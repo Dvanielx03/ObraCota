@@ -19,7 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import engine
-from conftest import DUPLEX_DOOR, synthetic_model, too_large_reason
+from conftest import DUPLEX_DOOR, geometry_limit_reason, synthetic_model
 from obracota_engine import reading, settings, store
 
 REFERENCE = Path(__file__).parent / "fixtures" / "inspect-duplex.json"
@@ -451,10 +451,12 @@ def test_restage_change_type_is_not_available_with_its_reason(client, originals,
            {"doors": 9, "doors_in_openings": 0, "door_types_with_maps": 0, "windows": 0, "coverings": 32,
             "material_layer_set_usages": 0}
     assert summary["capabilities"]["element_qto_sets"] > 0, "ReStage exports Qto_* sets (H0 §1)"
-    too_large = {"available": False, "reason": too_large_reason(restage_path)}
-    assert summary["operations"] == {"ifc.change_type": too_large, "ifc.set_property": too_large}
+    # Above the geometry limit: no change of type, but a property (no geometry) is still offered.
+    too_large = {"available": False, "reason": geometry_limit_reason(restage_path)}
+    assert summary["operations"] == {"ifc.change_type": too_large, "ifc.set_property": {"available": True}}
     assert doors["total"] == 9, "reading keeps working above the size limit"
-    assert door["operations"] == {"ifc.change_type": too_large, "ifc.set_property": too_large}
+    assert door["operations"]["ifc.change_type"] == too_large
+    assert door["operations"]["ifc.set_property"]["available"] is True
 
     monkeypatch.setattr(settings, "ENGINE_PREVIEW_MAX_BYTES", 1 << 30)
     within = ok(get(client, "/summary", ref))

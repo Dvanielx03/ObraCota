@@ -50,3 +50,8 @@ urllib3==2.8.0
 Werkzeug==3.1.9
 xmlschema==4.3.2
 xsdata==26.10
+# Added for DWG revisions written as DXF (dwg/revision.py, 25-11-2026). `pip install --dry-run --report - ezdxf` on
+# obracota-ifc-engine:latest installs exactly these two packages and changes none of the versions above
+# (ezdxf takes numpy, pyparsing and typing_extensions already pinned here).
+ezdxf==1.4.5
+fonttools==4.69.1

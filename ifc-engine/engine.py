@@ -13,7 +13,14 @@ JSON and lets ``recipe`` validate it the same way (only a body that is not JSON 
 /preview with ``checks_only=true`` runs the checks of every operation on the cached model and writes
 nothing. Without it, /preview builds and verifies the revision (``build``) and keeps the verified file as an
 artifact for /build. /build sends that artifact once, or rebuilds it with the full verification. /diff
-compares two stored versions. The size limit comes before anything is opened, in all three.
+compares two stored versions. The size limit comes before anything is opened, in all three: an IFC recipe that
+changes no geometry (a property, a material) takes originals up to ``ENGINE_DATA_PREVIEW_MAX_BYTES`` and is verified
+entity by entity on large ones (``entities.py``); one that may change geometry, a DWG revision and /diff stop at
+``ENGINE_PREVIEW_MAX_BYTES``.
+
+A recipe of ``dwg.*`` operations on a DWG (or DXF) original goes through ``dwg/revision.py`` instead: the same
+/preview and /build, the same report shape and artifacts, and the revision is a DXF. /dwg/entity reads one entity
+of a stored drawing by its handle, for the agent.
 
 /dwg/solids answers the ACIS solids of a stored DWG as one gzip mesh (``obracota_engine.dwg``, format in
 ``dwg/meshfile.py``), cached on disk by the SHA-256 of the original and the tessellator version. An
@@ -35,8 +42,8 @@ from fastapi import Body, FastAPI, Header, HTTPException
 from starlette.background import BackgroundTask
 from starlette.responses import FileResponse, Response
 
-from obracota_engine import artifacts, auth, build, errors, operations, reading, recipe, scope, settings, store
-from obracota_engine.dwg import meshfile, solids as dwg_solids
+from obracota_engine import artifacts, auth, build, entities, errors, operations, reading, recipe, scope, settings, store
+from obracota_engine.dwg import meshfile, revision as dwg_revision, solids as dwg_solids
 from obracota_engine.errors import EngineError
 # load and inspect stay importable from here: the step 0 capture of tests/fixtures/inspect-duplex.json
 # calls engine.inspect(*engine.load(...)) and can be repeated against any image.
@@ -47,6 +54,7 @@ from obracota_engine.operations.change_type import inspect, load
 async def lifespan(_app: FastAPI):
     # The artifact index lives in memory: files of a previous process would never be evicted (§5.9).
     artifacts.reset()
+    entities.snapshots.clear_parts()
     yield
 
 
@@ -104,10 +112,38 @@ def dwg_solids_mesh(project: Optional[str] = None, version: Optional[str] = None
     return Response(payload, media_type=meshfile.MEDIA_TYPE, headers=headers)
 
 
-def _fits(ref) -> None:
-    """The original exists with its SHA-256 and is not above ``ENGINE_PREVIEW_MAX_BYTES``: checked before
-    anything is opened (§5.6)."""
-    too_large = store.preview_limit_reason(store.require_original(ref.project, ref.version, ref.sha256))
+@app.get("/dwg/entity")
+def dwg_entity(project: Optional[str] = None, version: Optional[str] = None, sha256: Optional[str] = None,
+               handle: Optional[str] = None):
+    ref = reading.version_ref(project, version, sha256)
+    _fits(ref)
+    return dwg_revision.entity_reading(ref, handle)
+
+
+def _drawing(ref, recipe_: "recipe.Recipe") -> bool:
+    """Whether the request is a DWG revision: a dwg.* recipe, which only a DWG or DXF original accepts."""
+    path = store.require_original(ref.project, ref.version, ref.sha256)
+    drawing = dwg_revision.is_drawing(path)
+    if recipe.is_drawing_recipe(recipe_) and not drawing:
+        raise EngineError(400, "RECIPE_INVALID", "Las operaciones dwg.* solo se aplican a un DWG o un DXF.")
+    if drawing and recipe_.operations and not recipe.is_drawing_recipe(recipe_):
+        raise EngineError(400, "RECIPE_INVALID", "Un plano DWG solo admite operaciones dwg.*.")
+    return drawing
+
+
+def _fits(ref, recipe_: Optional["recipe.Recipe"] = None) -> None:
+    """The original exists with its SHA-256 and is not above its limit: checked before anything is opened (§5.6).
+
+    An IFC recipe whose operations change no geometry takes originals up to ``ENGINE_DATA_PREVIEW_MAX_BYTES``; one
+    that may change geometry stops at ``ENGINE_PREVIEW_MAX_BYTES`` and says what still works on that model. A DWG
+    revision, /diff and /dwg/entity keep ``ENGINE_PREVIEW_MAX_BYTES`` and their message."""
+    path = store.require_original(ref.project, ref.version, ref.sha256)
+    if recipe_ is None or recipe.is_drawing_recipe(recipe_) or dwg_revision.is_drawing(path):
+        too_large = store.preview_limit_reason(path)
+    elif build.is_geometry_free(recipe_):
+        too_large = store.preview_limit_reason(path, geometry_free=True)
+    else:
+        too_large = store.geometry_limit_reason(path)
     if too_large:
         raise EngineError(422, "MODEL_TOO_LARGE", too_large)
 
@@ -116,7 +152,18 @@ def _fits(ref) -> None:
 def preview(payload: Any = Body(None)):
     request = recipe.preview_request(payload)
     ref = request.ref
-    _fits(ref)
+    _fits(ref, request.recipe)
+    if _drawing(ref, request.recipe):
+        if request.checks_only:
+            return dwg_revision.checks_only(ref, request.recipe)
+        with build.drawing_slot(settings.ENGINE_PREVIEW_WAIT_S), tempfile.TemporaryDirectory() as workdir:
+            built = dwg_revision.build_and_verify(ref, request.recipe, Path(workdir), build.Deadline())
+            report = built.report
+            if built.ok:
+                meta = artifacts.put(built.output, ref.sha256, report["recipe_sha256"], built.sha256)
+                report = {**report, "artifact": meta.public()}
+                report = {key: report[key] for key in ("ok", "engine", "base", "recipe_sha256", "artifact")} | report
+            return report
     if request.checks_only:
         with store.models.reading(ref.project, ref.version, ref.sha256) as model, reading._model_errors():
             return operations.run_checks(model, request.recipe)
@@ -143,7 +190,7 @@ def _sha_of_file(path: Path) -> str:
 def build_revision(payload: Any = Body(None)):
     request = recipe.build_request(payload)
     ref = request.ref
-    _fits(ref)
+    _fits(ref, request.recipe)
     recipe_sha = recipe.recipe_sha256(request.recipe)
     workdir = tempfile.TemporaryDirectory()
     try:
@@ -153,8 +200,10 @@ def build_revision(payload: Any = Body(None)):
         if meta is not None and _sha_of_file(output) == meta.sha256:
             sha256, rebuilt = meta.sha256, False
         else:
-            with build.geometry_slot():
-                built = build.build_and_verify(ref, request.recipe, Path(workdir.name), build.Deadline())
+            drawing = _drawing(ref, request.recipe)
+            rebuild = dwg_revision.build_and_verify if drawing else build.build_and_verify
+            with build.drawing_slot() if drawing else build.geometry_slot():
+                built = rebuild(ref, request.recipe, Path(workdir.name), build.Deadline())
             if not built.ok:
                 raise EngineError(422, "VERIFICATION_FAILED", "La revisión no superó la verificación.",
                                   report=built.report)

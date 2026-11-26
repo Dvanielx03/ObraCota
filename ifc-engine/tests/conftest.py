@@ -275,6 +275,13 @@ def too_large_reason(path: Path) -> str:
     return f"El modelo supera el tamaño que H1 puede verificar ({megabytes} MB)."
 
 
+def geometry_limit_reason(path: Path) -> str:
+    """The reason the engine must give for a change of geometry on the IFC at ``path`` (written out, as above)."""
+    megabytes = max(1, round(path.stat().st_size / 1_000_000))
+    return (f"El modelo pesa {megabytes} MB: el motor verifica cambios de geometría en el IFC, como el cambio de tipo, "
+            f"hasta 32 MiB. Las propiedades y los materiales sí se cambian en este modelo.")
+
+
 @pytest.fixture
 def duplex_path() -> Path:
     return _real_model("DUPLEX_IFC")
@@ -311,6 +318,16 @@ def nothing_left_in_temporaries():
     yield
     left = engine_temporaries() - before
     assert not left, f"the engine left temporary directories: {sorted(left)}"
+
+
+@pytest.fixture(autouse=True)
+def snapshot_store(tmp_path, monkeypatch) -> Path:
+    """A private ENGINE_SNAPSHOTS for the test (bases written for the verification by entities)."""
+    root = tmp_path / "snapshots"
+    monkeypatch.setattr(settings, "ENGINE_SNAPSHOTS", root)
+    yield root
+    left = [entry.name for entry in root.glob(".*.part")] if root.exists() else []
+    assert not left, f"a snapshot was left half written: {left}"
 
 
 @pytest.fixture(autouse=True)

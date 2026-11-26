@@ -15,6 +15,12 @@ material name and category of the chosen finish, its approximate colour (``#rrgg
 
 ``ifc.remove_element`` exists only in the engine, as the guard of §5.5; the backend never enables it.
 
+The ``dwg.*`` operations change a DWG drawing (``dwg.revision``): ``element`` is the DWG handle of the entity (upper-case
+hex, the «Handle CAD» of the viewer). ``dwg.set_text`` (TEXT, MTEXT, ATTRIB, a dimension's text override or a
+multileader's text), ``dwg.set_layer``, ``dwg.set_color`` (AutoCAD colour index, 0 BYBLOCK to 256 BYLAYER),
+``dwg.move`` (``dx``/``dy`` in ``unit``: mm, cm, m, in, ft or drawing units) and ``dwg.add_note`` (a note with a
+revision cloud around the entity, on layer OBRACOTA-REVISION). A recipe is either all ``ifc.*`` or all ``dwg.*``.
+
 ``recipe_sha256`` ties an artifact to its recipe: the SHA-256 of the normalised recipe serialised with
 sorted keys, compact separators and without ASCII escaping (§5.4). The backend keeps its own hash.
 """
@@ -40,6 +46,14 @@ SET_PROPERTY = "ifc.set_property"
 REMOVE_ELEMENT = "ifc.remove_element"
 SET_MATERIAL = "ifc.set_material"
 MATERIAL_PIECES_MAX = 500
+DWG_SET_TEXT = "dwg.set_text"
+DWG_SET_LAYER = "dwg.set_layer"
+DWG_SET_COLOR = "dwg.set_color"
+DWG_MOVE = "dwg.move"
+DWG_ADD_NOTE = "dwg.add_note"
+DWG_OPERATIONS = frozenset({DWG_SET_TEXT, DWG_SET_LAYER, DWG_SET_COLOR, DWG_MOVE, DWG_ADD_NOTE})
+DWG_TEXT_MAX = 255
+DWG_MOVE_MAX = 1e7
 
 OperationId = Annotated[str, StringConstraints(pattern=r"^op-[0-9]{1,3}$")]
 GlobalId = Annotated[str, StringConstraints(pattern=r"^[0-9A-Za-z_$]{22}$")]
@@ -129,8 +143,95 @@ class RemoveElement(_Operation):
         return (REMOVE_ELEMENT, self.element)
 
 
-Operation = Union[ChangeType, SetProperty, SetMaterial, RemoveElement]
-_MODELS = {CHANGE_TYPE: ChangeType, SET_PROPERTY: SetProperty, SET_MATERIAL: SetMaterial, REMOVE_ELEMENT: RemoveElement}
+Handle = Annotated[str, StringConstraints(pattern=r"^[0-9A-F]{1,16}$")]
+DwgText = Annotated[str, StringConstraints(min_length=1, max_length=DWG_TEXT_MAX)]
+
+
+class _DwgOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    id: OperationId
+    element: Handle
+
+
+class DwgSetText(_DwgOperation):
+    op: Literal["dwg.set_text"]
+    text: DwgText
+
+    @field_validator("text")
+    @classmethod
+    def _text(cls, value):
+        return _plain_text(value)
+
+    def target(self) -> tuple:
+        return (DWG_SET_TEXT, self.element)
+
+
+class DwgSetLayer(_DwgOperation):
+    op: Literal["dwg.set_layer"]
+    layer: Annotated[str, StringConstraints(min_length=1, max_length=255)]
+
+    @field_validator("layer")
+    @classmethod
+    def _layer(cls, value):
+        return _plain_text(value)
+
+    def target(self) -> tuple:
+        return (DWG_SET_LAYER, self.element)
+
+
+class DwgSetColor(_DwgOperation):
+    op: Literal["dwg.set_color"]
+    color: Annotated[int, Field(ge=0, le=256)]
+
+    def target(self) -> tuple:
+        return (DWG_SET_COLOR, self.element)
+
+
+class DwgMove(_DwgOperation):
+    op: Literal["dwg.move"]
+    dx: float
+    dy: float
+    unit: Literal["mm", "cm", "m", "in", "ft", "drawing"]
+
+    @field_validator("dx", "dy")
+    @classmethod
+    def _finite(cls, value):
+        if not math.isfinite(value) or abs(value) > DWG_MOVE_MAX:
+            raise ValueError("displacement must be finite and bounded")
+        return value
+
+    @model_validator(mode="after")
+    def _moves(self):
+        if self.dx == 0 and self.dy == 0:
+            raise ValueError("a move needs dx or dy")
+        return self
+
+    def target(self) -> tuple:
+        return (DWG_MOVE, self.element)
+
+
+class DwgAddNote(_DwgOperation):
+    op: Literal["dwg.add_note"]
+    text: DwgText
+
+    @field_validator("text")
+    @classmethod
+    def _text(cls, value):
+        return _plain_text(value)
+
+    def target(self) -> tuple:
+        return (DWG_ADD_NOTE, self.element, self.text)
+
+
+Operation = Union[ChangeType, SetProperty, SetMaterial, RemoveElement, DwgSetText, DwgSetLayer, DwgSetColor, DwgMove, DwgAddNote]
+_MODELS = {CHANGE_TYPE: ChangeType, SET_PROPERTY: SetProperty, SET_MATERIAL: SetMaterial, REMOVE_ELEMENT: RemoveElement,
+           DWG_SET_TEXT: DwgSetText, DWG_SET_LAYER: DwgSetLayer, DWG_SET_COLOR: DwgSetColor, DWG_MOVE: DwgMove,
+           DWG_ADD_NOTE: DwgAddNote}
+
+
+def is_drawing_recipe(recipe: "Recipe") -> bool:
+    return bool(recipe.operations) and all(op.op in DWG_OPERATIONS for op in recipe.operations)
 
 
 @dataclass(frozen=True)
@@ -167,6 +268,10 @@ _REASONS = {
     "too_long": "tiene demasiados elementos",
     "string_too_long": "es demasiado largo",
     "string_too_short": "no puede estar vacío",
+    "int_type": "tiene que ser un entero",
+    "float_type": "tiene que ser un número",
+    "greater_than_equal": "es demasiado pequeño",
+    "less_than_equal": "es demasiado grande",
 }
 
 
@@ -209,6 +314,9 @@ def parse_recipe(raw: Any) -> Recipe:
     if len(items) > MAX_OPERATIONS:
         raise _invalid(f"Receta no válida: admite como máximo {MAX_OPERATIONS} operaciones.")
     operations = tuple(parse_operation(item, index) for index, item in enumerate(items, start=1))
+    drawing = {op.op in DWG_OPERATIONS for op in operations}
+    if len(drawing) > 1:
+        raise _invalid("Receta no válida: no se mezclan operaciones dwg.* con operaciones ifc.*.")
     ids, targets = set(), set()
     for op in operations:
         if op.id in ids:

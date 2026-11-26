@@ -14,8 +14,9 @@ Fields named ``*_m`` are in metres whatever the project unit (``null`` when the 
 unit). Property and quantity values are the stored ones, in project units, next to their IFC type.
 
 Operations are reported as capabilities. ``ifc.change_type`` needs a door with a type that fills exactly
-one opening; nothing is offered on an original above ``ENGINE_PREVIEW_MAX_BYTES`` (§5.9), although reading
-it still works.
+one opening and changes geometry, so it is not offered on an original above ``ENGINE_PREVIEW_MAX_BYTES`` (§5.9);
+``ifc.set_property`` changes no geometry and is offered up to ``ENGINE_DATA_PREVIEW_MAX_BYTES``. Reading works at
+any size.
 """
 import logging
 import math
@@ -224,7 +225,8 @@ def summary(ref: VersionRef) -> dict:
         storeys = sorted(model.by_type("IfcBuildingStorey"),
                          key=lambda s: (s.Elevation is None, s.Elevation or 0.0, s.Name or "", s.GlobalId))
         counts = Counter(element.is_a() for element in model.by_type("IfcElement"))
-        too_large = store.preview_limit_reason(lease.path)
+        geometry_limit = store.geometry_limit_reason(lease.path)
+        data_limit = store.preview_limit_reason(lease.path, geometry_free=True)
         return {
             "schema": model.schema,
             "sha256": ref.sha256,
@@ -245,8 +247,8 @@ def summary(ref: VersionRef) -> dict:
                 "coverings": len(model.by_type("IfcCovering")),
             },
             "operations": {
-                CHANGE_TYPE: _available(too_large or _model_change_type_reason(unit, doors)),
-                SET_PROPERTY: _available(too_large),
+                CHANGE_TYPE: _available(geometry_limit or _model_change_type_reason(unit, doors)),
+                SET_PROPERTY: _available(data_limit),
             },
             "cache": {"hit": lease.hit, "open_ms": lease.open_ms},
         }
@@ -364,10 +366,12 @@ def element(ref: VersionRef, guid: Optional[str]) -> dict:
         if not product.is_a("IfcProduct"):
             raise EngineError(404, "ELEMENT_NOT_FOUND", NOT_A_PRODUCT)
         with _model_errors():
-            return _describe(model, product, store.preview_limit_reason(lease.path))
+            return _describe(model, product, store.geometry_limit_reason(lease.path),
+                             store.preview_limit_reason(lease.path, geometry_free=True))
 
 
-def _describe(model: ifcopenshell.file, product, too_large: Optional[str]) -> dict:
+def _describe(model: ifcopenshell.file, product, too_large: Optional[str], data_limit: Optional[str] = None) -> dict:
+    """``too_large`` is why no change of geometry fits this original; ``data_limit`` why no property change does."""
     unit = length_unit(model)
     scale = unit["scale"] if unit else None
     element_type = get_type(product)
@@ -390,7 +394,7 @@ def _describe(model: ifcopenshell.file, product, too_large: Optional[str]) -> di
         "materials": _materials(product),
         "operations": {
             CHANGE_TYPE: _element_change_type(model, product, unit, element_type, opening, too_large),
-            SET_PROPERTY: _available(too_large) if too_large else _available(None, templates=_templates(model, product)),
+            SET_PROPERTY: _available(data_limit) if data_limit else _available(None, templates=_templates(model, product)),
         },
     }
 

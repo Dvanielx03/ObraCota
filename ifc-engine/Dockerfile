@@ -9,6 +9,8 @@
 FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b AS base
 WORKDIR /srv
 ENV PYTHONDONTWRITEBYTECODE=1
+# ezdxf (DWG revisions as DXF) keeps its font cache under XDG_CACHE_HOME; user 10001 has no home, /tmp is writable.
+ENV XDG_CACHE_HOME=/tmp/.cache
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 # Reader of 3D DWG solids (/dwg/solids, ACIS-LECTOR.md §5): Node runs LibreDWG compiled to WebAssembly,

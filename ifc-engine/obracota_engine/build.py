@@ -42,7 +42,7 @@ from typing import Optional
 
 import ifcopenshell
 
-from . import ENGINE_VERSION, invariants, quantities, reading, scope, settings, store, validation
+from . import ENGINE_VERSION, entities, invariants, quantities, reading, scope, settings, store, validation
 from .errors import EngineError, library
 from .operations import REGISTRY, Rejected, check_one
 from .operations.base import by_guid
@@ -51,11 +51,17 @@ from .recipe import Recipe, recipe_sha256
 log = logging.getLogger(__name__)
 
 LIMIT = scope.LIMIT
-TIMINGS = ("checks", "open", "apply", "write", "reopen", "verify", "validate", "diff", "quantities")
+TIMINGS = ("checks", "open", "apply", "write", "snapshot", "compare", "reopen", "verify", "validate", "diff",
+           "quantities")
 SKIPPED = [
     {"layer": 3, "reason": "Reglas WHERE desactivadas (express_rules=False)."},
     {"layer": 4, "reason": "El proyecto no tiene un IDS."},
     {"layer": 7, "reason": "La receta no mueve geometría."},
+]
+# A verification by entities (entities.py) compares no mesh: layer 7 says so, with what proves the geometry instead.
+SKIPPED_BY_ENTITIES = SKIPPED[:2] + [
+    {"layer": 7, "reason": "La receta no cambia geometría: no se teselaron ni compararon mallas con IfcDiff. La capa 6 "
+                           "comprobó, entidad por entidad, que ninguna geometría, colocación ni hueco cambió."},
 ]
 NOT_RUN = "No se ejecutó: una operación no superó sus comprobaciones."
 ENGINE_BUSY = "El motor IFC está ocupado con otra vista previa; vuelve a intentarlo en un momento."
@@ -100,6 +106,9 @@ class GeometryQueue:
 
 
 _slot = GeometryQueue(settings.ENGINE_GEOMETRY_QUEUE_LIMIT)
+# DWG revisions (dwg/revision.py) take seconds and little memory: they have their own queue, so a drawing change never
+# waits minutes behind the IFC preview of a large model.
+_drawing_slot = GeometryQueue(settings.ENGINE_GEOMETRY_QUEUE_LIMIT)
 
 
 def _clock() -> float:
@@ -118,12 +127,26 @@ def geometry_slot(wait_s=None):
         _slot.release()
 
 
+@contextmanager
+def drawing_slot(wait_s=None):
+    """The slot of DWG revisions, separate from the IFC geometry slot; 503 ``ENGINE_BUSY`` after ``wait_s`` seconds."""
+    if not _drawing_slot.acquire(timeout=settings.ENGINE_BUSY_WAIT_S if wait_s is None else wait_s):
+        raise EngineError(503, "ENGINE_BUSY", "El motor está ocupado con otra revisión de plano; vuelve a intentarlo en un momento.")
+    try:
+        yield
+    finally:
+        _drawing_slot.release()
+
+
 class Deadline:
     """``ENGINE_PREVIEW_DEADLINE_S`` from the moment the work starts, checked between phases."""
 
     def __init__(self):
         self.started = _clock()
         self.limit = settings.ENGINE_PREVIEW_DEADLINE_S
+
+    def remaining(self) -> float:
+        return self.limit - (_clock() - self.started)
 
     def check(self, phase: str) -> None:
         if _clock() - self.started >= self.limit:
@@ -161,6 +184,17 @@ class Built:
 
 # Operations that never touch an element's shape: its quantity before and after is the same.
 GEOMETRY_FREE = frozenset({"ifc.set_material", "ifc.set_property"})
+
+
+def is_geometry_free(recipe: Recipe) -> bool:
+    """Whether no operation of the recipe can change geometry (an empty recipe changes nothing)."""
+    return all(op.op in GEOMETRY_FREE for op in recipe.operations)
+
+
+def by_entities(recipe: Recipe, path) -> bool:
+    """Whether the revision is verified entity by entity (entities.py) rather than with IfcDiff: a recipe that
+    changes no geometry on an original of ``ENGINE_ENTITY_VERIFY_MIN_BYTES`` or more."""
+    return is_geometry_free(recipe) and Path(path).stat().st_size >= settings.ENGINE_ENTITY_VERIFY_MIN_BYTES
 
 
 def geometry_free(recipe: Recipe, owners: dict) -> frozenset:
@@ -214,10 +248,25 @@ def build_and_verify(ref, recipe: Recipe, workdir: Path, deadline: Deadline) -> 
 
     The caller owns ``workdir`` (a temporary directory removed in every branch) and holds the geometry slot.
     On ``ok`` the verified file is ``Built.output`` with its SHA-256; it is the caller who moves it out.
+
+    A recipe that changes no geometry on a large original (``by_entities``) is verified entity by entity
+    (``entities.py``): the snapshot of the base starts first, in a child process, and layers 2 and 6 compare entities
+    instead of running the whole schema validation and IfcDiff. Layer 1 and the quantities are the same.
     """
     timer = _Timer(deadline)
     path = store.require_original(ref.project, ref.version, ref.sha256)
     results = [_result(op) for op in recipe.operations]
+    entity_check = by_entities(recipe, path)
+    job = entities.SnapshotJob(path, ref.sha256) if entity_check else None
+    try:
+        return _build(ref, recipe, workdir, deadline, timer, path, results, job)
+    finally:
+        if job is not None:
+            job.cancel()
+
+
+def _build(ref, recipe: Recipe, workdir: Path, deadline: Deadline, timer: _Timer, path: Path, results: list,
+           job: Optional["entities.SnapshotJob"]) -> Built:
     with store.models.lease(ref.project, ref.version, ref.sha256) as lease:
         base = lease.model
         report = {"ok": False, "engine": engine_versions(),
@@ -265,6 +314,12 @@ def build_and_verify(ref, recipe: Recipe, workdir: Path, deadline: Deadline) -> 
                 work.write(str(output))
             del work
             gc.collect()
+        delta = None
+        if job is not None:
+            with timer.phase("snapshot"):
+                snapshot = job.wait(deadline.remaining())
+            with timer.phase("compare"):
+                delta = entities.compare(snapshot, output)
         output_sha = store.sha_of(output)
         with timer.phase("reopen"), library(REOPEN_FAILED):
             revised = ifcopenshell.open(str(output), format=".ifc")
@@ -276,20 +331,29 @@ def build_and_verify(ref, recipe: Recipe, workdir: Path, deadline: Deadline) -> 
                            for found in REGISTRY[op.op].verify(base, revised, op, recipe.operations)]
             issues += invariants.check(base, revised, declared)
             invariants.require_original_unchanged(path, ref.sha256)
-        with timer.phase("validate"), library(VALIDATE_FAILED):
-            schema = validation.layer(ref.sha256, base, revised, LIMIT)
-        with timer.phase("diff"):
-            diff = scope.diff(base, revised, declared)
+        if delta is None:
+            with timer.phase("validate"), library(VALIDATE_FAILED):
+                schema = validation.layer(ref.sha256, base, revised, LIMIT)
+            with timer.phase("diff"):
+                diff = scope.diff(base, revised, declared)
+            scope_layer, skipped = scope.layer(diff), list(SKIPPED)
+        else:
+            with timer.phase("validate"), library(VALIDATE_FAILED):
+                schema = validation.subset_layer(base, revised, delta, LIMIT)
+            with timer.phase("diff"), library(entities.UNORDERED):
+                diff = entities.audit(base, revised, delta, entities.permitted(base, recipe, owners), job.hit)
+            scope_layer = {**scope.layer(diff), "reason": entities.layer_reason(diff)}
+            skipped = [dict(item) for item in SKIPPED_BY_ENTITIES]
         with timer.phase("quantities"):
             unchanged = geometry_free(recipe, owners)
             lines, notices = quantities.lines(base, revised, sorted(declared), lambda: deadline.check("quantities"),
                                               unchanged)
 
-        layers = [_layer1(issues), schema, scope.layer(diff)]
+        layers = [_layer1(issues), schema, scope_layer]
         report.update(
             affected=_affected(base, revised, declared, owners),
             findings=([finding for result in results for finding in result["findings"]] + notices)[:LIMIT],
-            quantities=lines[:LIMIT], diff=diff, validation={"layers": layers, "skipped": list(SKIPPED)})
+            quantities=lines[:LIMIT], diff=diff, validation={"layers": layers, "skipped": skipped})
         errors = []
         if issues:
             errors.append({"code": "LAYER_1_FAILED", "detail": f"La capa 1 encontró {len(issues)} incidencias."})

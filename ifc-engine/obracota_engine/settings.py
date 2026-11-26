@@ -42,9 +42,25 @@ ENGINE_ARTIFACT_MAX = _positive_int("ENGINE_ARTIFACT_MAX", 4)
 ENGINE_ARTIFACT_MAX_BYTES = _positive_int("ENGINE_ARTIFACT_MAX_BYTES", 1 << 30)
 ENGINE_ARTIFACT_TTL_S = _positive_int("ENGINE_ARTIFACT_TTL_S", 900)
 
-# Originals above this size get no preview (422 MODEL_TOO_LARGE). Fixed by the step 0 measurements:
-# 32 MiB keeps a cold preview around 67 s and 2.1 GB at worst, under half the 150 s deadline.
+# Originals above this size get no preview of a recipe that may change geometry (422 MODEL_TOO_LARGE). Fixed by the
+# step 0 measurements: 32 MiB keeps a cold preview around 67 s and 2.1 GB at worst, under half the 150 s deadline.
 ENGINE_PREVIEW_MAX_BYTES = _positive_int("ENGINE_PREVIEW_MAX_BYTES", 33_554_432)
+
+# A recipe whose every operation leaves the geometry as it was (build.GEOMETRY_FREE: a property, a material) is
+# verified entity by entity (entities.py), without meshing the model, so it takes originals up to the upload limit
+# (256 MiB, the backend's OriginalStorage.LIMIT). Measured on 26-11-2026 in this image with 2 CPUs: a property on
+# ReStage (190 MB) 89 s cold, Schependomlaan (65 MB) 27 s; IfcOpenShell's write of the revision is most of it.
+ENGINE_DATA_PREVIEW_MAX_BYTES = _positive_int("ENGINE_DATA_PREVIEW_MAX_BYTES", 268_435_456)
+
+# From this size on a geometry-free recipe is verified entity by entity instead of with IfcDiff and a schema validation
+# of the whole file, which cost about 4.5 s per MB (Lantern Hollow, 20 MB: 89 s, against 12 s entity by entity).
+# Smaller models keep the IfcDiff verification of H1, which takes a few seconds there.
+ENGINE_ENTITY_VERIFY_MIN_BYTES = _positive_int("ENGINE_ENTITY_VERIFY_MIN_BYTES", 4_194_304)
+
+# The base as IfcOpenShell writes it, by SHA-256 of the original and IfcOpenShell version: what the entity comparison
+# reads next to the revision. Writing it costs as much as writing the revision (45 s on ReStage), so it is kept.
+ENGINE_SNAPSHOTS = _path("ENGINE_SNAPSHOTS", "/tmp/obracota-snapshots")
+ENGINE_SNAPSHOTS_MAX_BYTES = _positive_int("ENGINE_SNAPSHOTS_MAX_BYTES", 1 << 30)
 
 # A preview, a rebuilding /build or a /diff is aborted at the next phase boundary after this many seconds.
 ENGINE_PREVIEW_DEADLINE_S = _positive_int("ENGINE_PREVIEW_DEADLINE_S", 150)
@@ -77,3 +93,8 @@ ENGINE_SOLIDS_MAX_TRIANGLES = _positive_int("ENGINE_SOLIDS_MAX_TRIANGLES", 4_000
 # Meshes on disk by SHA-256 of the original and tessellator version; the oldest go above this many bytes.
 ENGINE_SOLIDS_CACHE = _path("ENGINE_SOLIDS_CACHE", "/tmp/obracota-solids")
 ENGINE_SOLIDS_CACHE_MAX_BYTES = _positive_int("ENGINE_SOLIDS_CACHE_MAX_BYTES", 512 * 1024 * 1024)
+
+# --- DWG revisions written as DXF (dwg/revision.py) ---------------------------------------------------------------
+# DXF conversions of DWG originals, by SHA-256: a check, a preview and a build of the same base convert it once.
+ENGINE_DXF_CACHE = _path("ENGINE_DXF_CACHE", "/tmp/obracota-dxf")
+ENGINE_DXF_CACHE_MAX_BYTES = _positive_int("ENGINE_DXF_CACHE_MAX_BYTES", 256 * 1024 * 1024)

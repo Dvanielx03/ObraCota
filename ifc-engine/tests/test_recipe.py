@@ -183,7 +183,8 @@ def test_model_too_large_without_opening(client, originals, synthetic, model_cac
                                  "recipe": body([change_type(element=synthetic["D1"].GlobalId)])})
         assert response.status_code == 422
         assert response.json()["code"] == "MODEL_TOO_LARGE"
-        assert response.json()["detail"].startswith("El modelo supera el tamaño que H1 puede verificar (")
+        # ifc.change_type changes geometry: the reason says so, and what still works on that model.
+        assert response.json()["detail"].startswith("El modelo pesa 1 MB: el motor verifica cambios de geometría")
     assert model_cache.opens == 0
 
 
