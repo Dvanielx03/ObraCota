@@ -285,8 +285,8 @@ public final class AskDocument {
             if (!terms.isEmpty() && !EvidenceCheck.mentions(EvidenceCheck.window(data, at, at + quote.length()), terms))
                 return Optional.empty();
             var datum = support.get();
-            var locatedLabel = datum.map(m -> EvidenceCheck.label(data,
-                new Measure(m.text(), m.value(), m.unit(), at + m.start(), at + m.end()), terms));
+            var measurement = datum.map(m -> new Measure(m.text(), m.value(), m.unit(), at + m.start(), at + m.end()));
+            var locatedLabel = measurement.map(m -> EvidenceCheck.label(data, m, terms));
             String label = locatedLabel.map(EvidenceCheck.Label::text).orElse("");
             if (datum.isPresent() && !terms.isEmpty()) {
                 if (!EvidenceCheck.names(label, terms)) return Optional.empty();
@@ -297,9 +297,18 @@ public final class AskDocument {
             // An answer without the value («espesores») is replaced by the label and value of the indexed text.
             String answer = datum.isPresent() && EvidenceCheck.numbers(c.answer()).isEmpty()
                 ? (label.strip() + " " + datum.get().text()).strip() : c.answer();
+            var qualified = measurement.flatMap(m -> EvidenceCheck.qualifiedValue(data, m));
+            if (qualified.isPresent() && !answer.contains(qualified.get())) answer = qualified.get();
             // The citation shows the whole sentence of the indexed text, when it holds no omitted instruction.
             int start = Math.min(at, locatedLabel.map(EvidenceCheck.Label::start).orElse(at));
             int end = Math.max(at + quote.length(), locatedLabel.map(EvidenceCheck.Label::end).orElse(at));
+            if (qualified.isPresent()) {
+                var qualifiedSpan = EvidenceCheck.locate(data, qualified.get());
+                if (qualifiedSpan.isPresent()) {
+                    start = Math.min(start, qualifiedSpan.get()[0]);
+                    end = Math.max(end, qualifiedSpan.get()[1]);
+                }
+            }
             var whole = EvidenceCheck.sentence(data, start, end);
             String sentence = data.substring(whole[0], whole[1]).strip();
             String cited = !sentence.contains(EvidenceCheck.OMITTED) && passage.content().contains(sentence) ? sentence : quote;

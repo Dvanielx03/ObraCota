@@ -271,6 +271,17 @@ public final class EvidenceCheck {
             ? new Label(after, measure.end(), end) : new Label(before, from, at);
     }
 
+    /** Keep a qualifier or a complete explicit interval even when the model copies only its first value. */
+    public static Optional<String> qualifiedValue(String passage, Measure measure) {
+        var next = measures(passage.substring(measure.end())).stream().findFirst();
+        if (next.isPresent() && next.get().unit().equals(measure.unit())
+            && passage.substring(measure.end(), measure.end() + next.get().start()).matches("\\s*[-–—]\\s*"))
+            return Optional.of(passage.substring(measure.start(), measure.end() + next.get().end()));
+        var separator = Pattern.compile("([<>]=?|[≥≤])\\s*$").matcher(passage.substring(Math.max(0, measure.start() - 8), measure.start()));
+        if (separator.find()) return Optional.of(separator.group() + measure.text());
+        return Optional.empty();
+    }
+
     public static Terms namedTerms(String label, Terms question) {
         String plain = normalize(label);
         var words = new LinkedHashSet<String>();
