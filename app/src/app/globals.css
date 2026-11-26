@@ -62,7 +62,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;margin-bottom:0;font
 dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 @media(max-height:520px) and (orientation:landscape){.workarea{grid-template-columns:220px minmax(0,1fr);grid-template-rows:minmax(0,1fr)}.workarea aside{grid-column:1;grid-row:1;display:flex}.stage{grid-row:1}.panelHead h1{font-size:22px}.inspector{max-height:35%}.panelHead,.inspector{padding:6px 12px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-.orientation{position:absolute;right:16px;top:49px;display:grid;justify-items:center;gap:8px;pointer-events:none;color:var(--muted)}.orientation small{font:10px var(--font-mono)}
+.orientation{position:absolute;right:16px;top:49px;display:grid;justify-items:center;gap:8px;pointer-events:none;color:var(--muted)}.orientation small{font:11px var(--font-mono)}
 .cube{width:48px;height:48px;margin:10px;perspective:260px}
 .faces{position:relative;width:100%;height:100%;transform-style:preserve-3d;transform:var(--cube-pose)}
 .face{position:absolute;inset:0;backface-visibility:hidden;pointer-events:auto;border:1px solid var(--border-strong);background:var(--secondary);color:var(--ink);font-size:11px;line-height:16px;min-height:0;padding:0}
@@ -70,7 +70,7 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .zoom-rectangle{position:absolute;pointer-events:none;border:1px solid var(--brand);background:var(--brand-tint)}
 @media(max-width:440px){.orientation{right:4px}}
 .drawing-info{font-size:12px;margin:0 0 12px}.drawing-info summary{cursor:pointer}.drawing-info p{margin-top:8px}
-.axis-triad{width:68px;height:56px}.axis-triad line{stroke:currentColor;stroke-width:1.3}.axis-triad text{font:10px var(--font-mono);text-anchor:middle;dominant-baseline:central;fill:currentColor}.orientation{gap:0}
+.axis-triad{width:68px;height:56px}.axis-triad line{stroke:currentColor;stroke-width:1.3}.axis-triad text{font:11px var(--font-mono);text-anchor:middle;dominant-baseline:central;fill:currentColor}.orientation{gap:0}
 .cube-host{position:absolute;inset:0;pointer-events:none}
 .view-picker{display:grid;justify-items:center;position:relative;pointer-events:auto;border-radius:var(--radius-sm)}
 .view-picker:focus-within{outline:2px solid var(--ring)}

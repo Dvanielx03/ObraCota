@@ -181,10 +181,10 @@
   background: var(--muted);
 }
 .empty-illustration-image::after { mask-image: var(--art-accent); background: var(--brand-mark); }
-.empty-illustration figcaption { color: var(--muted); font: 500 10px/1.2 var(--font-sans); text-align: center; }
+.empty-illustration figcaption { color: var(--muted); font: 500 11px/1.35 var(--font-sans); text-align: center; }
 .changes-loading { display: grid; justify-items: center; gap: 12px; padding: 32px 0; }
 .version-rail-empty { display: grid; justify-items: center; gap: 6px; padding: 6px 4px 8px; }
-.version-rail-empty p { margin: 0; color: var(--ink); text-align: center; font: 600 10px/1.2 var(--font-sans); }
+.version-rail-empty p { margin: 0; color: var(--ink); text-align: center; font: 600 11px/1.35 var(--font-sans); }
 
 @media (prefers-reduced-motion: reduce) {
   .spinner, .skeleton, .model-preparing, .stage > .view[data-ready] { animation: none; }
