@@ -13,7 +13,9 @@ export type AgentRunState = { state: "running"; notes: number; steps: AgentStep[
  * each tool it called and how it went, and the way to the draft's card, where the owner reviews it in 3D and approves
  * it herself. Nothing in this panel publishes.
  */
-export function AgentRunPanel({ value, onClose }: { value: AgentRunState; onClose: () => void }) {
+export function AgentRunPanel({ value, onClose, drawing = false }: { value: AgentRunState; onClose: () => void;
+  /** The model is a DWG or DXF drawing: the proposal is seen on the plan and the marks are entities. */
+  drawing?: boolean }) {
   const title = value.state === "running" ? "El agente está preparando el cambio"
     : value.state === "error" ? "No se pudo proponer el cambio"
     : value.run.status === "NO_CHANGE" && value.run.change ? "Borrador sin enviar" : RUN_TITLES[value.run.status];
@@ -29,7 +31,7 @@ export function AgentRunPanel({ value, onClose }: { value: AgentRunState; onClos
       {value.state !== "running" && <button type="button" className="agent-run-close" aria-label="Cerrar la propuesta del agente" onClick={onClose}>
         <X size={16} strokeWidth={2} aria-hidden="true" /></button>}
     </header>
-    {value.state === "running" && <p className="agent-run-note">Lee {value.notes === 1 ? "la pieza marcada" : "las piezas marcadas"}, prepara un borrador y solicita su vista previa. Si el motor está ocupado, la verificación espera en cola.</p>}
+    {value.state === "running" && <p className="agent-run-note">Lee {drawing ? (value.notes === 1 ? "la entidad marcada" : "las entidades marcadas") : value.notes === 1 ? "la pieza marcada" : "las piezas marcadas"}, prepara un borrador y solicita su vista previa. Si el motor está ocupado, la verificación espera en cola.</p>}
     {value.state === "error" && <p className="agent-run-note" role="alert">{value.message}</p>}
     {provider && <p className="agent-run-provider">{provider}</p>}
     {steps.length > 0 &&
@@ -44,7 +46,7 @@ export function AgentRunPanel({ value, onClose }: { value: AgentRunState; onClos
       <p className="agent-run-note">{value.run.message}</p>
       {value.run.change && <div className="agent-run-actions">
         <Link href={"/proyectos/" + value.project + "/cambios#" + value.run.change}>Abrir la tarjeta del cambio</Link>
-        {value.run.status === "READY" && <Link href={"/proyectos/" + value.project + "/cambios/" + value.run.change + "/vista"}>Ver propuesta en 3D</Link>}
+        {value.run.status === "READY" && <Link href={"/proyectos/" + value.project + "/cambios/" + value.run.change + "/vista"}>{drawing ? "Ver propuesta en el plano" : "Ver propuesta en 3D"}</Link>}
       </div>}
       {value.run.status === "READY" && <p className="agent-run-provider">Revísalo y apruébalo tú: el agente no publica revisiones.</p>}
     </>}

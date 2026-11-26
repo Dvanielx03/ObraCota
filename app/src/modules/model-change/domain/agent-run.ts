@@ -32,7 +32,10 @@ export const RUN_HISTORY_LABELS: Record<AgentRunSummary["status"], string> = {
 
 export interface AgentAvailability { available: boolean; provider: string; reserveCents: number; remainingCents: number; maxSteps: number }
 
-/** A note of Editar as the agent receives it: on a piece (its IFC GlobalId and name) or on a zone (no GlobalId). */
+/**
+ * A note of Editar as the agent receives it: on a piece (its IFC GlobalId and name), on an entity of a DWG or DXF drawing
+ * (its handle, in the same field), or on a zone (no identity).
+ */
 export interface AgentNote { globalId: string | null; name: string | null; text: string }
 
 /** What each tool of the catalog does, in the words of the steps panel. */
@@ -46,6 +49,8 @@ const TOOL_LABELS: Record<string, string> = {
   preview_change: "Verificar la vista previa",
   submit_change: "Enviar a tu aprobación",
   discard_change: "Descartar el borrador",
+  get_dwg_entity: "Leer la entidad marcada del plano",
+  draft_dwg_change: "Cambiar el plano en el borrador",
 };
 
 export const toolLabel = (tool: string): string => TOOL_LABELS[tool] ?? "Herramienta no permitida: " + tool;
@@ -75,6 +80,6 @@ export function agentNotes(marks: readonly ({ kind: "point"; guid?: string; name
 /** Why the agent cannot be asked yet, or undefined. */
 export function proposeReason(notes: readonly AgentNote[]): string | undefined {
   if (!notes.length) return "Escribe en alguna marca qué quieres cambiar";
-  if (!notes.some((note) => note.globalId)) return "Marca una pieza de un modelo IFC: el agente necesita su GlobalId";
+  if (!notes.some((note) => note.globalId)) return "Marca una pieza del modelo o una entidad del plano: el agente necesita su identificador";
   return undefined;
 }

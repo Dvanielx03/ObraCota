@@ -3,7 +3,7 @@ import Link from "next/link";
 import {useEffect,useMemo,useState} from "react";
 import {authenticatedResponse} from "@/core/http/http-client";
 import {BusyButton,LoadingStatus,Skeleton} from "@/shared/ui/loading";
-import {operationLabel,statusLabel,type ModelChange} from "../domain/model-change";
+import {isDrawingFormat,operationLabel,statusLabel,type ModelChange} from "../domain/model-change";
 import {modelChangeRepository} from "../infrastructure/model-change-http";
 import {ChangeEstimate,formatDay} from "./change-estimate";
 import {AgentSteps} from "./agent-steps";
@@ -74,6 +74,9 @@ export function ChangeCard({change,onChange,locked,onWork}:{change:ModelChange;o
     busyLabel={working[kind].button} spinnerSize={14} disabled={locked||!allowed} title={allowed?undefined:actions.reasons[kind]} onClick={()=>void run(kind)}>{label}</BusyButton>;
   const reason=(kind:"preview"|"apply")=>actions.reasons[kind];
   const proposalReady=change.preview.available && change.reportCurrent && !!change.report?.ok;
+  const drawing=isDrawingFormat(change.format);
+  const look=drawing?"Ver propuesta en el plano":"Ver propuesta en 3D";
+  const busy=work && (work==="apply"||work==="restore") && drawing?"Comprobando y guardando la revisión DXF…":work?working[work].status:"";
   return <article id={change.id} className="change-card">
     <ChangeHeader change={change}/>
     {change.agentRun && <AgentSteps project={change.project} run={change.agentRun} change={change.id}/>}
@@ -95,8 +98,8 @@ export function ChangeCard({change,onChange,locked,onWork}:{change:ModelChange;o
         {button("discard",actions.discard,"Descartar borrador","panel-action change-secondary")}
       </>}
       {change.status==="READY" && <>
-        {proposalReady && actions.apply?<Link className="panel-action" href={proposalHref(change)}>Ver propuesta en 3D</Link>
-          :<button className="panel-action" disabled title={actions.apply?"Pendiente: previsualiza el cambio de nuevo para verlo en 3D":reason("apply")}>Ver propuesta en 3D</button>}
+        {proposalReady && actions.apply?<Link className="panel-action" href={proposalHref(change)}>{look}</Link>
+          :<button className="panel-action" disabled title={actions.apply?"Pendiente: previsualiza el cambio de nuevo para verlo":reason("apply")}>{look}</button>}
         {/* The proposal file expired or the report is stale: offer the way back instead of only a disabled button. */}
         {!proposalReady && actions.preview && button("preview",true,"Previsualizar de nuevo","panel-action change-secondary")}
         {button("apply",actions.apply,"Aprobar y aplicar cambio")}
@@ -104,16 +107,16 @@ export function ChangeCard({change,onChange,locked,onWork}:{change:ModelChange;o
         {!actions.preview && reason("preview") && <span className="change-note">{reason("preview")}</span>}
       </>}
       {change.status==="APPLIED" && change.appliedVersion && <>
-        <p role="status">Cambio aplicado. <Link href={prefix+"/visor/"+change.appliedVersion+(target?"?element="+encodeURIComponent(target)+"&":"?")+"anterior="+change.baseVersion}>Abrir nueva versión</Link></p>
+        <p role="status">{drawing?"Cambio aplicado como revisión DXF. ":"Cambio aplicado. "}<Link href={prefix+"/visor/"+change.appliedVersion+(target?"?element="+encodeURIComponent(target)+"&":"?")+"anterior="+change.baseVersion}>Abrir nueva versión</Link></p>
         <VerifiedDownload project={change.project} version={change.appliedVersion} label="Descargar revisión publicada"/>
         {button("restore",actions.restore,"Crear revisión de restauración","panel-action restore-action")}
       </>}
       {change.status==="RESTORED" && change.restoredVersion && <p><Link href={prefix+"/visor/"+change.restoredVersion}>Abrir revisión restaurada</Link></p>}
       {change.status==="DISCARDED" && <p className="change-note">{change.discardedBy?.kind==="AGENT"
-        ?"Descartada por el agente el "+formatDay(change.discardedAt)+" · generado con IA"
+        ?"Descartada por el agente el "+formatDay(change.discardedAt)+" · propuesto por el agente de diseño"
         :"Descartada el "+formatDay(change.discardedAt)+" por "+(change.discardedBy?.email??"la propietaria")}</p>}
     </div>
-    {work && <LoadingStatus>{working[work].status}</LoadingStatus>}
+    {work && <LoadingStatus>{busy}</LoadingStatus>}
     {error && <p role="alert">{error}</p>}
   </article>;
 }

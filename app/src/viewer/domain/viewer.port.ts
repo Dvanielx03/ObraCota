@@ -8,7 +8,11 @@ export interface ElementInfo {
   evidence?: {unit:string;width:number|null;height:number|null;extents:number[]; finishes:{value:string;source:string}[];widths:{value:number;source:string}[]};
   count?: number;
   cad?: {types:Record<string,number>;min:number[];max:number[]};
-  annotation?: {handle:string; raw:string; position:[number,number,number]; anchor:[number,number,number]; height:number};
+  annotation?: {handle:string; raw:string; position:[number,number,number]; anchor:[number,number,number]; height:number;
+    /** The model space entity (an INSERT) a text inside a block belongs to. */
+    owner?: {handle:string; type:string};
+    /** How the text is drawn on a plan: its lines, baseline angle (radians) and the box point on the anchor (fractions). */
+    draw?: {lines:string[]; angle:number; ax:number; ay:number}};
   dimension?: {kind:string;value:number;style:string;endpoints:number[]};
 }
 export interface ModelInfo {
@@ -55,8 +59,13 @@ export interface ViewerPort {
   applyPose(pose: CameraPose, duration?: number): void;
   extents(): void;
   windowZoom(): void;
-  /** Piece and 3D point under a position of the window (client px), or null over the background. */
+  /**
+   * Piece and 3D point under a position of the window (client px), or null over the background. On a plan it also
+   * names the DWG entity under the click: a text, a dimension near its text, or the entity of the stroke.
+   */
   probe(clientX: number, clientY: number): ProbeHit | null;
+  /** The viewer id of the element that holds the DWG entity `handle` (a text, a dimension or a layer of strokes), framed and selected; null when the drawing has no such entity. */
+  locateHandle(handle: string): string | null;
   /**
    * Where 3D points fall on the canvas, in CSS px from its top-left corner. Null for a point that is
    * outside the view or hidden behind another part of the model; `owners` names the piece each
@@ -110,8 +119,13 @@ export interface GroupCapture {
   height:number;
 }
 export type GroupCaptureView="current"|"reframe"|"isolated";
-/** What a click lands on: the piece (viewer id) and the 3D point of its surface. */
-export interface ProbeHit { id: string; point: [number, number, number] }
+/**
+ * What a click lands on: the piece (viewer id) and the 3D point of its surface. On a DWG or DXF drawing, `entity` is the
+ * entity under the click (its handle, type and a readable name): the identity model changes and the agent use.
+ */
+export interface ProbeHit { id: string; point: [number, number, number]; entity?: DrawingEntity }
+/** A DWG entity of the drawing on screen: `handle` is the «Handle CAD» (hexadecimal). */
+export interface DrawingEntity { handle: string; type: string; name: string }
 export type ViewDirection = "front" | "back" | "right" | "left" | "top" | "bottom" | "iso";
 export type ExteriorMaterial = "wood" | "concrete" | "steel" | "glass" | "stone" | "paint";
 export type ExteriorTone = "light" | "medium" | "dark";

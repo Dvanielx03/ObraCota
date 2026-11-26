@@ -11,7 +11,14 @@ export type SetPropertyOperation={id:string;op:"ifc.set_property";element:string
 /** H2 material: one exterior finish for a list of pieces; `element` is the first of `elements`. */
 export type SetMaterialOperation={id:string;op:"ifc.set_material";element:string;elements:string[];material:string;category:string;color:string;
   price_key?:string|null};
-export type Operation=ChangeTypeOperation|SetPropertyOperation|SetMaterialOperation;
+/** Operations of a DWG drawing: `element` is the entity's handle; the approved revision is a DXF. */
+export type DwgSetTextOperation={id:string;op:"dwg.set_text";element:string;text:string};
+export type DwgSetLayerOperation={id:string;op:"dwg.set_layer";element:string;layer:string};
+export type DwgSetColorOperation={id:string;op:"dwg.set_color";element:string;color:number};
+export type DwgMoveOperation={id:string;op:"dwg.move";element:string;dx:number;dy:number;unit:"mm"|"cm"|"m"|"in"|"ft"|"drawing"};
+export type DwgAddNoteOperation={id:string;op:"dwg.add_note";element:string;text:string};
+export type DwgOperation=DwgSetTextOperation|DwgSetLayerOperation|DwgSetColorOperation|DwgMoveOperation|DwgAddNoteOperation;
+export type Operation=ChangeTypeOperation|SetPropertyOperation|SetMaterialOperation|DwgOperation;
 export type Recipe={format:"obracota.recipe/1";operations:Operation[]};
 
 export type FindingStatus="WARNING"|"OK"|"UNKNOWN";
@@ -23,6 +30,8 @@ export type QuantityLine={element:string|null;phase:"before"|"after"|null;quanti
   basis:string|null;reliable:boolean};
 export type DiffEntry={guid:string;class:string;name:IfcText;flags?:string[];attributes?:string[];declared?:boolean;reason?:string;reasons?:string[]};
 export type Diff={changed:DiffEntry[];added:DiffEntry[];deleted:DiffEntry[];unexpected:DiffEntry[];
+  /** A DWG revision: entities by handle, no openings nor IFC geometry. */
+  drawing?:boolean;
   openings:{changed:DiffEntry[];added:DiffEntry[];deleted:DiffEntry[];unfilled:DiffEntry[]};
   geometry?:{elements_compared:number;elements:number;openings_compared:number;openings:number};truncated:boolean};
 export type Layer={layer:number;name:string;status:"PASS"|"FAIL"|"NOT_RUN";reason?:string;issues?:unknown[];base_issues?:number;
@@ -60,6 +69,10 @@ export interface ModelChangeRepository{
 }
 
 const statuses:Record<ChangeStatus,string>={DRAFT:"Borrador",READY:"Lista para aprobar",APPLIED:"Aplicada",RESTORED:"Restaurada",DISCARDED:"Descartada"};
+/** Whether a change (or a version format) is of a DWG or DXF drawing: its revisions are DXF. */
+export function isDwgOperation(operation:Operation):operation is DwgOperation{return operation.op.startsWith("dwg.");}
+export const isDrawingFormat=(format:string|null|undefined)=>format==="DWG"||format==="DXF";
+
 /** «Borrador», «Lista para aprobar», «Aplicada», «Restaurada» or «Descartada» (§7.2). */
 export const statusLabel=(status:ChangeStatus)=>statuses[status];
 
@@ -80,6 +93,7 @@ function shownValue(value:unknown){
  */
 export function operationLabel(operation:Operation,result?:OperationResult,legacy?:Review|null):string{
   const before=result?.before??null,after=result?.after??null;
+  if(isDwgOperation(operation))return drawingLabel(operation,before,after);
   if(operation.op==="ifc.change_type"){
     const options=Array.isArray(before?.options)?before.options as {id:string;name:string;compatible:boolean}[]:legacy?.door.options??[];
     const option=options.find(item=>item.id===operation.type_id);
@@ -99,6 +113,47 @@ export function operationLabel(operation:Operation,result?:OperationResult,legac
   return scope+" · "+operation.pset+"."+operation.property+": "+from+shownValue(operation.value);
 }
 
+const ENTITY_NAMES:Record<string,string>={INSERT:"Bloque",LINE:"Línea",LWPOLYLINE:"Polilínea",POLYLINE:"Polilínea",ARC:"Arco",CIRCLE:"Círculo",
+  ELLIPSE:"Elipse",POINT:"Punto",TEXT:"Texto",MTEXT:"Texto",ATTRIB:"Atributo",DIMENSION:"Cota",MULTILEADER:"Directriz",HATCH:"Sombreado",
+  "3DSOLID":"Sólido",SPLINE:"Spline"};
+const COLOR_NAMES:Record<number,string>={0:"por bloque",1:"rojo",2:"amarillo",3:"verde",4:"cian",5:"azul",6:"magenta",7:"blanco o negro",8:"gris",
+  9:"gris claro",256:"por capa"};
+const UNIT_NAMES:Record<string,string>={mm:"mm",cm:"cm",m:"m",in:"in",ft:"ft",drawing:"unidades del dibujo"};
+/** A CAD text without its MTEXT formatting codes, as the plan shows it. */
+export function cadText(raw:unknown):string{
+  return String(raw??"").replace(/\\P/g," ").replace(/\\[ACFHQTWcfhp][^;]*;/g,"").replace(/\\[LlOoKk]/g,"").replace(/\\~/g," ")
+    .replace(/\\([\\{}])/g,"$1").replace(/[{}]/g,"").trim();
+}
+const colorLabel=(value:unknown)=>typeof value==="number"?value+(COLOR_NAMES[value]?" ("+COLOR_NAMES[value]+")":""):"sin dato";
+const decimal=new Intl.NumberFormat("es-CO",{maximumFractionDigits:3});
+/** «Mover 500 mm a la derecha y 200 mm hacia arriba». */
+function moveWords(operation:DwgMoveOperation){
+  const unit=UNIT_NAMES[operation.unit]??operation.unit,parts:string[]=[];
+  if(operation.dx)parts.push(decimal.format(Math.abs(operation.dx))+" "+unit+(operation.dx>0?" a la derecha":" a la izquierda"));
+  if(operation.dy)parts.push(decimal.format(Math.abs(operation.dy))+" "+unit+(operation.dy>0?" hacia arriba":" hacia abajo"));
+  return parts.join(" y ");
+}
+/** One DWG operation in words: «Texto · Texto 3465: «LIVING ROOM» → «REVISADO OBRA»». */
+function drawingLabel(operation:DwgOperation,before:Record<string,unknown>|null,after:Record<string,unknown>|null):string{
+  const type=typeof before?.type==="string"?before.type:"";
+  const entity=(ENTITY_NAMES[type]??(type||"Entidad"))+" "+operation.element;
+  switch(operation.op){
+    case "dwg.set_text":{
+      const from=before&&"text" in before?"«"+cadText(before.text)+"» → ":"";
+      return (type==="DIMENSION"?"Texto de cota":"Texto")+" · "+entity+": "+from+"«"+operation.text+"»";
+    }
+    case "dwg.set_layer":return "Capa · "+entity+": "+(typeof before?.layer==="string"?before.layer+" → ":"")+operation.layer
+      +(after?.created?" (capa nueva)":"");
+    case "dwg.set_color":return "Color · "+entity+": "+(before&&"color" in before?colorLabel(before.color)+" → ":"")+colorLabel(operation.color);
+    case "dwg.move":{
+      const drawn=typeof after?.dx==="number"&&operation.unit!=="drawing"&&typeof after?.unit==="string"
+        ?" ("+decimal.format(after.dx as number)+", "+decimal.format(after.dy as number)+" "+after.unit+" en el dibujo)":"";
+      return "Mover · "+entity+": "+moveWords(operation)+drawn;
+    }
+    case "dwg.add_note":return "Nota de revisión · "+entity+": «"+operation.text+"»";
+  }
+}
+
 const sources:Record<QuantitySource,string>={UNIT:"Por unidad",QTO:"Qto del IFC",GEOMETRY:"Calculada de la geometría"};
 /** Where a quantity came from (§6.1): «Por unidad», «Qto del IFC» or «Calculada de la geometría». */
 export const sourceLabel=(source:QuantitySource|null)=>source?sources[source]:"Fuente sin indicar";
@@ -115,7 +170,9 @@ export function diffCounts(diff:Diff|null|undefined){
 }
 
 const flagNames:Record<string,string>={type_changed:"tipo",geometry_changed:"geometría",properties_changed:"propiedades",
-  container_changed:"contenedor",aggregate_changed:"agregación",classification_changed:"clasificación"};
+  container_changed:"contenedor",aggregate_changed:"agregación",classification_changed:"clasificación",
+  // A verification by entities (large models, ifc-engine/obracota_engine/entities.py) names these two as well.
+  material_changed:"material",style_changed:"color"};
 /** IfcDiff flags in words: «tipo», «propiedades», «atributos: ObjectType»… */
 export function flagLabels(entry:Pick<DiffEntry,"flags"|"attributes">):string[]{
   return (entry.flags??[]).map(flag=>flag==="attributes_changed"

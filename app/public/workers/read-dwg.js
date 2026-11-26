@@ -78,6 +78,40 @@ export function emptyReason(skipped){
     : "El espacio modelo del DWG está vacío.";
 }
 
+/**
+ * One line of text without MTEXT formatting codes: font, height, colour, width and alignment switches go, a stacked
+ * fraction (\S1/2; \S1^2; \S1#2;) reads «1/2», and the %%c/%%d/%%p symbols become Ø, ° and ±.
+ */
+function plainLine(line){
+  return line.replace(/\\S([^;^/#]*)[\^/#]([^;]*);/g,(m,top,bottom)=>" "+top.trim()+"/"+bottom.trim())
+    .replace(/\\[ACFHQTWcfhp][^;]*;/g,"").replace(/\\[LlOoKkNX]/g,"")
+    .replace(/\\~/g," ").replace(/\\([\\{}])/g,"$1").replace(/[{}]/g,"")
+    .replace(/%%([cCdDpP])/g,(m,c)=>({c:"Ø",d:"°",p:"±"})[c.toLowerCase()]).replace(/ {2,}/g," ").trim();
+}
+/** MTEXT content as lines without formatting codes (\P breaks a line). */
+function textLines(raw){
+  return String(raw).split("\\P").map(plainLine).filter(line=>line.length);
+}
+/**
+ * How a TEXT or MTEXT is drawn on the plan: its lines, the angle of its baseline and which point of its box sits on the
+ * insertion point (fractions of the width from the left and of the height from the bottom).
+ */
+function textDraw(e,parent,raw){
+  const lines=e.type==="MTEXT"?textLines(raw):[String(raw).replace(/%%([cCdDpP])/g,(m,c)=>({c:"Ø",d:"°",p:"±"})[c.toLowerCase()]).trim()];
+  let angle=e.rotation||0;
+  if(e.type==="MTEXT" && e.direction && (e.direction.x||e.direction.y))angle=Math.atan2(e.direction.y,e.direction.x);
+  // The block's rotation and mirroring carry the text along.
+  const axis=new Vector3(Math.cos(angle),Math.sin(angle),0).transformDirection(parent);
+  let ax=0,ay=0;
+  if(e.type==="MTEXT"){const a=Math.min(9,Math.max(1,e.attachmentPoint||1));ax=((a-1)%3)/2;ay=1-Math.floor((a-1)/3)/2;}
+  else{
+    const h=e.halign||0,v=e.valign||0;
+    ax=h===1||h===4?.5:h===2?1:0;
+    ay=h===4?.5:v===2?.5:v===3?1:0;
+  }
+  return {lines,angle:Math.atan2(axis.y,axis.x),ax,ay};
+}
+
 export function extract(db, unknown,indexOnly=false) {
   const blocks=new Map(db.tables.BLOCK_RECORD.entries.map(b=>[b.name,b]));
   const layers=new Map(db.tables.LAYER.entries.map(l=>[l.name,l]));
@@ -86,6 +120,9 @@ export function extract(db, unknown,indexOnly=false) {
   const dimensions=[];
   const omit=type=>skipped.set(type,(skipped.get(type)||0)+1);
   let origin=null,minZ=Infinity,maxZ=-Infinity;
+  // The model space entity being drawn: every vertex of a batch remembers it (an INSERT stands for its whole block),
+  // so a click on a stroke of the plan names the DWG entity under it (its handle, the identity of model changes).
+  let top=null;
   function visit(e,parent=identity,inherited="0",ancestors=[]) {
     const layer=e.layer==="0"?inherited:e.layer || inherited;
     const properties=layers.get(layer);
@@ -108,17 +145,20 @@ export function extract(db, unknown,indexOnly=false) {
     }
     if(e.type==="TEXT" || e.type==="MTEXT"){
       const raw=e.text || "";
-      const name=raw.replace(/\\P/g," ").replace(/\\[ACFHQTWcfhp][^;]*;/g,"")
-        .replace(/\\[LlOoKk]/g,"").replace(/\\~/g," ").replace(/[{}]/g,"").trim();
+      const name=e.type==="MTEXT"?textLines(raw).join(" "):plainLine(String(raw));
       const point=e.type==="TEXT"?e.startPoint:e.insertionPoint;
       if(!point || !name){omit(e.type);return;}
-      const location=vec(point);
+      // A TEXT aligned other than left-baseline sits on its alignment point (fit and aligned keep the start point).
+      const halign=e.halign||0,aligned=e.type==="TEXT" && (halign!==0 || (e.valign||0)!==0) && halign!==3 && halign!==5 && e.endPoint;
+      const location=vec(aligned?e.endPoint:point);
       if(e.type==="TEXT"){location.z=e.elevation??0;location.applyMatrix4(ocs(e.extrusionDirection));}
       location.applyMatrix4(parent);
       if(!location.toArray().every(Number.isFinite)){omit(e.type);return;}
       labels.push({id:"annotation:"+labels.length,name,level:layer,type:e.type,
         annotation:{handle:String(e.handle??""),raw,position:location.toArray(),anchor:location.toArray(),
-          height:Math.abs(e.textHeight||0)*parent.getMaxScaleOnAxis()}});
+          height:Math.abs(e.textHeight||0)*parent.getMaxScaleOnAxis(),
+          ...(ancestors.length && top?{owner:{handle:String(top.handle??""),type:top.type}}:{}),
+          draw:textDraw(e,parent,raw)}});
       return;
     }
     if(e.type==="INSERT"){
@@ -144,10 +184,12 @@ export function extract(db, unknown,indexOnly=false) {
       if(!batch){
         const id=layer+"/"+kind;
         if(!batches.has(id))batches.set(id,{id,layer,kind,color:properties?.color,count:0,positions:[],
-          cad:{types:{},min:[Infinity,Infinity],max:[-Infinity,-Infinity]}});
+          cad:{types:{},min:[Infinity,Infinity],max:[-Infinity,-Infinity]},entities:[]});
         batch=batches.get(id);batch.count++;
         batch.cad.types[e.type]=(batch.cad.types[e.type]??0)+1;
       }
+      const owner=top??e,marks=batch.entities,last=marks[marks.length-1],handle=String(owner.handle??"");
+      if(!last || last.handle!==handle)marks.push({start:batch.positions.length/3,handle,type:owner.type});
       const {min,max}=batch.cad;
       min[0]=Math.min(min[0],p.x);min[1]=Math.min(min[1],p.y);
       max[0]=Math.max(max[0],p.x);max[1]=Math.max(max[1],p.y);
@@ -203,7 +245,8 @@ export function extract(db, unknown,indexOnly=false) {
     }
     if(e.thickness)omit("Espesor de extrusión");
   }
-  for(const entity of db.entities)visit(entity);
+  for(const entity of db.entities){top=entity;visit(entity);}
+  top=null;
   if(unknown)skipped.set("Otros objetos sin decodificar",unknown);
   const records=labels.concat(dimensions);
   if(indexOnly)return {groups:[],labels:records,units:db.header.INSUNITS??0};
@@ -286,12 +329,15 @@ self.onmessage=async({data})=>{
   let reader,ptr,thumbnail=null;
   try{
     const bytes=await file.arrayBuffer();
-    const version=new TextDecoder().decode(bytes.slice(0,6));
-    if(!/^AC\d{4}$/.test(version))throw new Error("La cabecera del archivo DWG no es válida.");
+    const head=new TextDecoder().decode(bytes.slice(0,4096));
+    // A DXF (the revisions ObraCota writes of a drawing, or an uploaded one): ASCII with its first section, or binary.
+    const dxf=/^AutoCAD Binary DXF/.test(head) || /^\s*(?:999\s*\r?\n[^\n]*\r?\n\s*)*0\s*\r?\n\s*SECTION\b/.test(head);
+    const version=dxf?"DXF":head.slice(0,6);
+    if(!dxf && !/^AC\d{4}$/.test(version))throw new Error("La cabecera del archivo DWG no es válida.");
     self.postMessage({status:"Leyendo espacio modelo y capas…"});
     reader=await LibreDwg.create(new URL("../dwg/wasm",self.location.href).href);
-    ptr=reader.dwg_read_data(bytes,Dwg_File_Type.DWG);
-    if(!ptr)throw new Error("No se pudo decodificar el DWG.");
+    ptr=reader.dwg_read_data(bytes,dxf?Dwg_File_Type.DXF:Dwg_File_Type.DWG);
+    if(!ptr)throw new Error(dxf?"No se pudo decodificar el DXF.":"No se pudo decodificar el DWG.");
     const {database,stats}=reader.convertEx(ptr);
     if(!data.indexOnly){
       try{addPolyfaceMeshes(reader,ptr,database);}

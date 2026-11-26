@@ -23,6 +23,8 @@ export const modelChangeRepository:ModelChangeRepository={
     const response=await authenticatedResponse(one(project,change.id)+"/preview",{signal});
     const blob=await response.blob();
     if(change.preview.size!==null && blob.size!==change.preview.size)throw new Error("La descarga de la vista previa está incompleta.");
-    return new File([blob],change.baseName.replace(/\.ifc$/i,"")+"-propuesta.ifc",{type:"application/octet-stream"});
+    // A drawing's preview is the DXF of the revision; an IFC's, the verified IFC.
+    const drawing=change.format==="DWG"||change.format==="DXF";
+    return new File([blob],change.baseName.replace(/\.(ifc|dwg|dxf)$/i,"")+"-propuesta."+(drawing?"dxf":"ifc"),{type:"application/octet-stream"});
   },
 };

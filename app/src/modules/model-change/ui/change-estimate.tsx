@@ -28,6 +28,8 @@ export function ChangeEstimate({change,labels}:{change:ModelChange;labels:Record
   const estimate=change.report?.estimate??null;
   if(!change.report && change.legacyReview)return <DoorEstimate review={change.legacyReview}/>;
   const frozen=change.status==="APPLIED"||change.status==="RESTORED";
+  if(change.format==="DWG"||change.format==="DXF")return <section aria-label="Estimación del cambio" className="change-estimate"><h3>Estimación en COP</h3>
+    <p className="change-note">No aplica: un cambio de plano (texto, capa, color, posición o nota) no tiene cantidades ni costo que estimar.</p></section>;
   return <section aria-label="Estimación del cambio" className="change-estimate"><h3>Estimación en COP</h3>
     {!estimate && <p className="change-note">Previsualiza el cambio para estimar su costo con las cantidades del modelo.</p>}
     {estimate && frozen && <p className="change-note">Estimación congelada al aprobar{change.appliedAt?" el "+formatDay(change.appliedAt):""}.</p>}

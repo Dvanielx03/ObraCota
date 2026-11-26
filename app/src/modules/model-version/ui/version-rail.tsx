@@ -53,7 +53,7 @@ export function VersionRail({ project, version, control, compare }: { project: s
         <div className="version-rail-empty"><EmptyArt kind="revisions" width={56}/></div></>
       : <ol>{versions.map((item, index) => {
           const open = item.id === version;
-          const Icon = item.format === "DWG" ? DraftingCompass : Box;
+          const Icon = item.format === "DWG" || item.format === "DXF" ? DraftingCompass : Box;
           const summary = revisionSummary(item);
           const key = index < 9 ? String(index + 1) : undefined;
           const hint = key ? "\nTecla " + key : "";

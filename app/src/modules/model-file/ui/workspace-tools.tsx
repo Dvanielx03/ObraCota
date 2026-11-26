@@ -34,6 +34,9 @@ type Tool = "render" | "compare" | "download";
 const TYPING = "input,textarea,select,[contenteditable]:not([contenteditable=false])";
 const HINT = "Haz clic en una pieza o arrastra para seleccionar una zona.";
 const MISS = "Ahí no hay ninguna pieza: haz clic sobre el modelo o arrastra para marcar una zona.";
+/** On a plan the marks name DWG entities: a text, a dimension near its text, or the entity of a stroke. */
+const PLAN_HINT = "Haz clic en un texto, una cota o un trazo del plano, o arrastra para marcar una zona.";
+const PLAN_MISS = "Ahí no hay ninguna entidad: haz clic sobre un trazo o un texto del plano, o arrastra para marcar una zona.";
 const LIMIT = "Puedes poner hasta " + EDIT_MARK_LIMIT + " marcas. Quita una para añadir otra.";
 /** Side of the zone that «Añadir marca en el centro» draws when no piece is under the centre. */
 const CENTER_ZONE = 0.24;
@@ -74,6 +77,8 @@ export interface EditControl {
   changeLimit?: string;
   /** The public sample (a GLB, not an editable IFC): why the agent and «Guardar en el modelo» are off on it. */
   sample?: string;
+  /** A DWG or DXF drawing: its marks are entities (DWG handles) and its revisions are DXF. */
+  drawing?: boolean;
 }
 
 const pieceName = (piece: ElementInfo) => piece.name || piece.type;
@@ -155,7 +160,7 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
   const base = scope ? optionsPath(scope.project, scope.version) : null;
   // A selection too long for one request still lets the budget be read, under the framing's key.
   const historyKey = !viewScope && tooLong ? VIEW_KEY : key;
-  const state = useOptionHistory(!plan && base ? base : null, !plan && base ? historyKey : null);
+  const state = useOptionHistory(base ? base : null, base ? historyKey : null);
   const selectionName = pieces.map(pieceName).join(", ");
   const name = viewScope ? VIEW_NAME : selectionName;
   const noScope = signIn && !scope ? "Inicia sesión para renderizar" : scopeReason ?? "Disponible en una versión guardada de un modelo 3D";
@@ -175,7 +180,18 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
   useEffect(() => { if (tool) reload(); }, [tool, reload]);
   useEffect(() => onWorking(working), [working, onWorking]);
   useEffect(() => () => onWorking(false), [onWorking]);
-  const [choices, setChoices] = useState<OptionChoices>(DEFAULT_CHOICES);
+  // The chips of Renderizar outlive a reload, a version change in the rail and a return from another model of the
+  // same project (the workspace remounts these tools per version): kept per project in this tab's session storage.
+  const choicesKey = "obracota:render-choices:" + (scope?.project ?? "local");
+  const [choices, setChoices] = useState<OptionChoices>(() => {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(choicesKey) ?? "null") as Partial<OptionChoices> | null;
+      return stored ? { ...DEFAULT_CHOICES, ...stored } : DEFAULT_CHOICES;
+    } catch { return DEFAULT_CHOICES; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(choicesKey, JSON.stringify(choices)); } catch { /* private mode: the chips just reset */ }
+  }, [choicesKey, choices]);
   // Renderizar › Ver en el modelo 3D: the chips preview the finish on the model's exterior, locally.
   // Sending a request clears the chips but keeps the preview until «Restablecer materiales».
   const [livePreview, setLivePreview] = useState(true);
@@ -211,6 +227,14 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
   // Editar (DU-17): the sub-bar's active tool, the marks over the canvas and the pending global edit.
   const [active, setActive] = useState<EditActive>("select");
   const [marks, setMarks] = useState<EditMark[]>([]);
+  // A described mark is work not sent yet (marks are drawn for one camera pose): leaving or reloading asks first.
+  const unsent = marks.some((mark) => mark.text.trim().length > 0);
+  useEffect(() => {
+    if (!unsent) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsent]);
   const [openMark, setOpenMark] = useState<number | null>(null);
   const [markFocus, setMarkFocus] = useState<MarkFocus | null>(null);
   const [globalEdit, setGlobalEdit] = useState<SceneEdit | null>(null);
@@ -223,7 +247,7 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
   const [reveal, setReveal] = useState(false);
   const revealed = useCallback(() => setReveal(false), []);
   const confirm = useRef<HTMLDialogElement>(null), afterConfirm = useRef<(() => void) | null>(null);
-  const marking = edit.on && !plan && active === "select" && !tool && !reviewOpen;
+  const marking = edit.on && active === "select" && !tool && !reviewOpen;
   // One panel at a time: REVISAR closes the tool panel, and a tool panel closes REVISAR.
   useEffect(() => { if (reviewOpen) setTool(null); }, [reviewOpen]);
   const closeReview = useRef(onCloseReview);
@@ -250,6 +274,7 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
     return () => clearTimeout(timer);
   }, [lost]);
   const flash = (text: string) => setNotice({ text, at: Date.now() });
+  const miss = plan ? PLAN_MISS : MISS;
 
   const clearEdit = useCallback(() => {
     setMarks([]); setOpenMark(null); setGlobalEdit(null); setAreaPose(null); setLost(null); setEditError(""); setActive("select");
@@ -293,10 +318,12 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
   }
   function addPoint(clientX: number, clientY: number) {
     const hit = viewer()?.probe(clientX, clientY);
-    if (!hit) { flash(MISS); return; }
+    if (!hit) { flash(miss); return; }
     if (!canAddEditMark(marks)) { flash(LIMIT); return; }
     const info = edit.piece(hit.id);
-    const mark = pointMark(marks, { element: hit.id, guid: info?.guid, name: info ? pieceName(info) : "Pieza" }, hit.point);
+    // On a drawing the mark keeps the DWG entity under the click: its handle is what the agent changes.
+    const mark = pointMark(marks, { element: hit.id, guid: hit.entity?.handle ?? info?.guid,
+      name: hit.entity?.name ?? (info ? pieceName(info) : "Pieza") }, hit.point);
     openNew(mark, [...marks, mark]);
     addPiece(hit.id);
   }
@@ -328,7 +355,8 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
     const hit = viewer()?.probe(client.x, client.y);
     if (!hit) { flash("No hay ninguna pieza en esa dirección."); return; }
     const info = edit.piece(hit.id);
-    setMarks(replaceEditMark(marks, { ...mark, element: hit.id, guid: info?.guid, name: info ? pieceName(info) : "Pieza", at: hit.point }));
+    setMarks(replaceEditMark(marks, { ...mark, element: hit.id, guid: hit.entity?.handle ?? info?.guid,
+      name: hit.entity?.name ?? (info ? pieceName(info) : "Pieza"), at: hit.point }));
     if (hit.id !== mark.element) {
       const others = edit.selection.filter((id) => id !== mark.element || pieceStillMarked(marks, mark.element, mark.id));
       edit.onSelection(others.includes(hit.id) ? others : [...others, hit.id]);
@@ -376,7 +404,7 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
   const costLine = budget ? "Reserva " + formatUsd(budget.reserve_cents) + " · quedan " + formatUsd(budget.remaining_cents) : undefined;
   const pill: EditPill | null = editError && sending !== "global" && !(active && active !== "select") ? { text: editError, tone: "error" }
     : sending === "marks" ? { text: "Enviando la edición…", tone: "cost", busy: true }
-    : marking && !marks.length ? { text: HINT, tone: "hint" }
+    : marking && !marks.length ? { text: plan ? PLAN_HINT : HINT, tone: "hint" }
     : hasEditText(marks) ? { text: (pieces.length && tooLong ? sendReason : aiReason) ?? costLine ?? "", tone: "cost" }
     : null;
 
@@ -385,7 +413,7 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
   const [agentRun, setAgentRun] = useState<AgentRunState | null>(null);
   const agentRequest = useRef<AbortController | null>(null);
   useEffect(() => () => agentRequest.current?.abort(), []);
-  const agentProject = edit.on && !plan && !edit.sample ? scope?.project : undefined;
+  const agentProject = edit.on && !edit.sample ? scope?.project : undefined;
   useEffect(() => {
     if (!agentProject) return;
     const abort = new AbortController();
@@ -508,7 +536,6 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
     run(name) {
       const now = latest.current;
       if (name === "review") { now.clickReview(); return undefined; }
-      if (now.plan) return "No disponible en un plano 2D";
       if (name === "render") { if (now.unavailable) return now.unavailable; now.toggle("render"); return undefined; }
       if (name === "edit") { if (now.editReason && !now.editing) return now.editReason; now.toggleEdit(); return undefined; }
       if (name === "compare" || name === "download") {
@@ -534,13 +561,13 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
 
   const port = viewer();
   return <>
-    {edit.on && !plan && host && port && <EditMarksLayer viewer={port} host={host} marks={marks} marking={marking} open={openMark} focus={markFocus}
+    {edit.on && host && port && <EditMarksLayer viewer={port} host={host} marks={marks} marking={marking} open={openMark} focus={markFocus}
       areaPose={areaPose} sendReason={sendReason} sendTitle={sendTitle} sending={sending === "marks"}
       propose={{ reason: proposeOff, title: proposeTitle, busy: running, run: () => void propose() }} onOpen={setOpenMark} onPoint={addPoint} onArea={addArea}
       onText={(id, text) => setMarks((list) => setEditMarkText(list, id, text))} onRemove={removeMark} onMove={moveMark}
-      onMiss={() => flash(MISS)} onCameraMoved={areasLost} onSend={() => void send("marks")} />}
+      onMiss={() => flash(miss)} onCameraMoved={areasLost} onSend={() => void send("marks")} />}
     {notice && <p key={notice.at} className="workspace-toast edit-toast" role="status">{notice.text}</p>}
-    {agentRun && <AgentRunPanel value={agentRun} onClose={() => setAgentRun(null)} />}
+    {agentRun && <AgentRunPanel value={agentRun} drawing={edit.drawing} onClose={() => setAgentRun(null)} />}
     {lost && <div key={lost.at} className="workspace-toast edit-toast" data-action="" role="status">
       <span>{lost.marks.length === 1 ? "Se quitó la zona marcada: solo valía para el encuadre anterior." : "Se quitaron las zonas marcadas: solo valían para el encuadre anterior."}</span>
       <button type="button" onClick={restoreAreas}>Deshacer</button>
@@ -548,14 +575,14 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
     <div ref={bars} className="workspace-bars" data-editing={edit.on || undefined} data-compact={compact || undefined}>
       <span aria-hidden="true" />
       <RovingToolbar label="Acciones del modelo" className="tool-bar">
-        {!plan && <>
+        {<>
           <ModeButton ref={renderButton} icon={Sparkles} label="Renderizar" aria-label="Renderizar opciones visuales" aria-haspopup="dialog" shortcut={TOOL_KEYS.render} busy={working}
             aria-expanded={tool === "render"} aria-controls="tool-render" disabledReason={unavailable} onClick={() => toggle("render")} />
           <ModeButton ref={editButton} icon={Pencil} label="Editar" data-prisma-tour="open" aria-pressed={edit.on}
             shortcut={TOOL_KEYS.edit} disabledReason={edit.on ? undefined : edit.reason} onClick={toggleEdit} />
         </>}
         {review}
-        {!plan && <>
+        {<>
           <ModeButton icon={Footprints} label="Recorrido" className="walk-trigger" disabledReason={walk.reason}
             shortcut={TOOL_KEYS.walk} onClick={startWalk} />
           <ToolSeparator />
@@ -567,7 +594,7 @@ export function WorkspaceTools({ viewer, plan, scope, scopeReason, signIn, piece
       </RovingToolbar>
       {camera}
     </div>
-    {edit.on && !plan && <EditBar anchor={editButton} hidden={!!tool || reviewOpen} active={active} onActive={changeActive} marks={marks.length} edit={globalEdit} pill={pill}
+    {edit.on && <EditBar anchor={editButton} hidden={!!tool || reviewOpen} active={active} onActive={changeActive} marks={marks.length} edit={globalEdit} pill={pill}
       addReason={marks.length >= EDIT_MARK_LIMIT ? "Ya hay " + EDIT_MARK_LIMIT + " marcas: quita una para añadir otra" : undefined} onAddCenter={addCenter}
       resetReason={marks.length || globalEdit ? undefined : "No hay ediciones que restablecer"} onReset={resetEdits}
       cost={cost} applyReason={applyReason} applying={sending === "global"} error={sending ? undefined : editError || undefined}

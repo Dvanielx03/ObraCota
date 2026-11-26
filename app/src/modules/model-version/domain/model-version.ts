@@ -1,5 +1,5 @@
 export interface ModelVersion {
-  id: string; fileId: string; revision: number; name: string; format: "IFC" | "DWG" | "RVT" | "FBX" | "OBJ";
+  id: string; fileId: string; revision: number; name: string; format: "IFC" | "DWG" | "DXF" | "RVT" | "FBX" | "OBJ";
   byteSize: number; sha256: string; uploadedAt: string; uploadedBy: string; uploaderEmail: string;
 }
 export const MAX_ORIGINAL_BYTES = 256 * 1024 * 1024;

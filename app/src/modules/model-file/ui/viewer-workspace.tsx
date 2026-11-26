@@ -297,10 +297,16 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
         setTab("reading");setModel(next);setOpenedBytes(file?.size??0);
         setGuide(step=>step==="done"?"off":step==="note"||step==="review"?"select":step);
         const target=file && file===initialFile ? new URLSearchParams(window.location.search).get("element") : null;
-        const initial = target ? next.elements.find(item=>item.guid===target || item.id===target)
+        // On a drawing the reference may be a DWG handle: a text or dimension by its handle, or the layer of strokes that holds it.
+        let initial = target ? next.elements.find(item=>item.guid===target || item.id===target || item.annotation?.handle===target)
           : next.sample ? next.elements.find(item=>item.id.endsWith("_d-viga")) : undefined;
+        if(target && !initial && next.drawing){
+          const holder=viewer.current.locateHandle(target);
+          initial=holder ? next.elements.find(item=>item.id===holder) : undefined;
+        }
         if(target && initial){viewer.current.locate(initial.id);setTab("properties");}
-        if(target && !initial)setError("La referencia del documento no coincide con una pieza visible de esta versión.");
+        if(target && !initial)setError(next.drawing?"La entidad "+target+" no está en el espacio modelo de esta versión del plano."
+          :"La referencia del documento no coincide con una pieza visible de esta versión.");
         setIds(initial?[initial.id]:[]);
         setSelected(initial?.id ?? null);viewer.current?.select(initial?.id ?? null);setStatus("");
       }
@@ -342,8 +348,10 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   // later loads in the same visit (another file, another version) show the file being read.
   const [entered,setEntered] = useState(false);
   useEffect(()=>{if(ready)setEntered(true);},[ready]);
-  // Editar, Renderizar and the walk work on any 3D model: IFC, a 3D DWG, FBX, OBJ or the sample; not on a plan.
+  // The walk and the guides of Editar work on any 3D model: IFC, a 3D DWG, FBX, OBJ or the sample; not on a plan.
   const prismaAvailable=ready && !plan;
+  // Editar and Renderizar work on any open model, a 2D plan included: on a DWG or DXF the marks name its entities.
+  const editAvailable=ready;
   // The quick tour follows what the person does and skips a stop whose control this file lacks.
   useEffect(()=>{
     if(!ready || !quick || quickPaused)return;
@@ -381,7 +389,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
   // and the panorama work and persist as on a saved version; without one they ask to sign in.
   const sampleOpen = !!model?.sample;
   const sampleScope = useSampleScope(sampleOpen);
-  const toolScope = plan ? undefined : serverNotes && storedVersion ? storedVersion : sampleScope.state === "ready" ? sampleScope.scope : undefined;
+  const toolScope = serverNotes && storedVersion ? storedVersion : sampleScope.state === "ready" ? sampleScope.scope : undefined;
   const sampleSignIn = sampleScope.state === "signed-out" ? SAMPLE_SIGN_IN : undefined;
   const sampleReason = sampleScope.state === "checking" ? "Preparando el ejemplo en el servidor…"
     : sampleScope.state === "error" ? "No se pudo preparar el ejemplo en el servidor: " + sampleScope.message : undefined;
@@ -559,7 +567,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
         {notice && <p key={notice.at} className="workspace-toast" data-tone={notice.tone} role={notice.tone==="error"?"alert":undefined}
           aria-hidden={notice.tone==="error"?undefined:true}>{notice.text}</p>}
         {!plan && !touring && <div className="cube-host" hidden={!ready}><ViewCube flat={false} orient={view=>viewer.current?.orient(view)}/></div>}
-        {touring && <p className="walk-hint" role="status" data-tone={walkError?"error":undefined}>{walkError||(walkLoading?<><Spinner size={12}/>{walkLoading}</>:null)||(walk==="mark"?"Elige un punto libre en el piso. Pulsa Intro para probar el centro.":<><span className="walk-keyboard">Arrastra para mirar · WASD o flechas para caminar</span><span className="walk-touch">Arrastra para mirar. Mantén pulsada una flecha para caminar.</span></>)}</p>}
+        {touring && <p className="walk-hint" role="status" data-tone={walkError?"error":undefined}>{walkError||(walkLoading?<><Spinner size={12}/>{walkLoading}</>:null)||(walk==="mark"?"Elige un punto libre en el piso. Pulsa Intro para probar el centro.":<><span className="walk-keyboard">Arrastra para mirar · WASD o flechas para caminar · Mayús para correr</span><span className="walk-touch">Arrastra para mirar. Mantén pulsada una flecha para caminar.</span></>)}</p>}
         {walk==="active" && walkPublished && !walkEditor && <p className="walk-save" role="status">Nueva revisión publicada. <a href={walkPublished.href}>Abrir versión en el visor</a></p>}
         {walk==="active" && walkEditor && viewer.current && storedVersion && walkBase && <WalkFinishEditor viewer={viewer.current}
           project={storedVersion.project} version={walkPublished?.version??storedVersion.version} base={walkBase}
@@ -598,7 +606,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
         {ready && !touring && model && <WorkspaceTools key={(serverNotes?"server:":"local:")+(model.versionId??model.name)} control={tools} viewer={readViewer} plan={plan}
           scope={toolScope} scopeReason={sampleReason} signIn={sampleSignIn} pieces={optionPieces} onWorking={setOptionsWorking}
           proposal={proposal && showingInitial?{renderReason:PROPOSAL_RENDER,compare:proposal.compare({elements:model.elements,viewer:readViewer,selected})}:undefined}
-          edit={{on:assistant,grouping,sample:model.sample?SAMPLE_EDIT:undefined,nonIfc:model.sample || /^IFC/i.test(model.schema)?undefined:model.schema.split(" ")[0],changeLimit:changeLimitReason(openedBytes),reason:proposal && showingInitial?PROPOSAL_EDIT:prismaAvailable?undefined:"Editar necesita un modelo 3D (IFC, DWG 3D, FBX, OBJ o el ejemplo GLB); las propuestas de cambio solo funcionan con IFC",
+          edit={{on:assistant,grouping,drawing:/^(DWG|DXF)/i.test(model.schema),sample:model.sample?SAMPLE_EDIT:undefined,nonIfc:model.sample || /^(IFC|DWG|DXF)/i.test(model.schema)?undefined:model.schema.split(" ")[0],changeLimit:changeLimitReason(openedBytes),reason:proposal && showingInitial?PROPOSAL_EDIT:editAvailable?undefined:"Abre un modelo o un plano para editarlo",
             selection:ids,onSelection:next=>{setIds(next);setColor(null);},piece:findElement,onFocusPiece:setEditFocus,
             onEnter:enterEdit,onExit:exitEdit,onUngroup:()=>setGrouping(false)}}
           reviewOpen={reviewOpen} onCloseReview={()=>review.current?.close()}
@@ -607,7 +615,7 @@ export function ViewerWorkspace({ returnHref, returnLabel = "Volver al panel", i
           walk={{reason:model.walk && prismaAvailable?undefined:model.sceneWalk && prismaAvailable?"Este modelo no tiene un piso propio: aplica una escena en Editar › Escena y recórrela sobre su suelo"
             :"Disponible en un modelo 3D con unidades verificables (IFC, DWG 3D o FBX)",
             sceneReason:model.sceneWalk && prismaAvailable?undefined:"Necesita un modelo 3D con unidades verificables (IFC, DWG 3D con unidad declarada o FBX); un OBJ no declara unidades",
-            onStart:startWalk,onScene:showScene}}
+            onStart:startWalk,onScene:plan?undefined:showScene}}
           camera={<RovingToolbar label="Controles de la cámara" className="tools">
             {!plan && <><IconTool icon={Rotate3d} aria-label="Orbitar" aria-pressed={!pan} onClick={()=>cameraMode(false)}/>
             <IconTool icon={Hand} aria-label="Desplazar" aria-pressed={pan} onClick={()=>cameraMode(true)}/><ToolSeparator/></>}

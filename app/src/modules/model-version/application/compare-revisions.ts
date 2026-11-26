@@ -33,9 +33,11 @@ export async function compareRevisions({ project, open, other, model, repository
   project: string; open: ModelVersion; other: ModelVersion; model: ModelInfo; repository: VersionRepository; signal: AbortSignal;
 }): Promise<RevisionComparison> {
   if (open.fileId !== other.fileId) throw new Error("Solo se comparan revisiones del mismo archivo.");
-  if (open.format !== other.format) throw new Error("Las dos revisiones tienen formatos distintos.");
+  const drawing = (format: string) => format === "DWG" || format === "DXF";
+  // A drawing's revisions are DXF: a DWG and its DXF revision compare by handle like two DWG.
+  if (open.format !== other.format && !(drawing(open.format) && drawing(other.format))) throw new Error("Las dos revisiones tienen formatos distintos.");
   if (open.format === "IFC") return { kind: "ifc", diff: await authenticated<Diff>(diffPath(project, open.id, other.id), { signal }) };
-  if (open.format === "DWG") {
+  if (drawing(open.format)) {
     if (!model.drawing) throw new Error("Abre el plano para compararlo con otra versión.");
     const { readDrawingIndex, drawingUnits } = await import("@/viewer/infrastructure/model-source");
     const file = await repository.open(project, other.id, signal);
@@ -44,5 +46,5 @@ export async function compareRevisions({ project, open, other, model, repository
     const result = compareDrawings(index.labels, model.elements);
     return { kind: "drawing", changes: result.changes, ambiguous: result.ambiguous };
   }
-  throw new Error("Comparar versiones funciona con IFC y DWG.");
+  throw new Error("Comparar versiones funciona con IFC y con planos DWG o DXF.");
 }

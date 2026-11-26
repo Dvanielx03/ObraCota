@@ -16,6 +16,7 @@ const visor=(project:string,version:string,guid:string)=>"/proyectos/"+project+"
 export const proposalHref=(change:Pick<ModelChange,"project"|"id">,guid?:string)=>
   "/proyectos/"+change.project+"/cambios/"+change.id+"/vista"+(guid?"?element="+encodeURIComponent(guid):"");
 const entryName=(entry:Pick<DiffEntry,"name"|"guid">)=>ifcText(entry.name)??"Sin nombre";
+const diffDrawing=(change:ModelChange)=>!!change.report?.diff?.drawing||change.format==="DWG"||change.format==="DXF";
 
 /** Section 2: the recipe in words, each operation with what the engine said about it. */
 export function ChangeRecipe({change,labels}:{change:ModelChange;labels:Record<string,string>}){
@@ -81,8 +82,9 @@ export function ChangeDiff({change}:{change:ModelChange}){
           <span>{entry.class} · {entryName(entry)} · <code title={entry.guid}>{shortGuid(entry.guid)}</code></span>
           <span className="change-flags">{unexpectedReasons[entry.reason??""]??entry.reason}{entry.flags?.length?" · "+flagLabels(entry).join(" · "):""}</span>
         </li>)}</ul></div>}
-      {(()=>{const openings=diff.openings,list=[...openings.changed,...openings.added,...openings.deleted,...openings.unfilled];
+      {!diff.drawing && (()=>{const openings=diff.openings,list=[...openings.changed,...openings.added,...openings.deleted,...openings.unfilled];
         return list.length?<><p>Huecos</p><DiffList entries={list}/></>:<p>Huecos · Sin cambios</p>;})()}
+      {diff.drawing && <p className="change-note">Comparación por handle de las entidades del espacio modelo, entre el DXF de la base y la revisión DXF.</p>}
       {diff.geometry && <p className="change-note">IfcDiff comparó la geometría de {diff.geometry.elements_compared} de {diff.geometry.elements} elementos
         y de {diff.geometry.openings_compared} de {diff.geometry.openings} huecos; el resto se comparó por atributos y relaciones.</p>}
     </>}
@@ -96,7 +98,8 @@ export function ChangeValidation({change}:{change:ModelChange}){
     {!change.report?<p className="change-note">{change.legacyReview?LEGACY:"Previsualiza el cambio para validar el archivo."}</p>
     :!validation?<p className="change-note">El motor no devolvió la validación.</p>:<>
       <ul className="change-list">{validation.layers.map(layer=><li key={layer.layer} data-status={layer.status}>
-        <span>{layer.name}{layer.layer===2 && layer.status!=="NOT_RUN"?": "+(layer.new_issues?.length??0)+" problemas nuevos (la base tiene "+(layer.base_issues??0)+")":""}</span>
+        <span>{layer.name}{layer.layer===2 && layer.status!=="NOT_RUN"?(diffDrawing(change)?": "+(layer.new_issues?.length??0)+" diferencias de lectura"
+          :": "+(layer.new_issues?.length??0)+" problemas nuevos (la base tiene "+(layer.base_issues??0)+")"):""}</span>
         <span className={layer.status==="FAIL"?"change-fail":undefined}>{layerStatus[layer.status]??layer.status}{layer.reason?" · "+layer.reason:""}</span>
       </li>)}</ul>
       {!!validation.skipped.length && <details><summary>Capas omitidas ({validation.skipped.length})</summary>

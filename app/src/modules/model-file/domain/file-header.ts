@@ -5,7 +5,10 @@
  */
 export const HEADER_BYTES = 4096;
 
-export const MODEL_EXTENSIONS = [".ifc", ".dwg", ".rvt", ".fbx", ".obj"] as const;
+export const MODEL_EXTENSIONS = [".ifc", ".dwg", ".dxf", ".rvt", ".fbx", ".obj"] as const;
+/** An ASCII DXF: optional 999 comments, then its first section (the server reads it the same way); or a binary DXF. */
+const DXF_HEAD = /^\s*(?:999\s*\r?\n[^\n]*\r?\n\s*)*0\s*\r?\n\s*SECTION\b/;
+const isDxf = (head: string) => head.startsWith("AutoCAD Binary DXF") || DXF_HEAD.test(head);
 /** The `accept` of the file pickers that open or store a model. */
 export const MODEL_ACCEPT = MODEL_EXTENSIONS.join(",");
 /** Stable hook of the project upload input for the end-to-end suites; its visible label may change. */
@@ -20,7 +23,7 @@ const KNOWN: { test: (head: string, bytes?: Uint8Array) => boolean; what: string
   { test: head => head.startsWith("PK"), what: "un archivo ZIP", hint: "Descomprímelo y sube el DWG, IFC, FBX u OBJ que contiene." },
   { test: head => head.startsWith("%PDF"), what: "un PDF", hint: "Sube el plano original en DWG o el modelo en IFC." },
   { test: head => head.startsWith("Rar!"), what: "un archivo RAR", hint: "Descomprímelo y sube el DWG, IFC, FBX u OBJ que contiene." },
-  { test: head => /^\s*0\s*\r?\n\s*SECTION/.test(head), what: "un DXF", hint: "Guárdalo como DWG desde tu programa de dibujo y súbelo de nuevo." },
+  { test: head => isDxf(head), what: "un DXF", hint: "Cámbiale la extensión a .dxf." },
   { test: head => /^\s*newmtl\s/m.test(head) && !/^\s*[vf]\s/m.test(head), what: "una biblioteca de materiales MTL", hint: "Sube el .obj que la acompaña: el visor dibuja las mallas con colores neutros." },
   { test: head => head.startsWith("Kaydara FBX Binary") || head.startsWith("; FBX"), what: "un FBX", hint: "Cámbiale la extensión a .fbx." },
 ];
@@ -46,6 +49,7 @@ function matches(format: string, head: string, complete: boolean, bytes?: Uint8A
   const text = head.replace(/^﻿/, "").trimStart();
   switch (format) {
     case "DWG": return /^AC10\d\d/.test(head);
+    case "DXF": return isDxf(head);
     case "RVT": return isOle(bytes);
     case "IFC": return text.startsWith("ISO-10303-21;");
     case "FBX": return head.startsWith("Kaydara FBX Binary  \0") || text.startsWith("; FBX");
@@ -54,15 +58,15 @@ function matches(format: string, head: string, complete: boolean, bytes?: Uint8A
 }
 
 /**
- * Why a file cannot be a valid IFC, DWG, RVT, FBX or OBJ, or null when its header matches its extension.
+ * Why a file cannot be a valid IFC, DWG, DXF, RVT, FBX or OBJ, or null when its header matches its extension.
  * `complete` says the head is the whole file (shorter than HEADER_BYTES, as the server decides), so its
  * last line is whole. `bytes` are the same first bytes undecoded: the binary signature of an RVT does not
  * survive the UTF-8 decoding of `head`, so without them an RVT is never valid.
  */
 export function headerProblem(name: string, head: string, complete = new TextEncoder().encode(head).length < HEADER_BYTES, bytes?: Uint8Array): string | null {
   const extension = name.toLowerCase().split(".").pop() ?? "";
-  const expected = ({ dwg: "DWG", ifc: "IFC", rvt: "RVT", fbx: "FBX", obj: "OBJ" } as Record<string, string>)[extension];
-  if (!expected) return "Elige un archivo .ifc, .dwg, .rvt, .fbx u .obj.";
+  const expected = ({ dwg: "DWG", dxf: "DXF", ifc: "IFC", rvt: "RVT", fbx: "FBX", obj: "OBJ" } as Record<string, string>)[extension];
+  if (!expected) return "Elige un archivo .ifc, .dwg, .dxf, .rvt, .fbx u .obj.";
   if (matches(expected, head, complete, bytes)) return null;
   const known = KNOWN.find(kind => kind.test(head, bytes));
   return known

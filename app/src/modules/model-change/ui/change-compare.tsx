@@ -21,7 +21,9 @@ export function ChangeCompare({diff,elements,viewer,selected,note="Para verlas d
     {title:"Elementos añadidos",entries:diff.added,flags:false},
     {title:"Elementos eliminados",entries:diff.deleted,flags:false},
   ].filter(section=>section.entries.length):[],[diff]);
-  const byGuid=useMemo(()=>new Map(elements.filter(item=>item.guid).map(item=>[item.guid!,item.id])),[elements]);
+  // A drawing's entries are DWG handles: its texts and dimensions are found by their handle.
+  const byGuid=useMemo(()=>new Map([...elements.filter(item=>item.annotation?.handle).map(item=>[item.annotation!.handle,item.id] as const),
+    ...elements.filter(item=>item.guid).map(item=>[item.guid!,item.id] as const)]),[elements]);
   const listed=useMemo(()=>sections.flatMap(section=>section.entries),[sections]);
   const ids=useMemo(()=>[...new Set(listed.map(entry=>byGuid.get(entry.guid)).filter((id):id is string=>!!id))],[listed,byGuid]);
   const shown=listed.filter(entry=>byGuid.has(entry.guid)).length;
@@ -56,13 +58,13 @@ export function ChangeCompare({diff,elements,viewer,selected,note="Para verlas d
       <code title={entry.guid}>{shortGuid(entry.guid)}</code>
       {section.flags && !!entry.flags?.length && <span className="change-compare-flags">{flagLabels(entry).join(" · ")}</span>}
       {byGuid.has(entry.guid)
-        ?<button type="button" className="change-compare-locate" onClick={()=>viewer()?.locate(byGuid.get(entry.guid)!)}>Localizar en 3D</button>
+        ?<button type="button" className="change-compare-locate" onClick={()=>viewer()?.locate(byGuid.get(entry.guid)!)}>{diff.drawing?"Localizar en el plano":"Localizar en 3D"}</button>
         :<span className="change-compare-flags">No está en el modelo abierto</span>}
     </li>)}</ul>):<p className="change-compare-note">IfcDiff no encontró elementos cambiados, añadidos ni eliminados.</p>}
     {!!diff.unexpected?.length && <p className="change-compare-unexpected">{diff.unexpected.length} fuera del alcance declarado: revísalos en la tarjeta del cambio.</p>}
     <label className="change-compare-toggle" title={ids.length?undefined:"Ningún elemento de la lista está en el modelo abierto"}>
       <input type="checkbox" checked={highlight} disabled={!ids.length} onChange={event=>toggle(event.target.checked)}/>
-      Resaltar en 3D{shown<listed.length && ids.length?" ("+shown+" de "+listed.length+")":""}
+      {diff.drawing?"Resaltar en el plano":"Resaltar en 3D"}{shown<listed.length && ids.length?" ("+shown+" de "+listed.length+")":""}
     </label>
     {note && <p className="change-compare-note">{note}</p>}
   </div>;

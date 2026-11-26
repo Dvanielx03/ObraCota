@@ -85,7 +85,10 @@ export function solidGroups(mesh: SolidMesh, origin: number[] | null, colors: Re
     const types: Record<string, number> = {};
     const min = [Infinity, Infinity], max = [-Infinity, -Infinity];
     let v = 0, t = 0;
+    // Triangle ranges of each body, so a click on a solid names its DWG handle (Editar, model changes).
+    const entities: { start: number; handle: string; type: string }[] = [];
     for (const body of bodies) {
+      entities.push({ start: t, handle: body.handle, type: body.type });
       for (let i = 0; i < body.vertex_count; i++) {
         const from = (body.first_vertex + i) * 3, to = (v + i) * 3;
         const x = positions[from] * scale + shift[0], y = positions[from + 1] * scale + shift[1], z = positions[from + 2] * scale + shift[2];
@@ -106,6 +109,8 @@ export function solidGroups(mesh: SolidMesh, origin: number[] | null, colors: Re
     const node = new T.Mesh(geometry, new T.MeshStandardMaterial({ color, side: T.DoubleSide, roughness: .6, metalness: .05 }));
     const id = layer + "/solids";
     node.userData.elementId = id;
+    node.userData.entities = entities;
+    node.userData.layer = layer;
     nodes.push(node);
     elements.push({ id, name: "Sólidos · " + layer, level: layer, type: "Sólidos ACIS", count: bodies.length, cad: { types, min, max } });
   }
