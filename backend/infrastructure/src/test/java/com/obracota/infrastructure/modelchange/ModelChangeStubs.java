@@ -114,6 +114,11 @@ public final class ModelChangeStubs {
 
         @Override public Map<String, Object> element(VersionRef version, String guid) { return Map.of("guid", guid); }
 
+        @Override public Map<String, Object> dwgEntity(VersionRef version, String handle) {
+            return Map.of("handle", handle, "type", "MTEXT", "layer", "Text", "color", 256, "text", "LIVING ROOM",
+                "plain_text", "LIVING ROOM", "position", List.of(130.1, 170.7), "units", Map.of("insunits", 6, "name", "m", "to_mm", 1000));
+        }
+
         @Override public Checks check(VersionRef base, Recipe recipe) {
             if (checkPauseMillis > 0) {
                 try {
@@ -145,7 +150,9 @@ public final class ModelChangeStubs {
             details.put("diff", Map.of("changed", List.of(), "added", List.of(), "deleted", List.of(), "unexpected", List.of()));
             details.put("validation", Map.of("layers", List.of()));
             if (!ok) return new PreviewReport(false, "recipe", null, results, List.of(), List.of(), details);
-            var bytes = ("ISO-10303-21;\n/* rev " + n + " */").getBytes(StandardCharsets.UTF_8);
+            // A drawing's revision is a DXF: a 999 comment, then the first section, as VolumeStorage checks it.
+            var bytes = (recipe.drawing() ? "999\nrev " + n + "\n  0\nSECTION\n  2\nENTITIES\n  0\nENDSEC\n  0\nEOF\n"
+                : "ISO-10303-21;\n/* rev " + n + " */").getBytes(StandardCharsets.UTF_8);
             var id = HexFormat.of().formatHex(Arrays.copyOf(sha256(("artifact" + n).getBytes(StandardCharsets.UTF_8)), 16));
             artifacts.put(id, bytes);
             return new PreviewReport(true, "recipe", new PreviewReport.Artifact(id, HexFormat.of().formatHex(sha256(bytes)), bytes.length,

@@ -27,6 +27,10 @@ public final class JacksonRecipeCodec implements RecipeCodec {
     private static final Set<String> CHANGE_TYPE_FIELDS = Set.of("id", "op", "element", "type_id");
     private static final Set<String> SET_PROPERTY_FIELDS = Set.of("id", "op", "element", "scope", "pset", "property", "value", "price_key");
     private static final Set<String> SET_MATERIAL_FIELDS = Set.of("id", "op", "element", "elements", "material", "category", "color", "price_key");
+    private static final Set<String> DWG_TEXT_FIELDS = Set.of("id", "op", "element", "text");
+    private static final Set<String> DWG_LAYER_FIELDS = Set.of("id", "op", "element", "layer");
+    private static final Set<String> DWG_COLOR_FIELDS = Set.of("id", "op", "element", "color");
+    private static final Set<String> DWG_MOVE_FIELDS = Set.of("id", "op", "element", "dx", "dy", "unit");
     private static final Set<String> RECIPE_FIELDS = Set.of("format", "operations");
     private static final int JSON_LIMIT = 64 * 1024;
 
@@ -100,6 +104,15 @@ public final class JacksonRecipeCodec implements RecipeCodec {
                 node.put("color", finish.color());
                 node.put("price_key", finish.priceKey() == null ? null : finish.priceKey().value());
             }
+            case DwgSetText text -> node.put("text", text.text());
+            case DwgSetLayer layer -> node.put("layer", layer.layer());
+            case DwgSetColor color -> node.put("color", color.color());
+            case DwgMove move -> {
+                node.put("dx", move.dx());
+                node.put("dy", move.dy());
+                node.put("unit", move.unit());
+            }
+            case DwgAddNote note -> node.put("text", note.text());
         }
         return node;
     }
@@ -131,6 +144,30 @@ public final class JacksonRecipeCodec implements RecipeCodec {
                 yield guarded(() -> new SetMaterial(id, elements, text(node, "material", position), text(node, "category", position),
                     text(node, "color", position), priceKey == null ? null : new PriceKey(priceKey)));
             }
+            case DwgSetText.OP -> {
+                fields(node, DWG_TEXT_FIELDS, "la operación " + position);
+                yield guarded(() -> new DwgSetText(id, text(node, "element", position), text(node, "text", position)));
+            }
+            case DwgSetLayer.OP -> {
+                fields(node, DWG_LAYER_FIELDS, "la operación " + position);
+                yield guarded(() -> new DwgSetLayer(id, text(node, "element", position), text(node, "layer", position)));
+            }
+            case DwgSetColor.OP -> {
+                fields(node, DWG_COLOR_FIELDS, "la operación " + position);
+                var color = node.get("color");
+                if (color == null || !color.canConvertToExactIntegral() || !color.isNumber())
+                    throw invalid("El color de la operación " + position + " es un índice de AutoCAD de 0 a 256.");
+                yield guarded(() -> new DwgSetColor(id, text(node, "element", position), color.intValue()));
+            }
+            case DwgMove.OP -> {
+                fields(node, DWG_MOVE_FIELDS, "la operación " + position);
+                yield guarded(() -> new DwgMove(id, text(node, "element", position), number(node, "dx", position),
+                    number(node, "dy", position), text(node, "unit", position)));
+            }
+            case DwgAddNote.OP -> {
+                fields(node, DWG_TEXT_FIELDS, "la operación " + position);
+                yield guarded(() -> new DwgAddNote(id, text(node, "element", position), text(node, "text", position)));
+            }
             case REMOVE -> throw new UnprocessableApplicationException("OPERATION_NOT_ENABLED", "Eliminar elementos llega en H5.");
             default -> throw invalid("La operación " + position + " no es una operación conocida.");
         };
@@ -143,6 +180,12 @@ public final class JacksonRecipeCodec implements RecipeCodec {
         if (node.isBoolean()) return new PropertyValue.Bool(node.asBoolean());
         if (node.isNumber()) return new PropertyValue.Number(node.decimalValue());
         throw invalid("El valor de la operación " + position + " es texto, un booleano o un número.");
+    }
+
+    private static java.math.BigDecimal number(JsonNode node, String field, int position) {
+        var value = node.get(field);
+        if (value == null || !value.isNumber()) throw invalid("Falta el número " + field + " en la operación " + position + ".");
+        return value.decimalValue();
     }
 
     private static List<String> elements(JsonNode node, int position) {

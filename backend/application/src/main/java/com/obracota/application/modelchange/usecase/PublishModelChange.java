@@ -9,6 +9,7 @@ import com.obracota.domain.modelchange.model.ModelChange;
 import com.obracota.domain.modelchange.model.ModelChangeEvent;
 import com.obracota.domain.modelchange.model.ModelChangeEvent.Action;
 import com.obracota.domain.modelchange.port.*;
+import com.obracota.domain.modelfile.model.ModelFile;
 import com.obracota.domain.modelversion.model.ModelVersion;
 import com.obracota.domain.security.model.Actor;
 import java.io.IOException;
@@ -62,8 +63,9 @@ public final class PublishModelChange {
             if (!change.reportCurrent(hash) || !change.report().ok() || preview == null || !previews.exists(project, id, preview.id()))
                 throw new ConflictApplicationException("La vista previa no está vigente; previsualiza el cambio de nuevo.");
             ModelVersion revision;
+            var name = ModelFile.drawing(base.format()) ? drawingRevisionName(base.name(), base.revision() + 1) : base.name();
             try (var bytes = previews.read(project, id, preview.id())) {
-                revision = versions.upload(project, actor.user(), base.fileId(), base.name(), preview.size(), bytes);
+                revision = versions.upload(project, actor.user(), base.fileId(), name, preview.size(), bytes);
             }
             if (!revision.sha256().equalsIgnoreCase(preview.sha256()))
                 throw new ConflictApplicationException("La revisión no coincide con la vista previa aprobada; previsualiza el cambio de nuevo.");
@@ -114,6 +116,18 @@ public final class PublishModelChange {
             return null;
         });
         return view(actor, project, id);
+    }
+
+    /**
+     * Name of the DXF revision of a drawing: {@code <original>-r<N>.dxf}, where the original loses its extension and the
+     * {@code -r<M>} of an earlier revision. {@code plano.dwg} at revision 2 is {@code plano-r2.dxf}.
+     */
+    public static String drawingRevisionName(String base, int revision) {
+        var dot = base.lastIndexOf('.');
+        var stem = (dot > 0 ? base.substring(0, dot) : base).replaceFirst("-r[0-9]+$", "");
+        var suffix = "-r" + revision + ".dxf";
+        if (stem.length() + suffix.length() > 255) stem = stem.substring(0, 255 - suffix.length());
+        return stem + suffix;
     }
 
     private ChangeView view(Actor actor, UUID project, UUID id) {

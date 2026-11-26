@@ -29,7 +29,7 @@ public record ModelChange(UUID id, UUID project, UUID file, UUID baseVersion, St
                           Publication applied, Estimate approvedEstimate, Publication restored, Discard discarded,
                           Instant createdAt, Instant updatedAt) {
     public static final int TEXT_LIMIT = 2000;
-    private static final Set<String> FORMATS = Set.of("IFC", "DWG");
+    private static final Set<String> FORMATS = Set.of("IFC", "DWG", "DXF");
 
     /** The verified IFC of the last ok preview, stored by the backend under its own id. */
     public record Preview(UUID id, String sha256, long size) {

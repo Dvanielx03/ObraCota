@@ -49,6 +49,7 @@ public class VolumeStorage implements OriginalStorage {
     /** Bytes read to judge a header. The form reads the same window (file-header.ts, HEADER_BYTES). */
     public static final int HEAD=4096;
     private static final byte[] FBX_BINARY="Kaydara FBX Binary  \0".getBytes(StandardCharsets.US_ASCII);
+    private static final java.util.regex.Pattern DXF_HEAD=java.util.regex.Pattern.compile("(?:999\\s*\\r?\\n[^\\n]*\\r?\\n\\s*)*0\\s*\\r?\\n\\s*SECTION\\b");
     /** Signature of an OLE compound file, the container Revit saves an RVT in. */
     private static final byte[] OLE={(byte)0xD0,(byte)0xCF,0x11,(byte)0xE0,(byte)0xA1,(byte)0xB1,0x1A,(byte)0xE1};
     // Statements of a Wavefront OBJ (geometry, grouping, materials and free-form curves) or a comment.
@@ -69,6 +70,8 @@ public class VolumeStorage implements OriginalStorage {
         return switch(format) {
             case "IFC" -> text.startsWith("ISO-10303-21;");
             case "DWG" -> text.matches("(?s)^AC10[0-9]{2}.*");
+            // ASCII DXF: optional 999 comments, then the first section; or the sentinel of a binary DXF.
+            case "DXF" -> text.startsWith("AutoCAD Binary DXF") || DXF_HEAD.matcher(text).lookingAt();
             case "RVT" -> head.length>=OLE.length && Arrays.equals(head,0,OLE.length,OLE,0,OLE.length);
             case "FBX" -> Arrays.equals(head,0,Math.min(head.length,FBX_BINARY.length),FBX_BINARY,0,FBX_BINARY.length) || text.startsWith("; FBX");
             case "OBJ" -> {

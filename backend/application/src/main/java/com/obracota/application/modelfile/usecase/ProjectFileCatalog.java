@@ -25,7 +25,7 @@ public record ProjectFileCatalog(ProjectRepository projects, ModelFileRepository
         Optional<ModelFile> existing = fileId == null ? files.named(project,name) : Optional.of(
             files.find(project,fileId).orElseThrow(NotFoundApplicationException::new));
         if (existing.isPresent()) {
-            if (!existing.get().format().equals(format)) throw new IllegalArgumentException("Formato distinto al del archivo");
+            if (!ModelFile.sameFamily(existing.get().format(), format)) throw new IllegalArgumentException("Formato distinto al del archivo");
             return existing.get();
         }
         ModelFile file = ModelFile.register(project,name);

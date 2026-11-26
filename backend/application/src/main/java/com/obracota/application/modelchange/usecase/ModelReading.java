@@ -3,7 +3,9 @@ package com.obracota.application.modelchange.usecase;
 import com.obracota.application.common.exception.InvalidRequestApplicationException;
 import com.obracota.application.common.exception.UnprocessableApplicationException;
 import com.obracota.application.modelversion.usecase.ProjectVersions;
+import com.obracota.domain.modelchange.model.recipe.DwgHandle;
 import com.obracota.domain.modelchange.model.recipe.GlobalId;
+import com.obracota.domain.modelfile.model.ModelFile;
 import com.obracota.domain.modelchange.port.ModelEnginePort;
 import com.obracota.domain.modelchange.port.ModelEnginePort.ElementQuery;
 import com.obracota.domain.modelchange.port.ModelEnginePort.VersionRef;
@@ -47,6 +49,15 @@ public final class ModelReading {
     public Map<String, Object> element(Actor actor, UUID project, UUID version, String guid) {
         var reference = reference(actor, project, version);
         return engine.element(reference, GlobalId.require(guid));
+    }
+
+    /** One entity of a DWG or DXF version by its handle, with the drawing's units (the agent's «Leer la entidad marcada»). */
+    public Map<String, Object> dwgEntity(Actor actor, UUID project, UUID version, String handle) {
+        Guards.reach(actor, project);
+        var model = Guards.changeable(versions, actor, project, version);
+        if (!ModelFile.drawing(model.format()))
+            throw new UnprocessableApplicationException("FORMAT_NOT_SUPPORTED", "Esta versión no es un plano DWG ni DXF.");
+        return engine.dwgEntity(VersionRef.of(project, model), DwgHandle.require(handle));
     }
 
     /**

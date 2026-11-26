@@ -471,8 +471,13 @@ class ModelChangeFlowTest {
             .content(dwgBytes())).andExpect(status().isCreated())).get("id").asText();
         site.as(get(site.base + "/versions/" + dwg + "/summary")).andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.message").value("Selecciona una versión IFC."));
-        site.as(post(site.changes).contentType("application/json").content(write(Map.of("baseVersion", dwg, "description", "Plano"))))
-            .andExpect(status().isUnprocessableEntity());
+        // A DWG drawing takes model changes since «Revisión DXF real» (its revisions are DXF); an IFC operation is refused.
+        var plan = read(site.as(post(site.changes).contentType("application/json").content(write(Map.of("baseVersion", dwg, "description", "Plano"))))
+            .andExpect(status().isCreated()));
+        org.junit.jupiter.api.Assertions.assertEquals("DWG", plan.get("format").asText());
+        site.as(post(site.changes + "/" + plan.get("id").asText() + "/operations").contentType("application/json")
+            .content(write(Map.of("op", "ifc.change_type", "element", DOOR, "type_id", ALTERNATE))))
+            .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("OPERATION_FORMAT"));
         site.as(post(site.changes).contentType("application/json").content("{\"description\":\"Sin base\"}")).andExpect(status().isBadRequest());
     }
 

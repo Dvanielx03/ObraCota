@@ -4,6 +4,7 @@ import com.obracota.domain.modelchange.model.price.PriceKey;
 import com.obracota.domain.modelchange.model.price.UnitPrice;
 import com.obracota.domain.modelchange.model.recipe.ChangeType;
 import com.obracota.domain.modelchange.model.recipe.Recipe;
+import com.obracota.domain.modelchange.model.recipe.DwgOperation;
 import com.obracota.domain.modelchange.model.recipe.SetMaterial;
 import com.obracota.domain.modelchange.model.recipe.SetProperty;
 import com.obracota.domain.modelchange.model.report.Estimate;
@@ -60,6 +61,8 @@ public final class ChangeEstimate {
                 }
                 case SetProperty ignored -> { }
                 case SetMaterial finish -> lines.add(finish(finish, report, book));
+                // A drawing change has no quantities nor prices: its estimate is empty (N/A in the card).
+                case DwgOperation ignored -> { }
             }
         }
         return Estimate.of(CURRENCY, lines);

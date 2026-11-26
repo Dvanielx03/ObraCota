@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
  * One typed step of a recipe. Every record validates its own shape in the constructor and throws
  * {@link IllegalArgumentException}; the engine decides later whether the model accepts it.
  */
-public sealed interface Operation permits ChangeType, SetProperty, SetMaterial {
+public sealed interface Operation permits ChangeType, SetProperty, SetMaterial, DwgOperation {
     Pattern ID = Pattern.compile("op-[0-9]{1,3}");
 
     /** Stable id inside the recipe ({@code op-1}, {@code op-2}…); {@code null} until the server assigns it. */
@@ -15,7 +15,7 @@ public sealed interface Operation permits ChangeType, SetProperty, SetMaterial {
     /** Wire name, for example {@code ifc.change_type}. */
     String op();
 
-    /** GlobalId of the element the operation targets. */
+    /** GlobalId of the element the operation targets (the DWG handle for {@link DwgOperation}). */
     String element();
 
     Operation withId(String id);

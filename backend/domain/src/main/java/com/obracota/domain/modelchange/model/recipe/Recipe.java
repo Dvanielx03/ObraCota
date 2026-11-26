@@ -22,11 +22,16 @@ public record Recipe(String format, List<Operation> operations) {
             if (operation.id() == null || !ids.add(operation.id())) throw new IllegalArgumentException("Cada operación necesita un id único");
             if (!targets.add(operation.target())) throw new IllegalArgumentException("Dos operaciones cambian lo mismo");
         }
+        if (operations.stream().map(operation -> operation instanceof DwgOperation).distinct().count() > 1)
+            throw new IllegalArgumentException("No se mezclan operaciones de un plano DWG con operaciones de un IFC");
     }
 
     public static Recipe empty() { return new Recipe(FORMAT, List.of()); }
 
     public boolean isEmpty() { return operations.isEmpty(); }
+
+    /** Whether the recipe changes a DWG drawing ({@code dwg.*} operations). */
+    public boolean drawing() { return !operations.isEmpty() && operations.getFirst() instanceof DwgOperation; }
 
     public Optional<Operation> find(String id) {
         return operations.stream().filter(operation -> operation.id().equals(id)).findFirst();

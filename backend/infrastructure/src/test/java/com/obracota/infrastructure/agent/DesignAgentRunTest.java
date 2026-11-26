@@ -334,14 +334,52 @@ class DesignAgentRunTest {
             real.format(), 190L * 1048576, real.sha256(), real.uploadedAt(), real.uploadedBy(), real.uploaderEmail());
         var dwg = new com.obracota.domain.modelversion.model.ModelVersion(real.id(), real.fileId(), real.revision(), real.name(),
             "DWG", real.byteSize(), real.sha256(), real.uploadedAt(), real.uploadedBy(), real.uploaderEmail());
+        var fbx = new com.obracota.domain.modelversion.model.ModelVersion(real.id(), real.fileId(), real.revision(), real.name(),
+            "FBX", real.byteSize(), real.sha256(), real.uploadedAt(), real.uploadedBy(), real.uploaderEmail());
+        // A DWG or DXF drawing above the limit is refused before the model; an IFC above it is not (see the next test).
+        var largeDrawing = new com.obracota.domain.modelversion.model.ModelVersion(real.id(), real.fileId(), real.revision(),
+            real.name(), "DWG", 190L * 1048576, real.sha256(), real.uploadedAt(), real.uploadedBy(), real.uploaderEmail());
         var tooLarge = assertThrows(com.obracota.application.common.exception.UnprocessableApplicationException.class,
-            () -> agentFor.apply(large).run(Actor.person(site.owner), project, version, notes));
+            () -> agentFor.apply(largeDrawing).run(Actor.person(site.owner), project, version,
+                List.of(new Note("1A2B", "Texto", "Cambiar texto a Muro nuevo"))));
         assertEquals("AGENT_MODEL_TOO_LARGE", tooLarge.code());
         var notIfc = assertThrows(com.obracota.application.common.exception.UnprocessableApplicationException.class,
-            () -> agentFor.apply(dwg).run(Actor.person(site.owner), project, version, notes));
+            () -> agentFor.apply(fbx).run(Actor.person(site.owner), project, version, notes));
         assertEquals("AGENT_IFC_ONLY", notIfc.code());
+        // A DWG drawing is workable since «Revisión DXF real», but its marks are DWG handles, never IFC GlobalIds.
+        var globalIdOnPlan = assertThrows(com.obracota.application.common.exception.InvalidRequestApplicationException.class,
+            () -> agentFor.apply(dwg).run(Actor.person(site.owner), project, version, notes));
+        assertEquals("NOTES_INVALID", globalIdOnPlan.code());
         assertEquals(journaled, db.queryForObject("select count(*) from agent_tool_call", Integer.class));
         assertEquals(0, site.changes());
+    }
+
+    @Test void aLargeIfcTakesPropertiesButRefusesAChangeOfTypeWithTheReason() throws Exception {
+        var site = new Site();
+        var project = UUID.fromString(site.project);
+        var version = UUID.fromString(site.version);
+        var real = versionRepository.find(project, version).orElseThrow();
+        var large = new com.obracota.domain.modelversion.model.ModelVersion(real.id(), real.fileId(), real.revision(), real.name(),
+            real.format(), 65_078_748L, real.sha256(), real.uploadedAt(), real.uploadedBy(), real.uploaderEmail());
+        var model = new ScriptedAgentModelAdapter(List.of(
+            ScriptedTurn.call("draft_change_type", Map.of("globalId", DOOR, "typeId", "1hOSvn6df7F8_7GcBWlS8Y")),
+            ScriptedTurn.call("draft_set_property", Map.of("globalId", DOOR, "pset", "Pset_DoorCommon",
+                "property", "FireRating", "value", "EI 60")),
+            ScriptedTurn.say("Fin.")));
+        var agent = new RunDesignAgent(projects, tools, model, journal, history, aiRuns, budget, tx, "gemini-3.1-flash-lite",
+            (p, v) -> Optional.of(large), 33_554_432L);
+
+        var result = agent.run(Actor.person(site.owner), project, version, List.of(new Note(DOOR, "Puerta", "Cambiar FireRating a EI 60")));
+
+        var refused = result.steps().getFirst();
+        assertEquals("draft_change_type", refused.tool());
+        assertEquals(AgentToolJournal.Status.REJECTED, refused.status());
+        assertEquals("MODEL_TOO_LARGE", refused.errorCode());
+        assertEquals("El modelo pesa 65 MB: el motor verifica cambios de geometría en el IFC, como el cambio de tipo, hasta 32 MiB. "
+            + "Las propiedades y los materiales sí se cambian en este modelo.", refused.detail());
+        assertEquals("draft_set_property", result.steps().get(1).tool());
+        assertEquals(AgentToolJournal.Status.OK, result.steps().get(1).status());
+        assertEquals(1, site.changes());
     }
 
     @Test void aDraftOnAPieceThatWasNotMarkedIsRefused() throws Exception {

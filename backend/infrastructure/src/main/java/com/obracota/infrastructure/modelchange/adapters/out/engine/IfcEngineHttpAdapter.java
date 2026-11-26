@@ -83,6 +83,11 @@ class IfcEngineHttpAdapter implements ModelEnginePort {
     }
 
     @Override
+    public Map<String, Object> dwgEntity(VersionRef version, String handle) {
+        return tree(get(reading("/dwg/entity", version).queryParam("handle", handle), readTimeout));
+    }
+
+    @Override
     public Checks check(VersionRef base, Recipe recipe) {
         var body = previewBody(base, recipe);
         body.put("checks_only", true);

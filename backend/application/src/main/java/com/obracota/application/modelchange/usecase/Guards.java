@@ -7,6 +7,7 @@ import com.obracota.application.common.exception.UnprocessableApplicationExcepti
 import com.obracota.application.modelversion.usecase.ProjectVersions;
 import com.obracota.domain.modelchange.model.ModelChange;
 import com.obracota.domain.modelchange.port.ModelChangeRepository;
+import com.obracota.domain.modelfile.model.ModelFile;
 import com.obracota.domain.modelversion.model.ModelVersion;
 import com.obracota.domain.security.model.Actor;
 import java.io.Closeable;
@@ -22,6 +23,7 @@ final class Guards {
     static final String PUBLISH = "Publicar, restaurar y fijar precios exigen la sesión de la propietaria.";
     static final String NOT_OWN = "El agente solo trabaja sobre sus propios borradores.";
     static final String NOT_IFC = "Selecciona una versión IFC.";
+    static final String NOT_CHANGEABLE = "Los cambios de modelo trabajan sobre un IFC o un plano DWG/DXF.";
     static final String STALE = "La base ya no es la última revisión (v%d).";
     static final String STALE_PUBLISH = "Abre la revisión más reciente para proponer o revertir un cambio.";
     static final String MODIFIED = "El cambio se modificó; recarga.";
@@ -47,6 +49,14 @@ final class Guards {
     static ModelVersion ifc(ProjectVersions versions, Actor actor, UUID project, UUID version) {
         var model = versions.get(project, actor.user(), version);
         if (!"IFC".equals(model.format())) throw new UnprocessableApplicationException("FORMAT_NOT_SUPPORTED", NOT_IFC);
+        return model;
+    }
+
+    /** The version, owned by the actor's user, that model changes work on: an IFC, or a DWG or DXF drawing. */
+    static ModelVersion changeable(ProjectVersions versions, Actor actor, UUID project, UUID version) {
+        var model = versions.get(project, actor.user(), version);
+        if (!"IFC".equals(model.format()) && !ModelFile.drawing(model.format()))
+            throw new UnprocessableApplicationException("FORMAT_NOT_SUPPORTED", NOT_CHANGEABLE);
         return model;
     }
 

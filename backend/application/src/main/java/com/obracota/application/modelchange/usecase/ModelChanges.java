@@ -13,6 +13,13 @@ import com.obracota.domain.modelchange.model.ModelChangeEvent;
 import com.obracota.domain.modelchange.model.ModelChangeEvent.Action;
 import com.obracota.domain.modelchange.model.price.UnitPrice;
 import com.obracota.domain.modelchange.model.recipe.ChangeType;
+import com.obracota.domain.modelchange.model.recipe.DwgAddNote;
+import com.obracota.domain.modelchange.model.recipe.DwgMove;
+import com.obracota.domain.modelchange.model.recipe.DwgOperation;
+import com.obracota.domain.modelchange.model.recipe.DwgSetColor;
+import com.obracota.domain.modelchange.model.recipe.DwgSetLayer;
+import com.obracota.domain.modelchange.model.recipe.DwgSetText;
+import com.obracota.domain.modelfile.model.ModelFile;
 import com.obracota.domain.modelchange.model.recipe.GlobalId;
 import com.obracota.domain.modelchange.model.recipe.Operation;
 import com.obracota.domain.modelchange.model.recipe.Recipe;
@@ -42,7 +49,10 @@ import java.util.function.Function;
  */
 public final class ModelChanges {
     /** Operations the backend lets through (§5.4): the door of equal size and, since step 11 of H1 (H2.1), typed properties. */
-    public static final Set<String> ENABLED_OPERATIONS = Set.of(ChangeType.OP, SetProperty.OP, SetMaterial.OP);
+    public static final Set<String> ENABLED_OPERATIONS = Set.of(ChangeType.OP, SetProperty.OP, SetMaterial.OP,
+        DwgSetText.OP, DwgSetLayer.OP, DwgSetColor.OP, DwgMove.OP, DwgAddNote.OP);
+    static final String DRAWING_ONLY = "Un plano DWG solo admite cambios de plano: texto, capa, color, mover o nota.";
+    static final String IFC_ONLY = "Los cambios de texto, capa, color, posición o nota son de un plano DWG o DXF.";
     public static final int LIST_LIMIT = 100;
     public static final int REASON_LIMIT = 500;
     static final String PREVIEW_MISSING = "La vista previa no está disponible.";
@@ -133,7 +143,7 @@ public final class ModelChanges {
         if (preview == null) throw new NotFoundApplicationException(PREVIEW_MISSING);
         var base = versions.get(project, actor.user(), change.baseVersion());
         try {
-            return new PreviewFile(previews.read(project, id, preview.id()), preview.size(), proposalName(base.name()));
+            return new PreviewFile(previews.read(project, id, preview.id()), preview.size(), proposalName(base.name(), base.format()));
         } catch (IOException e) {
             throw new NotFoundApplicationException(PREVIEW_MISSING);
         }
@@ -321,6 +331,9 @@ public final class ModelChanges {
         if (!ENABLED_OPERATIONS.contains(operation.op()))
             throw new UnprocessableApplicationException("OPERATION_NOT_ENABLED", "La operación " + operation.op() + " no está habilitada.");
         var start = tx.required(() -> editable(actor, project, id));
+        boolean drawing = ModelFile.drawing(start.base().format());
+        if (drawing != (operation instanceof DwgOperation))
+            throw new UnprocessableApplicationException("OPERATION_FORMAT", drawing ? DRAWING_ONLY : IFC_ONLY);
         var recipe = start.change().recipe();
         if (replacing != null && recipe.find(replacing).isEmpty()) throw new NotFoundApplicationException("La operación no existe.");
         var next = edited(recipe, operation, replacing);
@@ -413,7 +426,7 @@ public final class ModelChanges {
 
     private UUID insertDraft(Actor actor, UUID project, UUID baseVersion, String description, Operation first, String legacyReview,
                              byte[] picture) {
-        var base = Guards.ifc(versions, actor, project, baseVersion);
+        var base = Guards.changeable(versions, actor, project, baseVersion);
         Guards.requireLatest(versions, actor, project, base, Guards.STALE);
         var now = now();
         var change = ModelChange.draft(UUID.randomUUID(), project, base.fileId(), base.id(), base.format(), actor, description, now);
@@ -443,9 +456,11 @@ public final class ModelChanges {
             .map(price -> new DoorReview.Price(typeId, price.amount(), price.source(), price.date())).orElse(null);
     }
 
-    private static String proposalName(String base) {
-        var stem = base.toLowerCase(Locale.ROOT).endsWith(".ifc") ? base.substring(0, base.length() - 4) : base;
-        return stem + "-propuesta.ifc";
+    private static String proposalName(String base, String format) {
+        var drawing = ModelFile.drawing(format);
+        var dot = base.lastIndexOf('.');
+        var stem = dot > 0 ? base.substring(0, dot) : base;
+        return stem + "-propuesta." + (drawing ? "dxf" : "ifc");
     }
 
     private ModelChangeEvent event(UUID change, Action action, Actor actor, String detail) {

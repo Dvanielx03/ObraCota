@@ -50,6 +50,9 @@ public class AgentConfiguration {
                                         AgentRunHistory history, AiRunJournal aiRuns, AiBudget budget, Transactions tx, ModelCatalog models,
                                         @Value("${agent.model:}") String modelId,
                                         com.obracota.domain.modelversion.port.VersionRepository versions,
+                                        // The engine's ENGINE_PREVIEW_MAX_BYTES: above it an IFC takes no change of geometry
+                                        // (draft_change_type) and a DWG or DXF no revision; properties and materials of an
+                                        // IFC are verified entity by entity up to the upload limit.
                                         @Value("${agent.max-model-bytes:33554432}") long maxBytes) {
         return new RunDesignAgent(projects, tools, model, journal, history, aiRuns, budget, tx,
             modelId.isBlank() ? models.forCapability("CHAT").id() : modelId, versions::find, maxBytes);
