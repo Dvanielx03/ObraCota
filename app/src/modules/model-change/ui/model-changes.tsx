@@ -3,35 +3,11 @@ import Link from "next/link";
 import {useEffect,useState} from "react";
 import {EmptyState,PanelView} from "@/shared/ui/panel-view";
 import {EmptyArt,LoadingStatus} from "@/shared/ui/loading";
-import {approvedBudget,type ModelChange} from "../domain/model-change";
+import type {ModelChange} from "../domain/model-change";
 import {modelChangeRepository} from "../infrastructure/model-change-http";
-import {ChangeCard,ChangeHeader,useOperationLabels} from "./change-card";
-import {ChangeEstimate} from "./change-estimate";
+import {ChangeCard} from "./change-card";
 
-function BudgetCard({change}:{change:ModelChange}){
-  const labels=useOperationLabels(change);
-  return <article id={change.id} className="change-card"><ChangeHeader change={change}/><ChangeEstimate change={change} labels={labels}/>
-    <p className="change-link"><Link href={"/proyectos/"+change.project+"/cambios#"+change.id}>Ver el cambio completo</Link></p></article>;
-}
-
-/** Head of «Presupuesto»: the running difference of the approved changes, and which ones still lack a price. */
-function BudgetTotal({rows}:{rows:readonly ModelChange[]}){
-  const sum=approvedBudget(rows);
-  const money=new Intl.NumberFormat("es-CO",{style:"currency",currency:sum.currency});
-  if(!sum.counted && !sum.missing && !sum.otherCurrency)return <p className="budget-total" role="status">Ningún cambio aprobado todavía: el presupuesto suma solo los cambios aplicados.</p>;
-  return <section className="budget-total" aria-label="Total de cambios aprobados">
-    <p><strong>Diferencia acumulada de los cambios aprobados</strong> {money.format(sum.total)}</p>
-    <p className="change-note">{sum.counted===1?"1 cambio aprobado con estimación completa":sum.counted+" cambios aprobados con estimación completa"}
-      {sum.missing>0 && <> · {sum.missing===1?"1 aprobado sin total (faltan precios); no se suma":sum.missing+" aprobados sin total (faltan precios); no se suman"}</>}
-      {sum.otherCurrency>0 && <> · {sum.otherCurrency===1?"1 aprobado en otra moneda; no se suma":sum.otherCurrency+" aprobados en otra moneda; no se suman"}</>}.</p>
-  </section>;
-}
-
-/**
- * «Cambios de diseño» and «Presupuesto» of a project (§7.1–§7.3): every model change, newest first. The budget view
- * shows only each change's estimate: the frozen one once applied, the live one otherwise.
- */
-export function ModelChanges({project,budget=false}:{project:string;budget?:boolean}){
+export function ModelChanges({project}:{project:string}){
   const [rows,setRows]=useState<ModelChange[]>(),[error,setError]=useState(""),[busy,setBusy]=useState(0);
   useEffect(()=>{
     const control=new AbortController();
@@ -50,21 +26,18 @@ export function ModelChanges({project,budget=false}:{project:string;budget?:bool
     if(next.status==="APPLIED"||next.status==="RESTORED")
       modelChangeRepository.list(project).then(setRows).catch(()=>undefined);
   }
-  return <PanelView title={budget?"Presupuesto":"Cambios de diseño"} project={false}>
+  return <PanelView title="Cambios de diseño" project={false}>
     {error && <p role="alert">{error}</p>}
-    {!rows && !error && (budget ? <LoadingStatus>Cargando revisiones…</LoadingStatus> :
+    {!rows && !error && (
       <div className="changes-loading">
         <EmptyArt kind="changes" width={132}/>
         <LoadingStatus>Cargando revisiones…</LoadingStatus>
       </div>)}
-    {rows?.length===0 && (budget ?
-      <p>Selecciona una pieza de una <Link href={"/proyectos/"+project+"/archivos"}>versión IFC o DWG guardada</Link> para registrar una propuesta.</p> :
+    {rows?.length===0 && (
       <EmptyState heading="Sin cambios registrados" icon={<EmptyArt kind="changes" width={184}/>}>
         Abre una <Link href={"/proyectos/"+project+"/archivos"}>versión IFC o DWG guardada</Link> para registrar una propuesta.
       </EmptyState>)}
-    {budget && !!rows?.length && <BudgetTotal rows={rows}/>}
-    <div className="estimate-sheet">{rows?.map(change=>budget?<BudgetCard key={change.id} change={change}/>
-      :<ChangeCard key={change.id} change={change} onChange={next=>void changed(next)} locked={busy>0}
+    <div className="change-cards">{rows?.map(change=><ChangeCard key={change.id} change={change} onChange={next=>void changed(next)} locked={busy>0}
         onWork={working=>setBusy(count=>count+(working?1:-1))}/>)}</div>
   </PanelView>;
 }

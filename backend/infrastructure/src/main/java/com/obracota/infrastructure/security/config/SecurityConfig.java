@@ -46,19 +46,17 @@ public class SecurityConfig {
             .authorizeHttpRequests(c -> c.requestMatchers(HttpMethod.GET,"/actuator/health").permitAll()
                 .requestMatchers(HttpMethod.POST,"/api/auth/register","/api/auth/login","/api/auth/google","/api/auth/refresh","/api/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/auth/google/config").permitAll()
-                // The first matching rule wins (§4.6). Publishing, restoring and pricing are the person's:
+                // The first matching rule wins (§4.6). Publishing, restoring and setting the door minimum are the person's:
                 .requestMatchers(HttpMethod.POST,
                     "/api/projects/*/model-changes/*/apply","/api/projects/*/model-changes/*/restore",
-                    "/api/projects/*/design-changes/*/restore",
-                    "/api/projects/*/versions/*/prices/copy").hasAuthority(Authorities.PERSON_SESSION)
+                    "/api/projects/*/design-changes/*/restore").hasAuthority(Authorities.PERSON_SESSION)
                 .requestMatchers(HttpMethod.PUT,
-                    "/api/projects/*/design-changes/pricing","/api/projects/*/versions/*/prices").hasAuthority(Authorities.PERSON_SESSION)
+                    "/api/projects/*/design-changes/minimum-width").hasAuthority(Authorities.PERSON_SESSION)
                 // What an agent credential may touch, only inside its own project:
                 .requestMatchers("/api/projects/{project}/model-changes","/api/projects/{project}/model-changes/**").access(new AgentScope())
                 .requestMatchers(HttpMethod.GET,"/api/projects/{project}/files","/api/projects/{project}/files/*/versions",
                     "/api/projects/{project}/versions/{version}","/api/projects/{project}/versions/{version}/summary",
-                    "/api/projects/{project}/versions/{version}/elements","/api/projects/{project}/versions/{version}/elements/*",
-                    "/api/projects/{project}/versions/{version}/prices").access(new AgentScope())
+                    "/api/projects/{project}/versions/{version}/elements","/api/projects/{project}/versions/{version}/elements/*").access(new AgentScope())
                 // Everything else under the projects stays with the person:
                 .requestMatchers("/api/projects","/api/projects/**").hasAuthority(Authorities.PERSON_SESSION)
                 .anyRequest().denyAll())

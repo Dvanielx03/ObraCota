@@ -255,8 +255,7 @@ test("El paquete de revisión reúne el original, las vistas y los cambios aplic
     description:"Cambiar puerta "+id,summary:null,origin:"PERSON",author:{id:"u",email:"a@example.test"},createdAt:"2026-11-20T10:00:00Z",
     appliedAt:appliedVersion?"2026-11-21T10:00:00Z":null,appliedBy:null,legacyReview:null,
     recipe:{format:"obracota.recipe/1",operations:[{id:"op1",op:"ifc.set_property",element:"G1",scope:"occurrence",pset:"Pset_DoorCommon",property:"FireRating",value:"EI 60"}]},
-    report:{ok:true,operations:[],findings:[{rule:"r",status:"WARNING",explanation:"Revisar la evacuación",source:null,element:null}],quantities:[],
-      estimate:{currency:"COP",total:1250000,complete:true,lines:[]}}});
+    report:{ok:true,operations:[],findings:[{rule:"r",status:"WARNING",explanation:"Revisar la evacuación",source:null,element:null}],quantities:[]}});
   const changes=[change("a","APPLIED","v1-id","v2-id"),change("b","DISCARDED","v2-id",null),change("c","APPLIED","v0-id","v1-id")];
   const result=await exportReviewPackage(views,{project:"Dúplex Arrayán",version:"v2-id"},{
     pose:()=>({...pose(9,"pantalla"),position:camera.position}),apply:next=>{camera=next;},
@@ -272,13 +271,11 @@ test("El paquete de revisión reúne el original, las vistas y los cambios aplic
     "cambios/01-cambiar-puerta-a.json","RESUMEN.md"]);
   expect(strFromU8(files["original/Duplex_A.ifc"])).toBe("IFC");
   const record=JSON.parse(strFromU8(files["cambios/01-cambiar-puerta-a.json"]));
-  expect(record).toMatchObject({id:"a",relacion:"produjo esta versión",receta:{format:"obracota.recipe/1"},costo:{total:1250000}});
-  expect(record.informe.estimate).toBeUndefined();
+  expect(record).toMatchObject({id:"a",relacion:"produjo esta versión",receta:{format:"obracota.recipe/1"}});
   const summary=strFromU8(files["RESUMEN.md"]);
   expect(summary).toContain("# Paquete de revisión · Dúplex Arrayán · v2");
   expect(summary).toContain("Propiedad de la pieza · Pset_DoorCommon.FireRating: EI 60");
   expect(summary).toContain("Revisar la evacuación");
-  expect(summary).toMatch(/Costo estimado:\*\* \$\s?1\.250\.000/);
 });
 
 test("Exportar › Paquete de revisión (ZIP) descarga el original, las vistas y el resumen",async({page})=>{

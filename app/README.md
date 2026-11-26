@@ -2,7 +2,9 @@
 
 Desde la raíz, `docker compose up -d --build app` sirve el panel en http://localhost:3201. Para desarrollo, desde esta carpeta, ejecutar `npm ci` y `npm run dev`. La instalación copia el lector web-ifc y su WASM a un directorio público generado.
 
-La ruta principal abre `/proyectos`. Desde el resumen público de ReStage se entra a archivos, cambios, asistente, presupuesto o al visor en `/proyectos/restage/visor`. Cuenta se encuentra en `/cuenta`. Registro e inicio de sesión permiten crear proyectos privados y consultarlos desde otro inicio de sesión. El navegador llama a /api en su propio origen. Next.js reenvía estas solicitudes al backend configurado con API_INTERNAL_URL al construir la imagen. El puerto de `viewer/domain` separa las acciones del usuario del adaptador three.js. El archivo abierto en el visor permanece en memoria. Cerrar el modelo o recargar libera esa vista. Las cuentas y proyectos se guardan en PostgreSQL.
+Desde Propiedades, «Preguntar en el asistente del proyecto» abre la consulta documental de la pieza y revisión seleccionadas. El PDF se vincula en «Ficha técnica».
+
+La ruta principal abre `/proyectos`. Desde el resumen público de ReStage se entra a archivos, cambios, asistente o al visor en `/proyectos/restage/visor`. Cuenta se encuentra en `/cuenta`. Registro e inicio de sesión permiten crear proyectos privados y consultarlos desde otro inicio de sesión. El navegador llama a /api en su propio origen. Next.js reenvía estas solicitudes al backend configurado con API_INTERNAL_URL al construir la imagen. El puerto de `viewer/domain` separa las acciones del usuario del adaptador three.js. El archivo abierto en el visor permanece en memoria. Cerrar el modelo o recargar libera esa vista. Las cuentas y proyectos se guardan en PostgreSQL.
 
 **ReStage.** El ejemplo abre el GLB simplificado de la landing con su índice. La viga inicial muestra la selección sincronizada. Los conjuntos conservan su número de piezas. Las piezas individuales identificadas tienen GlobalId. La paleta del ejemplo representa sistemas constructivos. [Atribución](public/models/creditos.txt).
 
@@ -10,7 +12,7 @@ La ruta principal abre `/proyectos`. Desde el resumen público de ReStage se ent
 
 **Formatos.** Se guardan versiones IFC, DWG, DXF, RVT, FBX y OBJ. El formulario lee los primeros 4096 bytes para comprobar la cabecera y el servidor repite la validación. FBX y OBJ se abren como mallas. Un RVT guardado puede descargarse con verificación SHA-256. Para consultar su geometría, abre un IFC exportado desde Revit o usa la traducción a IFC cuando Autodesk APS esté configurado.
 
-**Cambios de modelo.** En `/proyectos/{id}/cambios` cada cambio muestra su receta, avisos, estimación, diferencias con la base y validación del archivo. «Ver propuesta en 3D» abre la vista previa verificada sin publicarla, con RECORRIDO Base/Propuesta y Comparar. «Aprobar y aplicar cambio» publica la revisión y «Crear revisión de restauración» vuelve a la base.
+**Cambios de modelo.** En `/proyectos/{id}/cambios` cada cambio muestra su receta, avisos, diferencias con la base y validación del archivo. «Ver propuesta en 3D» abre la vista previa verificada sin publicarla, con RECORRIDO Base/Propuesta y Comparar. «Aprobar y aplicar cambio» publica la revisión y «Crear revisión de restauración» vuelve a la base.
 
 **Revisiones de plano.** En un DWG o DXF guardado, Editar marca la entidad bajo el clic (su handle) y «Proponer cambio al modelo» envía la nota al agente. El motor convierte el DWG a DXF con LibreDWG, aplica `dwg.set_text`, `dwg.set_layer`, `dwg.set_color`, `dwg.move` o `dwg.add_note` (nota con nube de revisión en la capa OBRACOTA-REVISION) con ezdxf, relee el resultado y compara cada entidad por handle. Al aprobar, la revisión se publica como `<original>-r<N>.dxf` en el mismo archivo; AutoCAD abre el DXF y puede guardarlo como DWG. Renderizar también trabaja sobre el plano.
 

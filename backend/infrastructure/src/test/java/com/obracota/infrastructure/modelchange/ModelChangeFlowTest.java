@@ -6,7 +6,6 @@ import com.obracota.application.common.exception.EngineUnavailableException;
 import com.obracota.application.common.exception.ForbiddenApplicationException;
 import com.obracota.application.common.exception.UnprocessableApplicationException;
 import com.obracota.application.modelchange.usecase.PublishModelChange;
-import com.obracota.application.modelchange.usecase.VersionPrices;
 import com.obracota.domain.security.model.Actor;
 import com.obracota.domain.security.port.service.TokenService;
 import com.obracota.infrastructure.designchange.DesignChangeController;
@@ -47,7 +46,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * The REST API of model changes, readings and prices (§4.2-§4.5) with the engine stubbed (§8.2):
+ * The REST API of model changes and readings (§4.2-§4.5) with the engine stubbed (§8.2):
  * J1, J2, J4, J6, J7, J8, J9, J10, J15, J16 and J17.
  */
 @SpringBootTest @AutoConfigureMockMvc @ActiveProfiles("test") @Import(ModelChangeStubs.Beans.class)
@@ -65,7 +64,6 @@ class ModelChangeFlowTest {
     @Autowired MutableClock clock;
     @Autowired TokenService tokens;
     @Autowired PublishModelChange publish;
-    @Autowired VersionPrices pricing;
     @Autowired DesignChangeController facade;
     @Value("${security.jwt-secret}") String secret;
 
@@ -253,78 +251,6 @@ class ModelChangeFlowTest {
 
     // J6 ---------------------------------------------------------------------------------------------------------------
 
-    @Test void pricesAreCopiedWithSourceAndDate() throws Exception {
-        var site = new Site();
-        var v1 = site.v1.get("id").asText();
-        var prices = Map.of("prices", List.of(
-            Map.of("key", "type:" + CURRENT, "unit", "UNIT", "amount", 100000, "source", "Cotización de prueba", "date", "2026-11-20"),
-            Map.of("key", "type:" + ALTERNATE, "unit", "UNIT", "amount", 125000, "source", "Cotización de prueba", "date", "2026-11-20")));
-        var put = read(site.as(put(site.base + "/versions/" + v1 + "/prices").contentType("application/json").content(write(prices)))
-            .andExpect(status().isOk()));
-        assertEquals(2, put.get("prices").size());
-        for (var price : put.get("prices")) {
-            assertEquals("COP", price.get("currency").asText());
-            assertTrue(price.get("copiedFrom").isNull());
-        }
-        site.as(put(site.base + "/versions/" + v1 + "/prices").contentType("application/json")
-            .content("{\"prices\":[{\"key\":\"tipo:malo\",\"unit\":\"UNIT\",\"amount\":1,\"source\":\"x\",\"date\":\"2026-11-20\"}]}"))
-            .andExpect(status().isBadRequest());
-        site.as(put(site.base + "/versions/" + v1 + "/prices").contentType("application/json")
-            .content("{\"prices\":[{\"key\":\"item:Sobrecosto\",\"unit\":\"UNIT\",\"amount\":-1,\"source\":\"x\",\"date\":\"2026-11-20\"}]}"))
-            .andExpect(status().isBadRequest());
-
-        var id = site.ready(v1, DOOR).get("id").asText();
-        var estimate = site.change(id).at("/report/estimate");
-        assertEquals(25000, estimate.get("total").asInt());
-        assertTrue(estimate.get("complete").asBoolean());
-        assertEquals("Cotización de prueba", estimate.at("/lines/0/after/source").asText());
-        assertEquals("2026-11-20", estimate.at("/lines/0/after/date").asText());
-
-        var applied = read(site.action(id, "apply").andExpect(status().isOk()));
-        var v2 = applied.get("appliedVersion").asText();
-        assertEquals(25000, applied.at("/report/estimate/total").asInt());
-        assertCopies(site, v2, v1);
-
-        var v3 = read(site.action(id, "restore").andExpect(status().isOk())).get("restoredVersion").asText();
-        assertCopies(site, v3, v2);
-        // The estimate stays the one frozen on approval.
-        assertEquals(25000, site.change(id).at("/report/estimate/total").asInt());
-    }
-
-    void assertCopies(Site site, String version, String from) throws Exception {
-        var list = read(site.as(get(site.base + "/versions/" + version + "/prices")).andExpect(status().isOk())).get("prices");
-        assertEquals(2, list.size());
-        var amounts = new HashMap<String, Integer>();
-        for (var price : list) {
-            amounts.put(price.get("key").asText(), price.get("amount").asInt());
-            assertEquals("Cotización de prueba", price.get("source").asText());
-            assertEquals("2026-11-20", price.get("date").asText());
-            assertEquals("UNIT", price.get("unit").asText());
-            assertEquals(from, price.get("copiedFrom").asText());
-        }
-        assertEquals(Map.of("type:" + CURRENT, 100000, "type:" + ALTERNATE, 125000), amounts);
-    }
-
-    @Test void pricesCopyOnlyFromAnEarlierRevisionOfTheSameFile() throws Exception {
-        var site = new Site();
-        var v1 = site.v1.get("id").asText();
-        site.as(put(site.base + "/versions/" + v1 + "/prices").contentType("application/json")
-            .content("{\"minimumWidthM\":0.8,\"prices\":[{\"key\":\"item:Herraje antipánico\",\"unit\":\"UNIT\",\"amount\":45000,"
-                + "\"source\":\"Catálogo de prueba\",\"date\":\"2026-11-19\"}]}"))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.minimumWidthM").value(0.8));
-        var v2 = site.upload(ORIGINAL + "\n/* manual */", site.file).get("id").asText();
-        site.as(get(site.base + "/versions/" + v2 + "/prices")).andExpect(status().isOk()).andExpect(jsonPath("$.prices.length()").value(0));
-        site.as(post(site.base + "/versions/" + v2 + "/prices/copy").param("from", v1)).andExpect(status().isOk())
-            .andExpect(jsonPath("$.prices[0].key").value("item:Herraje antipánico"))
-            .andExpect(jsonPath("$.prices[0].copiedFrom").value(v1));
-        site.as(post(site.base + "/versions/" + v1 + "/prices/copy").param("from", v2)).andExpect(status().isBadRequest());
-        var other = read(site.as(post(site.base + "/uploads").queryParam("name", "Estructura.ifc").contentType("application/octet-stream")
-            .content(ORIGINAL)).andExpect(status().isCreated())).get("id").asText();
-        site.as(post(site.base + "/versions/" + other + "/prices/copy").param("from", v1)).andExpect(status().isConflict());
-    }
-
-    // J7 ---------------------------------------------------------------------------------------------------------------
-
     @Test void submitRequiresCurrentOkPreview() throws Exception {
         var site = new Site();
         var v1 = site.v1.get("id").asText();
@@ -447,10 +373,8 @@ class ModelChangeFlowTest {
                 post(site.changes + "/" + id + "/operations").contentType("application/json").content(changeType(OTHER_DOOR, ALTERNATE)),
                 post(site.changes + "/" + id + "/preview"), post(site.changes + "/" + id + "/submit"),
                 post(site.changes + "/" + id + "/discard"), post(site.changes + "/" + id + "/apply"), post(site.changes + "/" + id + "/restore"),
-                get(version + "/summary"), get(version + "/elements"), get(version + "/elements/" + DOOR), get(version + "/prices"),
-                get(version + "/diff").param("base", v1),
-                put(version + "/prices").contentType("application/json").content("{\"prices\":[]}"),
-                post(version + "/prices/copy").param("from", v1)))
+                get(version + "/summary"), get(version + "/elements"), get(version + "/elements/" + DOOR),
+                get(version + "/diff").param("base", v1)))
             perform(request, stranger).andExpect(status().isNotFound());
         assertEquals("READY", site.change(id).get("status").asText());
         site.as(get(site.changes + "/" + UUID.randomUUID())).andExpect(status().isNotFound())
@@ -646,21 +570,18 @@ class ModelChangeFlowTest {
         var draft = site.create(v1, "Borrador de la persona").get("id").asText();
         site.addOperation(draft, OTHER_DOOR, ALTERNATE).andExpect(status().isCreated());
 
-        // Publishing, restoring, pricing and anything outside the agent's routes: 403 with the JSON body, nothing changes.
+        // Publishing, restoring and anything outside the agent's routes: 403 with the JSON body, nothing changes.
         var forbidden = List.of(
             post(site.changes + "/" + ready + "/apply"), post(site.changes + "/" + ready + "/restore"),
             post(site.base + "/design-changes/" + ready + "/restore"),
             post(site.base + "/design-changes").contentType("application/json")
                 .content(write(Map.of("version", v1, "element", DOOR, "typeId", ALTERNATE, "description", "Puerta del agente"))),
-            put(site.base + "/versions/" + v1 + "/prices").contentType("application/json")
-                .content("{\"prices\":[{\"key\":\"type:" + ALTERNATE + "\",\"unit\":\"UNIT\",\"amount\":1,\"source\":\"x\",\"date\":\"2026-11-20\"}]}"),
-            post(site.base + "/versions/" + v1 + "/prices/copy").queryParam("from", v1),
-            put(site.base + "/design-changes/pricing").queryParam("version", v1).contentType("application/json").content("{\"prices\":[]}"),
+            put(site.base + "/design-changes/minimum-width").contentType("application/json").content("{\"minimum\":0.8}"),
             post("/api/projects").contentType("application/json").content("{\"name\":\"Proyecto del agente\"}"),
             get("/api/projects"), get(site.base + "/design-changes"), get(site.base + "/versions/" + v1 + "/original"));
         for (var request : forbidden)
             perform(request, agent).andExpect(status().isForbidden()).andExpect(content().contentTypeCompatibleWith("application/json"))
-                .andExpect(jsonPath("$.message").value("Publicar, restaurar y fijar precios exigen la sesión de la propietaria."));
+                .andExpect(jsonPath("$.message").value("Publicar, restaurar y configurar el ancho mínimo exigen la sesión de la propietaria."));
         assertEquals("READY", site.change(ready).get("status").asText());
         assertEquals(1, site.revisions());
         assertEquals(0, db.queryForObject("select count(*) from unit_price where version_id=?", Integer.class, UUID.fromString(v1)));
@@ -672,7 +593,6 @@ class ModelChangeFlowTest {
         perform(get(site.base + "/versions/" + v1 + "/summary"), agent).andExpect(status().isOk());
         perform(get(site.base + "/versions/" + v1 + "/elements"), agent).andExpect(status().isOk());
         perform(get(site.base + "/versions/" + v1 + "/elements/" + DOOR), agent).andExpect(status().isOk());
-        perform(get(site.base + "/versions/" + v1 + "/prices"), agent).andExpect(status().isOk());
         perform(get(site.changes + "/" + ready), agent).andExpect(status().isOk())
             .andExpect(jsonPath("$.actions.apply").value(false));
         clock.advance(Duration.ofSeconds(1));
@@ -742,11 +662,8 @@ class ModelChangeFlowTest {
         var readyId = UUID.fromString(ready);
         assertThrows(ForbiddenApplicationException.class, () -> publish.apply(actor, project, readyId));
         assertThrows(ForbiddenApplicationException.class, () -> publish.restore(actor, project, readyId));
-        assertThrows(ForbiddenApplicationException.class, () -> pricing.replace(actor, project, UUID.fromString(v1), null, List.of()));
-        assertThrows(ForbiddenApplicationException.class, () -> pricing.copy(actor, project, UUID.fromString(v1), UUID.fromString(v1)));
         assertThrows(ForbiddenApplicationException.class, () -> facade.restore(project, readyId, actor));
-        assertThrows(ForbiddenApplicationException.class, () -> facade.savePricing(project, actor, UUID.fromString(v1),
-            new DesignChangeController.Pricing(null, List.of())));
+        assertThrows(ForbiddenApplicationException.class, () -> facade.saveMinimum(project, actor, new DesignChangeController.MinimumWidth(java.math.BigDecimal.ONE)));
         assertEquals("APPLIED", site.change(ready).get("status").asText());
     }
 

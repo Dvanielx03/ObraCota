@@ -185,22 +185,21 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
   .walk-keyboard{display:none}
 }
 .door-proposal{display:grid;gap:10px;padding:14px 0;border-top:1px solid var(--border);font-size:13px}
-.door-proposal h3,.estimate-sheet h3{margin:.35em 0;font-size:14px}
+.door-proposal h3,.change-cards h3{margin:.35em 0;font-size:14px}
 .door-proposal label,.door-proposal form{display:grid;gap:5px}
 .door-proposal form{gap:10px}
 .door-proposal input,.door-proposal textarea,.door-proposal select{max-width:100%;min-height:40px;width:100%;border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:7px;background:var(--field);color:var(--ink);font:inherit}
 .door-proposal textarea{min-height:68px}
-.door-proposal fieldset{display:grid;gap:6px;margin:0;padding:8px;border:1px solid var(--border);border-radius:var(--radius-md)}
-.door-proposal summary,.estimate-sheet summary{cursor:pointer;padding:6px 0;font-weight:600}
-.door-proposal summary+*,.estimate-sheet summary+*{margin-top:6px}
+.door-proposal summary,.change-cards summary{cursor:pointer;padding:6px 0;font-weight:600}
+.door-proposal summary+*,.change-cards summary+*{margin-top:6px}
 .door-proposal button{width:fit-content;min-height:40px;border:1px solid var(--border);border-radius:var(--radius-md);padding:6px 10px}
 .door-proposal button:hover:enabled{background:var(--hover)}
-.door-proposal figure,.estimate-sheet figure{margin:10px 0}
+.door-proposal figure,.change-cards figure{margin:10px 0}
 .door-proposal figure img{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:var(--radius-md)}
-.door-proposal figcaption,.estimate-sheet figcaption{padding-top:4px;color:var(--muted);font-size:12px}
-.estimate-sheet article{padding:1.2rem 0;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
-.estimate-sheet section{margin:12px 0}
-.estimate-sheet .restore-action{background:transparent;color:var(--ink);border:1px solid var(--border)}
+.door-proposal figcaption,.change-cards figcaption{padding-top:4px;color:var(--muted);font-size:12px}
+.change-cards article{padding:1.2rem 0;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.change-cards section{margin:12px 0}
+.change-cards .restore-action{background:transparent;color:var(--ink);border:1px solid var(--border)}
 .help-sheet .help-primary{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}.help-sheet .help-primary:hover{background:var(--primary-hover)}
 
 /* Desktop workspace: the canvas runs under a floating header; tools float at the bottom (DU-03 = C).
@@ -806,11 +805,11 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 /* The sections of change-report.tsx inside REVISAR's report (the panel styles them in panel.css). */
 .review-server-change section{display:flex;flex-direction:column;gap:6px}
 .review-server-change .change-recipe{margin:0;padding-left:0;list-style:none;display:grid;gap:4px}
-.review-server-change .change-list{display:grid;gap:6px;margin:0;padding:0;list-style:none}
-.review-server-change .change-list>li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px}
-.review-server-change .change-list code{font:var(--type-caption);font-family:var(--font-mono);color:var(--muted)}
+.review-server-change .change-cards{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.review-server-change .change-cards>li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px}
+.review-server-change .change-cards code{font:var(--type-caption);font-family:var(--font-mono);color:var(--muted)}
 .review-server-change .change-flags,.review-server-change .change-note{color:var(--muted)}
-.review-server-change .change-fail,.review-server-change .change-unexpected,.review-server-change .change-list [data-status=FAIL]{color:var(--error)}
+.review-server-change .change-fail,.review-server-change .change-unexpected,.review-server-change .change-cards [data-status=FAIL]{color:var(--error)}
 .review-server-change details{border-top:1px solid var(--border-faint);padding:6px 0}
 .review-server-change p,.review-server-change h3{margin:0}
 /* Renderizar › Ver en el modelo 3D: local exterior finish preview. */

@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 
 /**
  * {@code ifc.set_property}: writes one typed property, on the piece or on its type ({@link PropertyScope}).
- * {@code priceKey} is optional: with it the estimate adds an extra cost line.
+ * {@code priceKey} is retained to read and verify the hash of historical recipes.
  */
 public record SetProperty(String id, String element, PropertyScope scope, String pset, String property, PropertyValue value,
                           PriceKey priceKey) implements Operation {

@@ -37,14 +37,9 @@ export type Diff={changed:DiffEntry[];added:DiffEntry[];deleted:DiffEntry[];unex
 export type Layer={layer:number;name:string;status:"PASS"|"FAIL"|"NOT_RUN";reason?:string;issues?:unknown[];base_issues?:number;
   output_issues?:number;new_issues?:unknown[];unexpected?:string[];truncated?:boolean};
 export type Validation={layers:Layer[];skipped:{layer:number;reason:string}[]};
-export type Price={key:string;unit:string;currency:string;amount:number;source:string;date:string;copiedFrom:string|null};
-export type EstimateLine={operation:string|null;kind:"TYPE_CHANGE"|"ADDITIONAL_COST"|"MATERIAL_FINISH";element:string|null;quantity:number|null;unit:string|null;
-  quantitySource:QuantitySource|null;basis:string|null;beforeKey:string|null;before:Price|null;afterKey:string|null;after:Price|null;
-  difference:number|null};
-export type Estimate={currency:string;total:number;complete:boolean;lines:EstimateLine[]};
 export type Report={ok:boolean;operations:OperationResult[];findings:Finding[];quantities:QuantityLine[];
   affected?:{guid:string;class:string;name:IfcText;operations:string[]}[];diff?:Diff|null;validation?:Validation|null;
-  errors?:{code:string;detail?:string|null}[];estimate:Estimate|null};
+  errors?:{code:string;detail?:string|null}[]};
 export type Person={id:string;email:string|null};
 export type ActionName="edit"|"preview"|"submit"|"apply"|"restore"|"discard";
 export type ModelChange={id:string;project:string;file:string;baseVersion:string;baseRevision:number;baseName:string;format:string;
@@ -185,27 +180,4 @@ export function reportFindings(report:Report):Finding[]{
   const all=[...report.operations.flatMap(result=>result.findings??[]),...report.findings];
   const seen=new Set<string>();
   return all.filter(item=>{const key=item.rule+"|"+(item.element??"");if(seen.has(key))return false;seen.add(key);return true;});
-}
-
-/** What the project's budget adds up: only applied changes count, with the estimate frozen at approval. */
-export type ApprovedBudget={currency:string;total:number;counted:number;missing:number;otherCurrency:number};
-
-/**
- * Sum of the frozen estimates of the applied changes (§6.3). A restored change was undone and a discarded one never
- * happened, so neither counts; an applied change whose estimate lacks a price is reported in `missing`, not guessed.
- * The total is in the currency of the first counted estimate: one in another currency is reported in
- * `otherCurrency` and left out, since adding amounts of two currencies gives a meaningless figure.
- */
-export function approvedBudget(changes:readonly ModelChange[]):ApprovedBudget{
-  let total=0,counted=0,missing=0,otherCurrency=0,currency="";
-  for(const change of changes){
-    if(change.status!=="APPLIED")continue;
-    const estimate=change.report?.estimate;
-    if(!estimate||!estimate.complete){missing++;continue;}
-    const own=estimate.currency||"COP";
-    if(!currency)currency=own;
-    else if(own!==currency){otherCurrency++;continue;}
-    total+=estimate.total;counted++;
-  }
-  return {currency:currency||"COP",total,counted,missing,otherCurrency};
 }

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Box, Calculator, Clock, Files, GitCompareArrows, LogIn, MessageSquareText, SearchX } from "lucide-react";
+import { Box, Clock, Files, GitCompareArrows, LogIn, MessageSquareText, SearchX } from "lucide-react";
 import { EmptyState, PanelView } from "@/shared/ui/panel-view";
 import { LoadingStatus } from "@/shared/ui/loading";
 import { editedLabel } from "../domain/project-card";
@@ -21,7 +21,6 @@ function entries(base: string, overview: OverviewStatus): SummaryEntry[] {
       reason: overview.status === "loading" ? "Buscando la última versión…" : "Sube una versión para abrirla en el visor" },
     { key: "cambios", title: "Cambios de diseño", icon: GitCompareArrows, href: base + "/cambios", text: "Propuestas sobre piezas IFC y planos DWG, con su revisión" },
     { key: "asistente", title: "Asistente", icon: MessageSquareText, href: base + "/asistente", text: "Preguntas sobre las fichas vinculadas" },
-    { key: "presupuesto", title: "Presupuesto", icon: Calculator, href: base + "/presupuesto", text: "Diferencia de costo de cada cambio" },
   ];
 }
 

@@ -1,7 +1,6 @@
 package com.obracota.domain.modelchange.model;
 
 import com.obracota.domain.modelchange.model.recipe.Recipe;
-import com.obracota.domain.modelchange.model.report.Estimate;
 import com.obracota.domain.modelchange.model.report.PreviewReport;
 import com.obracota.domain.security.model.Actor;
 import java.time.Instant;
@@ -26,7 +25,7 @@ public record ModelChange(UUID id, UUID project, UUID file, UUID baseVersion, St
                           ChangeOrigin origin, UUID author, UUID agentRun, String description, String summary, Recipe recipe,
                           PreviewReport report, String reportRecipeSha256, Instant previewedAt, Preview preview,
                           String legacyReview, boolean picture, Instant submittedAt,
-                          Publication applied, Estimate approvedEstimate, Publication restored, Discard discarded,
+                          Publication applied, Publication restored, Discard discarded,
                           Instant createdAt, Instant updatedAt) {
     public static final int TEXT_LIMIT = 2000;
     private static final Set<String> FORMATS = Set.of("IFC", "DWG", "DXF");
@@ -84,7 +83,7 @@ public record ModelChange(UUID id, UUID project, UUID file, UUID baseVersion, St
             throw new IllegalArgumentException("Descripción inválida");
         return new ModelChange(id, project, file, baseVersion, format, ChangeStatus.DRAFT, ChangeOrigin.of(actor), actor.user(),
             actor.run(), description.strip(), null, Recipe.empty(), null, null, null, null, null, false, null,
-            null, null, null, null, now, now);
+            null, null, null, now, now);
     }
 
     /** The door review of the routes before H1 and whether a visual reference is attached (the door facade). */
@@ -164,7 +163,7 @@ public record ModelChange(UUID id, UUID project, UUID file, UUID baseVersion, St
     }
 
     /** Publishes the approved preview as {@code version}, freezing the estimate that was approved. */
-    public ModelChange applied(UUID version, UUID by, Estimate estimate, String recipeSha256, Instant now) {
+    public ModelChange applied(UUID version, UUID by, String recipeSha256, Instant now) {
         if (status == ChangeStatus.DRAFT) throw new ChangeStateException("Previsualiza el cambio para aprobarlo.");
         if (status != ChangeStatus.READY) throw new ChangeStateException(closed());
         if (!reportCurrent(recipeSha256) || !report.ok() || preview == null)
@@ -172,7 +171,6 @@ public record ModelChange(UUID id, UUID project, UUID file, UUID baseVersion, St
         var copy = new Next(this);
         copy.status = ChangeStatus.APPLIED;
         copy.applied = new Publication(Objects.requireNonNull(version, "version"), now, by);
-        copy.approvedEstimate = estimate;
         copy.preview = null;
         copy.updatedAt = now;
         return copy.build();
@@ -221,7 +219,6 @@ public record ModelChange(UUID id, UUID project, UUID file, UUID baseVersion, St
         private Preview preview;
         private boolean picture;
         private Publication applied, restored;
-        private Estimate approvedEstimate;
         private Discard discarded;
 
         private Next(ModelChange c) {
@@ -229,14 +226,14 @@ public record ModelChange(UUID id, UUID project, UUID file, UUID baseVersion, St
             origin = c.origin; author = c.author; agentRun = c.agentRun; description = c.description; summary = c.summary;
             recipe = c.recipe; report = c.report; reportRecipeSha256 = c.reportRecipeSha256; previewedAt = c.previewedAt;
             preview = c.preview; legacyReview = c.legacyReview; picture = c.picture; submittedAt = c.submittedAt;
-            applied = c.applied; approvedEstimate = c.approvedEstimate; restored = c.restored; discarded = c.discarded;
+            applied = c.applied; restored = c.restored; discarded = c.discarded;
             createdAt = c.createdAt; updatedAt = c.updatedAt;
         }
 
         private ModelChange build() {
             return new ModelChange(id, project, file, baseVersion, format, status, origin, author, agentRun, description, summary,
                 recipe, report, reportRecipeSha256, previewedAt, preview, legacyReview, picture, submittedAt, applied,
-                approvedEstimate, restored, discarded, createdAt, updatedAt);
+                restored, discarded, createdAt, updatedAt);
         }
     }
 }

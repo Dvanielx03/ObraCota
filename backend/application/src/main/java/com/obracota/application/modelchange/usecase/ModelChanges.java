@@ -11,7 +11,6 @@ import com.obracota.domain.modelchange.model.ChangeStatus;
 import com.obracota.domain.modelchange.model.ModelChange;
 import com.obracota.domain.modelchange.model.ModelChangeEvent;
 import com.obracota.domain.modelchange.model.ModelChangeEvent.Action;
-import com.obracota.domain.modelchange.model.price.UnitPrice;
 import com.obracota.domain.modelchange.model.recipe.ChangeType;
 import com.obracota.domain.modelchange.model.recipe.DwgAddNote;
 import com.obracota.domain.modelchange.model.recipe.DwgMove;
@@ -67,7 +66,7 @@ public final class ModelChanges {
 
     private final ProjectVersions versions;
     private final ModelChangeRepository changes;
-    private final PriceBook prices;
+    private final DoorMinimum doorMinimum;
     private final PreviewStorage previews;
     private final ModelEnginePort engine;
     private final DoorInspectionPort doors;
@@ -76,24 +75,24 @@ public final class ModelChanges {
     private final ChangeViews views;
     private final Duration budget;
 
-    public ModelChanges(ProjectVersions versions, ModelChangeRepository changes, PriceBook prices, PreviewStorage previews,
+    public ModelChanges(ProjectVersions versions, ModelChangeRepository changes, DoorMinimum doorMinimum, PreviewStorage previews,
                         ModelEnginePort engine, DoorInspectionPort doors, RecipeCodec codec, Transactions tx, Clock clock) {
-        this(versions, changes, prices, previews, engine, doors, codec, tx, clock, REQUEST_BUDGET);
+        this(versions, changes, doorMinimum, previews, engine, doors, codec, tx, clock, REQUEST_BUDGET);
     }
 
-    public ModelChanges(ProjectVersions versions, ModelChangeRepository changes, PriceBook prices, PreviewStorage previews,
+    public ModelChanges(ProjectVersions versions, ModelChangeRepository changes, DoorMinimum doorMinimum, PreviewStorage previews,
                         ModelEnginePort engine, DoorInspectionPort doors, RecipeCodec codec, Transactions tx, Clock clock, Duration budget) {
         if (budget == null || budget.isNegative() || budget.isZero()) throw new IllegalArgumentException("budget must be positive");
         this.budget = budget;
         this.versions = versions;
         this.changes = changes;
-        this.prices = prices;
+        this.doorMinimum = doorMinimum;
         this.previews = previews;
         this.engine = engine;
         this.doors = doors;
         this.tx = tx;
         this.clock = clock;
-        this.views = new ChangeViews(versions, changes, prices, previews, codec);
+        this.views = new ChangeViews(versions, changes, previews, codec);
     }
 
     /** Bytes of the stored preview, its size and the name to save it with ({@code <base>-propuesta.ifc}). The caller closes it. */
@@ -205,7 +204,7 @@ public final class ModelChanges {
         var verified = verify(project, id, VersionRef.of(project, start.base()), recipe, deadline);
         var stored = verified.stored();
         try {
-            var report = ChangeFindings.withDoorRules(recipe, verified.report(), prices.minimumWidth(project).orElse(null));
+            var report = ChangeFindings.withDoorRules(recipe, verified.report(), doorMinimum.minimumWidth(project).orElse(null));
             var previous = tx.required(() -> {
                 versions.catalog().requireOwnerForUpdate(project, actor.user());
                 var current = Guards.load(changes, project, id);
@@ -279,18 +278,13 @@ public final class ModelChanges {
         return doors.inspect(project, version, GlobalId.require(element));
     }
 
-    /** Today's door review: {@code /inspect}, {@code DoorRules} and the type prices of the version. */
+    /** Today's door review: {@code /inspect} and {@code DoorRules}. */
     public DoorReview doorReview(Actor actor, UUID project, UUID version, String element, String typeId) throws IOException {
         var door = door(actor, project, version, element);
         GlobalId.require(typeId);
         var type = door.options().stream().filter(option -> option.id().equals(typeId)).findFirst()
             .orElseThrow(() -> new UnprocessableApplicationException("TYPE_NOT_AVAILABLE", "El tipo no está disponible en este IFC."));
-        var book = prices.prices(project, version);
-        var before = doorPrice(book, door.typeId());
-        var after = doorPrice(book, typeId);
-        var estimate = new DoorReview.Estimate(1, 1, before, after,
-            before == null || after == null ? null : after.amount().subtract(before.amount()));
-        return new DoorReview(door, type, DoorRules.evaluate(door, type, prices.minimumWidth(project).orElse(null)), estimate);
+        return new DoorReview(door, type, DoorRules.evaluate(door, type, doorMinimum.minimumWidth(project).orElse(null)));
     }
 
     /**
@@ -450,11 +444,6 @@ public final class ModelChanges {
             : "La vista previa no superó las comprobaciones.";
     }
 
-    private static DoorReview.Price doorPrice(List<UnitPrice> book, String typeId) {
-        if (typeId == null) return null;
-        return book.stream().filter(price -> price.key().typeId().filter(typeId::equals).isPresent()).findFirst()
-            .map(price -> new DoorReview.Price(typeId, price.amount(), price.source(), price.date())).orElse(null);
-    }
 
     private static String proposalName(String base, String format) {
         var drawing = ModelFile.drawing(format);

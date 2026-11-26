@@ -145,7 +145,6 @@ public class ModelChangeController {
         Map<String, Object> report = null;
         if (change.report() != null) {
             report = new LinkedHashMap<>(reports.tree(change.report()));
-            report.put("estimate", view.estimate() == null ? null : reports.tree(view.estimate()));
         }
         var stored = change.preview();
         var preview = stored == null ? new Preview(false, null, null, null)
@@ -174,7 +173,9 @@ public class ModelChangeController {
     private JsonNode legacy(String review) {
         if (review == null) return null;
         try {
-            return json.readTree(review);
+            var value = json.readTree(review);
+            if (value instanceof com.fasterxml.jackson.databind.node.ObjectNode object) object.remove("estimate");
+            return value;
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }

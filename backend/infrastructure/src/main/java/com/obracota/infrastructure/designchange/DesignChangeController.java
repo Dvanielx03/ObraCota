@@ -7,12 +7,8 @@ import com.obracota.application.modelchange.usecase.ChangeView;
 import com.obracota.application.modelchange.usecase.DoorReview;
 import com.obracota.application.modelchange.usecase.ModelChanges;
 import com.obracota.application.modelchange.usecase.PublishModelChange;
-import com.obracota.application.modelchange.usecase.VersionPrices;
-import com.obracota.application.modelversion.usecase.ProjectVersions;
+import com.obracota.application.modelchange.usecase.ConfigureDoorMinimum;
 import com.obracota.domain.designchange.DoorInspectionPort;
-import com.obracota.domain.modelchange.model.price.PriceKey;
-import com.obracota.domain.modelchange.model.price.UnitPrice;
-import com.obracota.domain.modelchange.model.recipe.GlobalId;
 import com.obracota.domain.security.model.Actor;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +16,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.*;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.*;
 
 /**
@@ -35,21 +30,17 @@ import java.util.*;
 public class DesignChangeController {
     private final ModelChanges changes;
     private final PublishModelChange publish;
-    private final VersionPrices prices;
-    private final ProjectVersions versions;
+    private final ConfigureDoorMinimum minimum;
     private final ObjectMapper json;
 
-    public DesignChangeController(ModelChanges changes, PublishModelChange publish, VersionPrices prices, ProjectVersions versions,
+    public DesignChangeController(ModelChanges changes, PublishModelChange publish, ConfigureDoorMinimum minimum,
                                   ObjectMapper json) {
         this.changes = changes;
         this.publish = publish;
-        this.prices = prices;
-        this.versions = versions;
+        this.minimum = minimum;
         this.json = json;
     }
 
-    public record Price(String typeId, BigDecimal amount, String source, LocalDate date) {}
-    public record Pricing(BigDecimal minimum, List<Price> prices) {}
     public record Proposal(UUID version, String element, String typeId, String description, String picture) {}
     public record Change(UUID id, UUID version, String description, DoorReview review, UUID applied, UUID restored, boolean picture) {}
 
@@ -64,27 +55,12 @@ public class DesignChangeController {
         return changes.door(actor, project, version, element);
     }
 
-    @GetMapping("/pricing")
-    public Pricing prices(@PathVariable UUID project, Actor actor, @RequestParam UUID version) {
-        requireIfc(project, actor, version);
-        return pricing(prices.read(actor, project, version));
-    }
+    public record MinimumWidth(BigDecimal minimum) {}
 
-    @PutMapping("/pricing")
-    public Pricing savePricing(@PathVariable UUID project, Actor actor, @RequestParam UUID version, @RequestBody Pricing input) {
-        requireIfc(project, actor, version);
-        List<UnitPrice> typed = null;
-        if (input.prices() != null) {
-            if (input.prices().size() > VersionPrices.LIMIT) throw new IllegalArgumentException("Como máximo " + VersionPrices.LIMIT + " precios");
-            typed = new ArrayList<>();
-            for (var price : input.prices()) {
-                if (price == null || !GlobalId.valid(price.typeId()) || price.date() == null) throw new IllegalArgumentException("Precio inválido");
-                if (price.source() != null && price.source().length() > UnitPrice.SOURCE_LIMIT) throw new IllegalArgumentException("Fuente inválida");
-                typed.add(new UnitPrice(PriceKey.type(price.typeId()), UnitPrice.Unit.UNIT, UnitPrice.COP, price.amount(), price.source(),
-                    price.date(), null));
-            }
-        }
-        return pricing(prices.replace(actor, project, version, input.minimum(), typed));
+    @PutMapping("/minimum-width")
+    public ResponseEntity<Void> saveMinimum(@PathVariable UUID project, Actor actor, @RequestBody MinimumWidth input) {
+        minimum.set(actor, project, input.minimum());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/review")
@@ -121,7 +97,8 @@ public class DesignChangeController {
         DoorReview review = null;
         if (change.legacyReview() != null) {
             try {
-                review = json.readValue(change.legacyReview(), DoorReview.class);
+                review = json.readerFor(DoorReview.class).without(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                    .readValue(change.legacyReview());
             } catch (JsonProcessingException e) {
                 throw new UncheckedIOException(e);
             }
@@ -137,17 +114,6 @@ public class DesignChangeController {
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }
-    }
-
-    private static Pricing pricing(VersionPrices.PriceList list) {
-        var doors = list.prices().stream().filter(price -> price.key().isType() && price.unit() == UnitPrice.Unit.UNIT)
-            .map(price -> new Price(price.key().typeId().orElseThrow(), price.amount(), price.source(), price.date())).toList();
-        return new Pricing(list.minimumWidth(), doors);
-    }
-
-    private void requireIfc(UUID project, Actor actor, UUID version) {
-        if (!"IFC".equals(versions.get(project, actor.user(), version).format()))
-            throw new UnprocessableApplicationException("FORMAT_NOT_SUPPORTED", "Selecciona una versión IFC.");
     }
 
     private static byte[] picture(String data) {

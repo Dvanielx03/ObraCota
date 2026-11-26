@@ -191,7 +191,6 @@ export function WalkFinishEditor({ viewer, project, version, base, onApplying, o
               });
             }}>{proposal ? "Propuesta" : "Base"}</button>)}
         </div>
-        <p>{change?.report?.estimate?.complete ? "Consulta el presupuesto del cambio en su tarjeta." : "Sin estimación completa para este acabado."}</p>
       </>}
       {issue && <p className="walk-edit-error" role="alert">{issue}</p>}
       {working && <p role="status">{working}</p>}

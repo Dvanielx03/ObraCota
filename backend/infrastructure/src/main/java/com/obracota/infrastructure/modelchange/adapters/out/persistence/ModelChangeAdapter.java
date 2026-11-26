@@ -18,8 +18,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 /**
  * {@code model_change} and {@code model_change_event} with JdbcTemplate, as {@code door_change} was (no JPA, so
- * Hibernate's {@code validate} never sees these tables). The recipe is stored canonical; the report and the approved
- * estimate as JSON text, so the same migration runs on H2 and PostgreSQL.
+ * Hibernate's {@code validate} never sees these tables). Recipes and reports are stored as JSON text on H2 and PostgreSQL.
  */
 public class ModelChangeAdapter implements ModelChangeRepository {
     /** File, format and project are the base version's (V24, third normal form): read through the join of {@link #SCOPED}. */
@@ -27,7 +26,7 @@ public class ModelChangeAdapter implements ModelChangeRepository {
         m.id, f.project_id, b.file_id, m.base_version, b.format, m.status, m.origin, m.author_id, m.agent_run_id, m.description,
         m.summary, m.recipe, m.report, m.report_recipe_sha256, m.previewed_at, m.preview_id, m.preview_sha256, m.preview_size,
         m.legacy_review, case when m.picture is null then false else true end as picture_present, m.submitted_at, m.applied_version,
-        m.applied_at, m.applied_by, m.approved_estimate, m.restored_version, m.restored_at, m.restored_by, m.discarded_at,
+        m.applied_at, m.applied_by, m.restored_version, m.restored_at, m.restored_by, m.discarded_at,
         m.discarded_by, m.discarded_by_kind, m.created_at, m.updated_at
         """;
     private static final String SCOPED =
@@ -98,9 +97,9 @@ public class ModelChangeAdapter implements ModelChangeRepository {
         db.update("""
             insert into model_change (id, base_version, status, origin, author_id, agent_run_id,
               description, summary, recipe, report, report_recipe_sha256, previewed_at, preview_id, preview_sha256, preview_size,
-              legacy_review, picture, submitted_at, applied_version, applied_at, applied_by, approved_estimate, restored_version,
+              legacy_review, picture, submitted_at, applied_version, applied_at, applied_by, restored_version,
               restored_at, restored_by, discarded_at, discarded_by, discarded_by_kind, created_at, updated_at)
-            values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, statement -> {
             int i = 1;
             statement.setObject(i++, change.id());
@@ -119,7 +118,7 @@ public class ModelChangeAdapter implements ModelChangeRepository {
         int rows = db.update("""
             update model_change set status=?, origin=?, author_id=?, agent_run_id=?, description=?, summary=?, recipe=?, report=?,
               report_recipe_sha256=?, previewed_at=?, preview_id=?, preview_sha256=?, preview_size=?, legacy_review=?,
-              submitted_at=?, applied_version=?, applied_at=?, applied_by=?, approved_estimate=?, restored_version=?, restored_at=?,
+              submitted_at=?, applied_version=?, applied_at=?, applied_by=?, restored_version=?, restored_at=?,
               restored_by=?, discarded_at=?, discarded_by=?, discarded_by_kind=?, updated_at=?
             where id=? and base_version in (%s)
             """.formatted(PROJECT_VERSIONS), statement -> {
@@ -159,7 +158,6 @@ public class ModelChangeAdapter implements ModelChangeRepository {
         s.setObject(i++, applied == null ? null : applied.version());
         s.setObject(i++, applied == null ? null : time(applied.at()));
         s.setObject(i++, applied == null ? null : applied.by());
-        s.setString(i++, c.approvedEstimate() == null ? null : reports.write(c.approvedEstimate()));
         var restored = c.restored();
         s.setObject(i++, restored == null ? null : restored.version());
         s.setObject(i++, restored == null ? null : time(restored.at()));
@@ -206,7 +204,6 @@ public class ModelChangeAdapter implements ModelChangeRepository {
         var appliedAt = instant(rs, "applied_at");
         var restoredAt = instant(rs, "restored_at");
         var discardedAt = instant(rs, "discarded_at");
-        var estimate = rs.getString("approved_estimate");
         var kind = rs.getString("discarded_by_kind");
         return new ModelChange(rs.getObject("id", UUID.class), rs.getObject("project_id", UUID.class), rs.getObject("file_id", UUID.class),
             rs.getObject("base_version", UUID.class), rs.getString("format"), ChangeStatus.valueOf(rs.getString("status")),
@@ -216,7 +213,6 @@ public class ModelChangeAdapter implements ModelChangeRepository {
             previewId == null ? null : new ModelChange.Preview(previewId, rs.getString("preview_sha256"), rs.getLong("preview_size")),
             rs.getString("legacy_review"), rs.getBoolean("picture_present"), instant(rs, "submitted_at"),
             appliedAt == null ? null : new ModelChange.Publication(rs.getObject("applied_version", UUID.class), appliedAt, rs.getObject("applied_by", UUID.class)),
-            estimate == null ? null : reports.estimate(estimate),
             restoredAt == null ? null : new ModelChange.Publication(rs.getObject("restored_version", UUID.class), restoredAt, rs.getObject("restored_by", UUID.class)),
             discardedAt == null ? null : new ModelChange.Discard(discardedAt, rs.getObject("discarded_by", UUID.class), Actor.Kind.valueOf(kind)),
             instant(rs, "created_at"), instant(rs, "updated_at"));

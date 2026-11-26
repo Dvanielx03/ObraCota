@@ -51,9 +51,6 @@ test("Guardar en el modelo crea un cambio de material que la propietaria aprueba
 
     const card=page.locator(`article[id="${change}"]`);
     await expect(card.getByRole("region",{name:"Receta"})).toContainText("Acabado exterior · 23 piezas");
-    const estimate=card.getByRole("region",{name:"Estimación del cambio"});
-    await expect(estimate).toContainText("No hay precio registrado para «Piedra · claro»");
-    await expect(estimate).toContainText("Faltan precios para estimar el total.");
 
     const publishing=page.waitForResponse(response=>response.url().endsWith("/model-changes/"+change+"/apply") && response.request().method()==="POST");
     await card.getByRole("button",{name:"Aprobar y aplicar cambio"}).click();

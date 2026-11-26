@@ -1,7 +1,7 @@
 import {useState,type FormEvent} from "react";
 import Link from "next/link";
 import {authenticated} from "@/core/http/http-client";
-import {DoorReview,endpoints,type Change,type Door,type Price,type Review} from "./door-review";
+import {DoorReview,endpoints,type Change,type Door,type Review} from "./door-review";
 import {LoadingStatus} from "@/shared/ui/loading";
 
 function uploadImage(file:File):Promise<string>{
@@ -33,14 +33,8 @@ export function DoorProposal({project,version,element,capture}:{project:string;v
     event.preventDefault();
     const data=new FormData(event.currentTarget);
     await perform(async()=>{
-      const prices:Price[]=[];
-      for(const [prefix,typeId] of [["actual",door?.typeId],["propuesto",type]] as const){
-        if(typeId && String(data.get(prefix+"Precio")).trim())prices.push({
-          typeId,amount:Number(data.get(prefix+"Precio")),source:String(data.get(prefix+"Fuente")),date:String(data.get(prefix+"Fecha")),
-        });
-      }
       const minimum=String(data.get("minimum")).trim();
-      await authenticated(base+"/pricing?"+new URLSearchParams({version}),{method:"PUT",body:JSON.stringify({minimum:minimum?Number(minimum)/1000:null,prices})});
+      await authenticated(base+"/minimum-width",{method:"PUT",body:JSON.stringify({minimum:minimum?Number(minimum)/1000:null})});
       if(type)await inspect();
     });
   }
@@ -68,17 +62,13 @@ export function DoorProposal({project,version,element,capture}:{project:string;v
         }}/></label>
         {picture && <figure><img src={picture} alt="Propuesta visual elegida"/><figcaption>Referencia visual</figcaption></figure>}
       </details>
-      {type && <details key={type}><summary>Ingresar precio y ancho mínimo</summary>
+      {type && <details key={type}><summary>Configurar ancho mínimo</summary>
         <form onSubmit={saveSettings}>
           <label>Ancho nominal mínimo de proyecto (mm)<input type="number" name="minimum" min="1" step="1"/></label>
-          {([["actual","Tipo actual"],["propuesto","Tipo propuesto"]] as const).map(([prefix,label])=><fieldset key={prefix}><legend>{label}</legend>
-            <label>Precio COP<input type="number" name={prefix+"Precio"} min="0" step=".01"/></label>
-            <label>Fuente<input name={prefix+"Fuente"} maxLength={300}/></label><label>Fecha<input name={prefix+"Fecha"} type="date"/></label>
-          </fieldset>)}
           <button disabled={busy}>Guardar datos de revisión</button>
         </form>
       </details>}
-      <button disabled={busy||!type} onClick={()=>void perform(inspect)}>Revisar costo y avisos</button>
+      <button disabled={busy||!type} onClick={()=>void perform(inspect)}>Revisar avisos</button>
       {review && <><DoorReview review={review} project={project} version={version}/>
         <button disabled={busy||!description.trim()} onClick={()=>void perform(register)}>Registrar propuesta IFC</button></>}
     </>}

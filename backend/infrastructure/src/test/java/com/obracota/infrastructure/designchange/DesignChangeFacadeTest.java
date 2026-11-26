@@ -65,24 +65,13 @@ class DesignChangeFacadeTest {
         var version = v1.get("id").asText();
         var changes = base + "/design-changes";
 
-        // GET /door and the pricing routes, now over unit_price.
+        // Preserve the door rule independently from the removed cost feature.
         mvc.perform(get(changes + "/door").param("version", version).param("element", DOOR).header("Authorization", user))
             .andExpect(status().isOk()).andExpect(jsonPath("$.typeId").value(CURRENT)).andExpect(jsonPath("$.width").value(0.762));
-        var pricing = Map.of("minimum", new BigDecimal("0.8"), "prices", List.of(
-            Map.of("typeId", CURRENT, "amount", 100000, "source", "Cotización de prueba", "date", "2026-11-20"),
-            Map.of("typeId", ALTERNATE, "amount", 125000, "source", "Cotización de prueba", "date", "2026-11-20")));
-        mvc.perform(put(changes + "/pricing").param("version", version).header("Authorization", user).contentType("application/json")
-            .content(json.writeValueAsBytes(pricing))).andExpect(status().isOk())
-            .andExpect(jsonPath("$.minimum").value(0.8)).andExpect(jsonPath("$.prices.length()").value(2));
-        assertEquals(2, db.queryForObject("select count(*) from unit_price where version_id=? and price_key like 'type:%' and unit='UNIT' and currency='COP'",
-            Integer.class, UUID.fromString(version)));
-        mvc.perform(get(changes + "/pricing").param("version", version).header("Authorization", user))
-            .andExpect(jsonPath("$.prices[?(@.typeId=='" + ALTERNATE + "')].amount").value(125000.0));
-        mvc.perform(put(changes + "/pricing").param("version", version).header("Authorization", user).contentType("application/json")
-            .content("{\"prices\":[{\"typeId\":\"corto\",\"amount\":1,\"source\":\"x\",\"date\":\"2026-11-20\"}]}"))
-            .andExpect(status().isBadRequest());
+        mvc.perform(put(changes + "/minimum-width").header("Authorization", user).contentType("application/json")
+            .content("{\"minimum\":0.8}")).andExpect(status().isNoContent());
         mvc.perform(get(changes + "/review").param("version", version).param("element", DOOR).param("typeId", ALTERNATE)
-            .header("Authorization", user)).andExpect(status().isOk()).andExpect(jsonPath("$.estimate.difference").value(25000.0));
+            .header("Authorization", user)).andExpect(status().isOk()).andExpect(jsonPath("$.findings[?(@.rule=='MINIMUM_NOMINAL_WIDTH')].status").value("WARNING"));
         mvc.perform(get(changes + "/review").param("version", version).param("element", DOOR).param("typeId", "4klOFZffH6WQFlV10uM1wH")
             .header("Authorization", user)).andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.message").value("El tipo no está disponible en este IFC."));
@@ -98,8 +87,6 @@ class DesignChangeFacadeTest {
         assertTrue(ready.get("applied").isNull());
         assertEquals(ALTERNATE, ready.at("/review/proposal/id").asText());
         assertEquals(DOOR, ready.at("/review/door/element").asText());
-        assertEquals(25000, ready.at("/review/estimate/difference").asInt());
-        assertEquals("Cotización de prueba", ready.at("/review/estimate/after/source").asText());
         assertTrue(ready.at("/review/findings").isArray());
         var readyId = UUID.fromString(ready.get("id").asText());
         assertEquals("READY", db.queryForObject("select status from model_change where id=?", String.class, readyId));
@@ -136,14 +123,13 @@ class DesignChangeFacadeTest {
             .andExpect(status().isOk()).andExpect(content().contentType("image/png")).andExpect(content().bytes(PNG));
         mvc.perform(get(changes).header("Authorization", register())).andExpect(status().isNotFound());
 
-        // The facade hands its resolved actor to the use cases: an agent cannot publish or price through it.
+        // The facade hands its resolved actor to the use cases: an agent cannot publish through it.
         var userId = db.queryForObject("select owner_id from project where id=?", UUID.class, UUID.fromString(project));
         var agent = Actor.agent(userId, UUID.fromString(project), UUID.randomUUID());
         assertThrows(ForbiddenApplicationException.class, () -> facade.restore(UUID.fromString(project), readyId, agent));
-        assertThrows(ForbiddenApplicationException.class, () -> facade.savePricing(UUID.fromString(project), agent, UUID.fromString(version),
-            new DesignChangeController.Pricing(null, List.of())));
+        assertThrows(ForbiddenApplicationException.class, () -> facade.saveMinimum(UUID.fromString(project), agent, new DesignChangeController.MinimumWidth(BigDecimal.ONE)));
 
-        // Apply creates revision 2 with the preview's bytes, copies the prices and is idempotent.
+        // Apply creates revision 2 with the preview's bytes and is idempotent.
         mvc.perform(post(base + "/model-changes/" + readyId + "/apply").header("Authorization", user)).andExpect(status().isOk());
         var v2 = applied(read(mvc.perform(get(changes).header("Authorization", user)).andExpect(status().isOk())), readyId);
         var revision = read(mvc.perform(get(base + "/versions/" + v2).header("Authorization", user)).andExpect(status().isOk()));
@@ -151,8 +137,6 @@ class DesignChangeFacadeTest {
         var stored = db.queryForObject("select preview_sha256 from model_change where id=?", String.class, readyId);
         assertNull(stored);
         assertNotEquals(v1.get("sha256").asText(), revision.get("sha256").asText());
-        assertEquals(2, db.queryForObject("select count(*) from unit_price where version_id=? and copied_from=?", Integer.class,
-            UUID.fromString(v2), UUID.fromString(version)));
         assertFalse(Files.exists(root.resolve(".previews").resolve(project).resolve(readyId.toString()).resolve(previewId + ".ifc")));
         mvc.perform(post(base + "/model-changes/" + readyId + "/apply").header("Authorization", user)).andExpect(status().isOk());
         assertEquals(v2, applied(read(mvc.perform(get(changes).header("Authorization", user))), readyId));

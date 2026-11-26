@@ -1,16 +1,13 @@
 package com.obracota.infrastructure.modelchange;
 
 import com.obracota.application.modelchange.rules.ChangeActions;
-import com.obracota.application.modelchange.rules.ChangeEstimate;
 import com.obracota.application.modelchange.rules.ChangeFindings;
 import com.obracota.domain.modelchange.model.ChangeOrigin;
 import com.obracota.domain.modelchange.model.ChangeStateException;
 import com.obracota.domain.modelchange.model.ChangeStatus;
 import com.obracota.domain.modelchange.model.ModelChange;
 import com.obracota.domain.modelchange.model.price.PriceKey;
-import com.obracota.domain.modelchange.model.price.UnitPrice;
 import com.obracota.domain.modelchange.model.recipe.*;
-import com.obracota.domain.modelchange.model.report.EstimateLine;
 import com.obracota.domain.modelchange.model.report.Finding;
 import com.obracota.domain.modelchange.model.report.PreviewReport;
 import com.obracota.domain.modelchange.model.report.QuantityLine;
@@ -19,7 +16,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -96,7 +92,7 @@ class ModelChangeRulesTest {
         @Test void recipeIsFrozenOutsideDraft() {
             var ready = ready(PERSON);
             assertThrows(ChangeStateException.class, () -> ready.withRecipe(Recipe.empty(), NOW));
-            var applied = ready.applied(UUID.randomUUID(), USER, null, "h1", NOW);
+            var applied = ready.applied(UUID.randomUUID(), USER, "h1", NOW);
             assertThrows(ChangeStateException.class, () -> applied.withRecipe(Recipe.empty(), NOW));
             var discarded = draft(PERSON).discarded(PERSON, NOW);
             assertThrows(ChangeStateException.class, () -> discarded.withRecipe(Recipe.empty(), NOW));
@@ -135,18 +131,18 @@ class ModelChangeRulesTest {
 
         @Test void applyAndRestoreFollowTheirOrder() {
             var draft = draft(PERSON);
-            var refused = assertThrows(ChangeStateException.class, () -> draft.applied(UUID.randomUUID(), USER, null, "h0", NOW));
+            var refused = assertThrows(ChangeStateException.class, () -> draft.applied(UUID.randomUUID(), USER, "h0", NOW));
             assertEquals("Previsualiza el cambio para aprobarlo.", refused.getMessage());
             var notApplied = assertThrows(ChangeStateException.class, () -> ready(PERSON).restored(UUID.randomUUID(), USER, NOW));
             assertEquals("Todavía no se aplicó el cambio.", notApplied.getMessage());
             var ready = ready(PERSON);
-            assertThrows(ChangeStateException.class, () -> ready.applied(UUID.randomUUID(), USER, null, "other", NOW), "stale report");
+            assertThrows(ChangeStateException.class, () -> ready.applied(UUID.randomUUID(), USER, "other", NOW), "stale report");
             var version = UUID.randomUUID();
-            var applied = ready.applied(version, USER, null, "h1", NOW);
+            var applied = ready.applied(version, USER, "h1", NOW);
             assertEquals(ChangeStatus.APPLIED, applied.status());
             assertEquals(version, applied.applied().version());
             assertNull(applied.preview(), "the preview file is gone once published");
-            assertThrows(ChangeStateException.class, () -> applied.applied(UUID.randomUUID(), USER, null, "h1", NOW));
+            assertThrows(ChangeStateException.class, () -> applied.applied(UUID.randomUUID(), USER, "h1", NOW));
             var restored = applied.restored(UUID.randomUUID(), USER, NOW);
             assertEquals(ChangeStatus.RESTORED, restored.status());
             assertThrows(ChangeStateException.class, () -> restored.restored(UUID.randomUUID(), USER, NOW));
@@ -154,7 +150,7 @@ class ModelChangeRulesTest {
         }
 
         @Test void discardOnlyWhilePendingAndRecordsWho() {
-            var applied = ready(PERSON).applied(UUID.randomUUID(), USER, null, "h1", NOW);
+            var applied = ready(PERSON).applied(UUID.randomUUID(), USER, "h1", NOW);
             var refused = assertThrows(ChangeStateException.class, () -> applied.discarded(PERSON, NOW));
             assertEquals("Un cambio aplicado se revierte con una revisión de restauración.", refused.getMessage());
             var agent = Actor.agent(USER, UUID.randomUUID(), UUID.randomUUID());
@@ -213,75 +209,6 @@ class ModelChangeRulesTest {
             assertThrows(IllegalArgumentException.class, () -> PropertyScope.of("TYPE"));
         }
 
-        @Test void priceKeysAndPricesAreValidated() {
-            assertTrue(PriceKey.type(PROPOSED).isType());
-            assertEquals(Optional.of(PROPOSED), PriceKey.type(PROPOSED).typeId());
-            assertEquals("item:Sello cortafuego", PriceKey.item("Sello cortafuego").value());
-            assertThrows(IllegalArgumentException.class, () -> new PriceKey("type:corto"));
-            assertThrows(IllegalArgumentException.class, () -> new PriceKey("item:"));
-            assertThrows(IllegalArgumentException.class, () -> new PriceKey("item:con\ttab"));
-            assertThrows(IllegalArgumentException.class, () -> price(PROPOSED, "-1"));
-            assertThrows(IllegalArgumentException.class, () -> price(PROPOSED, "1.001"));
-            assertThrows(IllegalArgumentException.class, () -> new UnitPrice(PriceKey.type(PROPOSED), UnitPrice.Unit.UNIT, "COP",
-                BigDecimal.TEN, " ", LocalDate.now(), null));
-            assertEquals("Cotización", new UnitPrice(PriceKey.type(PROPOSED), UnitPrice.Unit.UNIT, "COP", BigDecimal.TEN, " Cotización ",
-                LocalDate.now(), null).source());
-        }
-    }
-
-    static UnitPrice price(String type, String amount) {
-        return new UnitPrice(PriceKey.type(type), UnitPrice.Unit.UNIT, "COP", new BigDecimal(amount), "Cotización de prueba",
-            LocalDate.parse("2026-11-20"), null);
-    }
-
-    @Nested class Estimates {
-        @Test void typeChangeIsProposedMinusCurrent() {
-            var recipe = recipe(new ChangeType(null, DOOR, PROPOSED));
-            var estimate = ChangeEstimate.of(recipe, report(recipe, true), List.of(price(CURRENT, "100000"), price(PROPOSED, "125000")));
-            var line = estimate.lines().getFirst();
-            assertEquals(EstimateLine.Kind.TYPE_CHANGE, line.kind());
-            assertEquals(PriceKey.type(CURRENT), line.beforeKey());
-            assertEquals(0, new BigDecimal("25000").compareTo(line.difference()));
-            assertEquals(0, new BigDecimal("25000").compareTo(estimate.total()));
-            assertTrue(estimate.complete());
-            assertEquals("COP", estimate.currency());
-            assertEquals("Puerta por unidad: ifc5d no mapea Qto_DoorBaseQuantities", line.basis());
-            assertEquals("Cotización de prueba", line.after().source());
-        }
-
-        @Test void aMissingPriceLeavesTheDifferenceEmpty() {
-            var recipe = recipe(new ChangeType(null, DOOR, PROPOSED));
-            var estimate = ChangeEstimate.of(recipe, report(recipe, true), List.of(price(CURRENT, "100000")));
-            assertNull(estimate.lines().getFirst().difference());
-            assertFalse(estimate.complete());
-            assertEquals(0, BigDecimal.ZERO.compareTo(estimate.total()));
-            var unreported = ChangeEstimate.of(recipe, null, List.of(price(CURRENT, "100000"), price(PROPOSED, "125000")));
-            assertNull(unreported.lines().getFirst().beforeKey(), "without a report the current type is unknown");
-            assertNull(unreported.lines().getFirst().difference());
-        }
-
-        @Test void aPriceInAnotherUnitIsShownButNotUsed() {
-            var recipe = recipe(new ChangeType(null, DOOR, PROPOSED));
-            var perArea = new UnitPrice(PriceKey.type(PROPOSED), UnitPrice.Unit.M2, "COP", new BigDecimal("125000"), "Cotización",
-                LocalDate.parse("2026-11-20"), null);
-            var line = ChangeEstimate.of(recipe, report(recipe, true), List.of(price(CURRENT, "100000"), perArea)).lines().getFirst();
-            assertEquals(perArea, line.after());
-            assertNull(line.difference());
-        }
-
-        @Test void propertiesCostOnlyWithAPriceKey() {
-            var key = PriceKey.item("Sello cortafuego EI 60");
-            var recipe = recipe(
-                new SetProperty(null, DOOR, PropertyScope.OCCURRENCE, "Pset_DoorCommon", "FireRating", new PropertyValue.Text("EI 60"), key),
-                new SetProperty(null, DOOR, PropertyScope.OCCURRENCE, "Pset_DoorCommon", "AcousticRating", new PropertyValue.Text("R30"), null));
-            var extra = new UnitPrice(key, UnitPrice.Unit.UNIT, "COP", new BigDecimal("40000.50"), "Proveedor", LocalDate.parse("2026-11-19"), null);
-            var estimate = ChangeEstimate.of(recipe, null, List.of(extra));
-            assertEquals(1, estimate.lines().size(), "no line without price_key");
-            assertEquals(EstimateLine.Kind.ADDITIONAL_COST, estimate.lines().getFirst().kind());
-            assertEquals(0, new BigDecimal("40000.50").compareTo(estimate.total()));
-            assertTrue(ChangeEstimate.of(recipe(new SetProperty(null, DOOR, PropertyScope.TYPE, "Pset_DoorCommon", "FireRating",
-                new PropertyValue.Text("EI 60"), null)), null, List.of()).lines().isEmpty());
-        }
     }
 
     @Nested class DoorNotices {
@@ -371,7 +298,7 @@ class ModelChangeRulesTest {
         }
 
         @Test void restoreOnlyUndoesTheLatestRevision() {
-            var applied = ready(PERSON).applied(UUID.randomUUID(), USER, null, "h1", NOW);
+            var applied = ready(PERSON).applied(UUID.randomUUID(), USER, "h1", NOW);
             var latest = ChangeActions.of(PERSON, applied, new ChangeActions.Facts(true, 2, true, true, true, false));
             assertTrue(latest.restore());
             var later = ChangeActions.of(PERSON, applied, new ChangeActions.Facts(false, 3, true, false, true, false));

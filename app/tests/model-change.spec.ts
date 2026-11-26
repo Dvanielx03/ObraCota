@@ -37,7 +37,7 @@ async function json(response:Awaited<ReturnType<APIRequestContext["get"]>>,statu
   return response.json();
 }
 
-test("Cambio de modelo: borrador, vista previa en 3D, envío, rechazo, aplicación con precios copiados y restauración",async({page})=>{
+test("Cambio de modelo: borrador, vista previa en 3D, envío, rechazo, aplicación y restauración",async({page})=>{
   test.setTimeout(180_000);
   const ifc=process.env.DUPLEX_IFC;
   test.skip(!ifc,"Indica el IFC Duplex original con DUPLEX_IFC.");
@@ -53,16 +53,12 @@ test("Cambio de modelo: borrador, vista previa en 3D, envío, rechazo, aplicaci�
       params:{name:"Duplex_A.ifc"},data:readFileSync(ifc!)}),201);
     const v1=original.id as string;
 
-    // E1 · a draft by API, its door operation and the two prices of the base.
-    const current=(await json(await page.request.get(base+"/versions/"+v1+"/elements/"+door,{headers}),200)).type.guid as string;
+    // E1 · a draft and its door operation through the API.
     const draft=await json(await page.request.post(base+"/model-changes",{headers,data:{baseVersion:v1,description:"Probar una puerta alternativa con el mismo hueco"}}),201);
     expect(draft.status).toBe("DRAFT");
     const first=draft.id as string;
     expect((await json(await page.request.post(base+"/model-changes/"+first+"/operations",{headers,...slow,
       data:{op:"ifc.change_type",element:door,type_id:alternate}}),201)).status).toBe("DRAFT");
-    const prices=[{key:"type:"+current,unit:"UNIT",amount:100000,source:"Cotización de prueba",date:"2026-11-20"},
-      {key:"type:"+alternate,unit:"UNIT",amount:125000,source:"Cotización de prueba",date:"2026-11-20"}];
-    await json(await page.request.put(base+"/versions/"+v1+"/prices",{headers,data:{prices}}),200);
 
     // E2 · preview and submit from the card; every section of the report is there.
     await page.goto(route+"/cambios#"+first);
@@ -74,10 +70,6 @@ test("Cambio de modelo: borrador, vista previa en 3D, envío, rechazo, aplicaci�
     await expect(submit).toBeEnabled({timeout:150_000});
     await expect(card.getByRole("region",{name:"Receta"})).toContainText("Cambiar tipo");
     await expect(card.getByRole("region",{name:"Avisos de diseño"})).toBeVisible();
-    const estimate=card.getByRole("region",{name:"Estimación del cambio"});
-    await expect(estimate).toContainText(/25[.,]000/);
-    await expect(estimate).toContainText("Cotización de prueba");
-    await expect(estimate).toContainText("2026-11-20");
     const diff=card.getByRole("region",{name:"Diferencias con la base"});
     await expect(diff.locator(`code[title="${door}"]`)).toBeVisible();
     await expect(diff).toContainText("tipo");
@@ -142,7 +134,7 @@ test("Cambio de modelo: borrador, vista previa en 3D, envío, rechazo, aplicaci�
     await expect(rejected).toContainText("por "+email);
     expect(await json(await page.request.get(base+"/files/"+original.fileId+"/versions",{headers}),200)).toHaveLength(1);
 
-    // E5 · approve the first one: v2 opens marked on the rail, its prices were copied and the budget is frozen.
+    // E5 · approve the first one: v2 opens marked on the rail.
     const approved=page.locator(`article[id="${first}"]`);
     const publishing=page.waitForResponse(response=>response.url().endsWith("/model-changes/"+first+"/apply") && response.request().method()==="POST");
     await approved.getByRole("button",{name:"Aprobar y aplicar cambio"}).click();
@@ -151,28 +143,12 @@ test("Cambio de modelo: borrador, vista previa en 3D, envío, rechazo, aplicaci�
     await expect(opened).toBeVisible({timeout:60_000});
     const href=(await opened.getAttribute("href"))!;
     expect(href).toContain("anterior="+v1);
-    const v2=href.split("?")[0].split("/").pop()!;
-    const copied=await json(await page.request.get(base+"/versions/"+v2+"/prices",{headers}),200);
-    expect(copied.prices).toHaveLength(2);
-    for(const price of prices)expect(copied.prices).toContainEqual(expect.objectContaining({...price,currency:"COP",copiedFrom:v1}));
-    const changes=page.url();
     await opened.click();
     await expect(page.getByRole("navigation",{name:"Versiones del archivo"}).getByRole("link",{name:/^Versión 2 .*\(abierta\)$/}))
       .toHaveAttribute("aria-current","page",{timeout:60_000});
 
     // E6 · RECORRIDO over v2 keeps «Anterior» and «Nueva», as design-change.spec.ts checks.
     await walkBetween(page,"Anterior","Nueva");
-
-    await page.goto(changes.replace(/\/cambios.*$/,"/presupuesto"));
-    const frozen=page.locator(`article[id="${first}"]`).getByRole("region",{name:"Estimación del cambio"});
-    await expect(frozen).toContainText(/25[.,]000/);
-    await expect(frozen).toContainText("Estimación congelada al aprobar");
-    // Only the applied change adds up (the rejected one does not), and its card links back to the full change.
-    const total=page.getByRole("region",{name:"Total de cambios aprobados"});
-    await expect(total).toContainText(/25[.,]000/);
-    await expect(total).toContainText("1 cambio aprobado con estimación completa");
-    await expect(page.locator(`article[id="${first}"]`).getByRole("link",{name:"Ver el cambio completo"}))
-      .toHaveAttribute("href","/proyectos/"+id+"/cambios#"+first);
 
     // E7 · the restoring revision v3 carries the SHA-256 of the original upload.
     await page.goto(route+"/cambios#"+first);

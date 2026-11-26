@@ -92,7 +92,6 @@ test("Edita el acabado de la mesa ReStage desde Recorrido y reabre el IFC aproba
     const verified = await draft.json();
     expect(verified.report).toMatchObject({ ok: true });
     expect(verified.recipe.operations).toEqual([expect.objectContaining({ op: "ifc.set_material", elements: [table], material: "Pintura · oscuro" })]);
-    await expect(panel).toContainText("Sin estimación completa");
     expect(await history()).toHaveLength(1);
     const proposedColor = await centrePixel(page);
     await page.screenshot({ path: info.outputPath("02-propuesta.png") });

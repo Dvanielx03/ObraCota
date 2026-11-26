@@ -4,7 +4,6 @@ import com.obracota.application.agenttools.DesignAgentTools;
 import com.obracota.application.modelchange.usecase.ModelChanges;
 import com.obracota.application.modelchange.usecase.ModelReading;
 import com.obracota.application.modelchange.usecase.PublishModelChange;
-import com.obracota.application.modelchange.usecase.VersionPrices;
 import com.obracota.application.modelfile.usecase.ProjectFileCatalog;
 import com.obracota.application.modelversion.usecase.ProjectVersions;
 import com.obracota.domain.modelversion.port.OriginalStorage;
@@ -18,11 +17,11 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * J14: what the agent's catalog receives ({@link ModelChanges}, {@link ModelReading}) cannot lead to publishing.
  * They are {@code final} classes, not records, and no public method returns, directly or inside the records it returns,
- * anything that uploads a revision, reads the originals or sets prices. Plain reflection, no Spring.
+ * anything that uploads a revision, reads the originals. Plain reflection, no Spring.
  */
 class AgentReachTest {
     static final Set<Class<?>> PUBLISHING = Set.of(ProjectVersions.class, OriginalStorage.class, VersionRepository.class,
-        ProjectFileCatalog.class, PublishModelChange.class, VersionPrices.class);
+        ProjectFileCatalog.class, PublishModelChange.class);
 
     @ParameterizedTest
     @ValueSource(classes = {ModelChanges.class, ModelReading.class, DesignAgentTools.class})
@@ -53,7 +52,7 @@ class AgentReachTest {
     }
 
     @ParameterizedTest
-    @ValueSource(classes = {PublishModelChange.class, VersionPrices.class})
+    @ValueSource(classes = {PublishModelChange.class})
     void theWalkWouldNoticeAPublishingType(Class<?> type) {
         var reached = new HashSet<Class<?>>();
         walk(type, reached);

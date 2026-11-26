@@ -2,7 +2,6 @@ package com.obracota.application.modelchange.usecase;
 
 import com.obracota.application.common.exception.ConflictApplicationException;
 import com.obracota.application.common.port.Transactions;
-import com.obracota.application.modelchange.rules.ChangeEstimate;
 import com.obracota.application.modelversion.usecase.ProjectVersions;
 import com.obracota.domain.modelchange.model.ChangeStatus;
 import com.obracota.domain.modelchange.model.ModelChange;
@@ -21,27 +20,25 @@ import java.util.*;
  * actor, which is what protects architecture A, where the agent runs in process without HTTP.
  * <p>
  * Neither calls the engine. Applying uploads exactly the bytes of the approved preview and checks their SHA-256;
- * restoring uploads the bytes of the base. Both copy the prices with their source and date. Each runs in one
+ * restoring uploads the bytes of the base. Each runs in one
  * transaction under the project lock, as the door routes did.
  */
 public final class PublishModelChange {
     private final ProjectVersions versions;
     private final ModelChangeRepository changes;
-    private final PriceBook prices;
     private final PreviewStorage previews;
     private final Transactions tx;
     private final Clock clock;
     private final ChangeViews views;
 
-    public PublishModelChange(ProjectVersions versions, ModelChangeRepository changes, PriceBook prices, PreviewStorage previews,
+    public PublishModelChange(ProjectVersions versions, ModelChangeRepository changes, PreviewStorage previews,
                               RecipeCodec codec, Transactions tx, Clock clock) {
         this.versions = versions;
         this.changes = changes;
-        this.prices = prices;
         this.previews = previews;
         this.tx = tx;
         this.clock = clock;
-        this.views = new ChangeViews(versions, changes, prices, previews, codec);
+        this.views = new ChangeViews(versions, changes, previews, codec);
     }
 
     /**
@@ -70,9 +67,7 @@ public final class PublishModelChange {
             if (!revision.sha256().equalsIgnoreCase(preview.sha256()))
                 throw new ConflictApplicationException("La revisión no coincide con la vista previa aprobada; previsualiza el cambio de nuevo.");
             var now = clock.instant();
-            var estimate = ChangeEstimate.of(change.recipe(), change.report(), prices.prices(project, base.id()));
-            prices.copyMissing(project, base.id(), revision.id());
-            changes.update(change.applied(revision.id(), actor.user(), estimate, hash, now));
+            changes.update(change.applied(revision.id(), actor.user(), hash, now));
             changes.record(ModelChangeEvent.of(id, Action.APPLY, actor,
                 "Revisión v" + revision.revision() + " publicada con la vista previa aprobada.", now));
             List<UUID> done = new ArrayList<>();
@@ -109,7 +104,6 @@ public final class PublishModelChange {
             if (!revision.sha256().equalsIgnoreCase(base.sha256()))
                 throw new ConflictApplicationException("La revisión de restauración no coincide con la base.");
             var now = clock.instant();
-            prices.copyMissing(project, applied.id(), revision.id());
             changes.update(change.restored(revision.id(), actor.user(), now));
             changes.record(ModelChangeEvent.of(id, Action.RESTORE, actor,
                 "Revisión v" + revision.revision() + " con los bytes de la base v" + base.revision() + ".", now));

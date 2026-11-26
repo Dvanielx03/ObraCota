@@ -76,7 +76,6 @@ for (const [width, height] of [[1366, 768], [1920, 1080]]) {
     for (const [view, file, evidence] of [
       ["Archivos y versiones", "archivos", "Restage_IP_ALL_MULTI_001.ifc"],
       ["Asistente", "asistente", "Iniciar sesión para usar el asistente"],
-      ["Presupuesto", "presupuesto", "Pendiente de estimación"],
       ["Cambios de diseño", "cambios", "Sin cambios registrados"],
     ]) {
       const tab = sections.getByRole("link", { name: view, exact: true });

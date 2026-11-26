@@ -6,16 +6,13 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.obracota.domain.modelchange.model.price.PriceKey;
-import com.obracota.domain.modelchange.model.price.UnitPrice;
 import com.obracota.domain.modelchange.model.report.*;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.*;
 
 /**
- * JSON form of {@link PreviewReport} and {@link Estimate}. The report keeps the engine's wire names (§5.6): what the
+ * JSON form of {@link PreviewReport}. The report keeps the engine's wire names (§5.6): what the
  * engine sent plus the backend's notices, which is also what {@code model_change.report} stores. Reading is strict on
  * the typed sections ({@code ok}, {@code recipe_sha256}, {@code artifact}, {@code operations}, {@code findings},
  * {@code quantities}) and keeps the other sections verbatim in {@code details}. Anything that does not fit throws
@@ -172,75 +169,6 @@ public final class ReportJson {
         return lines;
     }
 
-    // Estimate -------------------------------------------------------------------------------------------------------
-
-    public String write(Estimate estimate) { return write(tree(estimate)); }
-
-    /** The estimate as a JSON-like tree: what {@code approved_estimate} stores and what the API returns. */
-    public Map<String, Object> tree(Estimate estimate) {
-        var root = new LinkedHashMap<String, Object>();
-        root.put("currency", estimate.currency());
-        root.put("total", estimate.total());
-        root.put("complete", estimate.complete());
-        root.put("lines", estimate.lines().stream().map(line -> {
-            var node = new LinkedHashMap<String, Object>();
-            node.put("operation", line.operation());
-            node.put("kind", line.kind().name());
-            node.put("element", line.element());
-            node.put("quantity", line.quantity());
-            node.put("unit", line.unit() == null ? null : line.unit().name());
-            node.put("quantitySource", line.quantitySource());
-            node.put("basis", line.basis());
-            node.put("beforeKey", line.beforeKey() == null ? null : line.beforeKey().value());
-            node.put("before", price(line.before()));
-            node.put("afterKey", line.afterKey() == null ? null : line.afterKey().value());
-            node.put("after", price(line.after()));
-            node.put("difference", line.difference());
-            return node;
-        }).toList());
-        return root;
-    }
-
-    public Estimate estimate(String text) {
-        var root = tree(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        var lines = new ArrayList<EstimateLine>();
-        for (var item : list(root.get("lines"), "lines")) {
-            var node = map(item, "lines[]");
-            var unit = optionalText(node.get("unit"), "unit");
-            var beforeKey = optionalText(node.get("beforeKey"), "beforeKey");
-            var afterKey = optionalText(node.get("afterKey"), "afterKey");
-            lines.add(new EstimateLine(optionalText(node.get("operation"), "operation"),
-                EstimateLine.Kind.valueOf(text(node.get("kind"), "kind")), optionalText(node.get("element"), "element"),
-                node.get("quantity") == null ? null : number(node.get("quantity"), "quantity"),
-                unit == null ? null : UnitPrice.Unit.valueOf(unit), optionalText(node.get("quantitySource"), "quantitySource"),
-                optionalText(node.get("basis"), "basis"), beforeKey == null ? null : new PriceKey(beforeKey), price(node.get("before")),
-                afterKey == null ? null : new PriceKey(afterKey), price(node.get("after")),
-                node.get("difference") == null ? null : number(node.get("difference"), "difference")));
-        }
-        return new Estimate(text(root.get("currency"), "currency"), lines, number(root.get("total"), "total"), bool(root.get("complete"), "complete"));
-    }
-
-    private static Map<String, Object> price(UnitPrice price) {
-        if (price == null) return null;
-        var node = new LinkedHashMap<String, Object>();
-        node.put("key", price.key().value());
-        node.put("unit", price.unit().name());
-        node.put("currency", price.currency());
-        node.put("amount", price.amount());
-        node.put("source", price.source());
-        node.put("date", price.date().toString());
-        node.put("copiedFrom", price.copiedFrom() == null ? null : price.copiedFrom().toString());
-        return node;
-    }
-
-    private static UnitPrice price(Object value) {
-        if (value == null) return null;
-        var node = map(value, "price");
-        var copied = optionalText(node.get("copiedFrom"), "copiedFrom");
-        return new UnitPrice(new PriceKey(text(node.get("key"), "key")), UnitPrice.Unit.valueOf(text(node.get("unit"), "unit")),
-            text(node.get("currency"), "currency"), number(node.get("amount"), "amount"), text(node.get("source"), "source"),
-            LocalDate.parse(text(node.get("date"), "date")), copied == null ? null : UUID.fromString(copied));
-    }
 
     // Tree access ----------------------------------------------------------------------------------------------------
 

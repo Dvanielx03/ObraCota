@@ -13,7 +13,7 @@ import org.springframework.security.web.access.AccessDeniedHandler;
  * and the interface would show its generic text.
  */
 public final class JsonAccessDenied implements AccessDeniedHandler {
-    static final String MESSAGE = "Publicar, restaurar y fijar precios exigen la sesión de la propietaria.";
+    static final String MESSAGE = "Publicar, restaurar y configurar el ancho mínimo exigen la sesión de la propietaria.";
     private static final byte[] BODY = ("{\"message\":\"" + MESSAGE + "\"}").getBytes(StandardCharsets.UTF_8);
 
     @Override

@@ -4,7 +4,6 @@ import com.obracota.domain.modelchange.model.ChangeStatus;
 import com.obracota.domain.modelchange.model.recipe.ChangeType;
 import com.obracota.infrastructure.modelchange.adapters.out.json.JacksonRecipeCodec;
 import com.obracota.infrastructure.modelchange.adapters.out.persistence.ModelChangeAdapter;
-import com.obracota.infrastructure.modelchange.adapters.out.persistence.PriceBookAdapter;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -104,10 +103,6 @@ class ModelChangeMigrationTest {
         assertEquals(1, changes.pending(project, file).size());
         assertEquals(3, changes.events(reverted).size());
         assertEquals(Map.of(user, "ingeniera@example.test"), changes.emails(List.of(user)));
-        var prices = new PriceBookAdapter(db).prices(project, base);
-        assertEquals(1, prices.size());
-        assertEquals("Cotización de prueba", prices.getFirst().source());
-        assertEquals(TYPE, prices.getFirst().key().typeId().orElseThrow());
 
         UUID historicalRun = UUID.randomUUID(), historicalChange = UUID.randomUUID();
         db.update("""
@@ -121,10 +116,10 @@ class ModelChangeMigrationTest {
         flyway(data, "latest", locations).migrate();
         assertFalse(table(db, "door_change"));
         assertFalse(table(db, "door_unit_price"));
+        assertEquals(1, db.queryForObject("select count(*) from unit_price where version_id=?", Integer.class, base));
         assertTrue(table(db, "door_project_minimum"));
         assertEquals(4, changes.list(project, Set.of(), null, 100).size());
         assertEquals("{\"door\":{}}", changes.find(project, pending).orElseThrow().legacyReview());
-        assertEquals(1, new PriceBookAdapter(db).prices(project, base).size());
         var history = new com.obracota.infrastructure.agent.adapters.out.persistence.JdbcAgentRunHistory(db);
         var run = history.list(project, user, base, historicalChange).getFirst();
         assertEquals(historicalRun, run.id());

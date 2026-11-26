@@ -109,7 +109,6 @@ export function serverReportLines(review: ServerReview): string[] {
     }
     for (const layer of change.report.validation?.layers ?? [])
       lines.push("  Validación · " + layer.name + " · " + layer.status + (layer.reason ? " · " + layer.reason : ""));
-    if (change.report.estimate) lines.push("  Estimación: " + change.report.estimate.total.toLocaleString("es-CO") + " " + change.report.estimate.currency + (change.report.estimate.complete ? "" : " (incompleta)"));
   }
   return lines;
 }

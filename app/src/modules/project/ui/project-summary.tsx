@@ -1,4 +1,4 @@
-import { Box, Calculator, Files, GitCompareArrows, MessageSquareText } from "lucide-react";
+import { Box, Files, GitCompareArrows, MessageSquareText } from "lucide-react";
 import type { Project } from "../domain/project";
 import { PanelView } from "@/shared/ui/panel-view";
 import { SummaryLinks } from "./summary-links";
@@ -23,7 +23,6 @@ export function ProjectSummary({ project }: { project: Project }) {
         { key: "archivos", title: "Archivos y versiones", icon: Files, href: base + "/archivos", text: project.sourceFile },
         { key: "cambios", title: "Cambios de diseño", icon: GitCompareArrows, href: base + "/cambios", text: "Sin solicitudes registradas" },
         { key: "asistente", title: "Asistente", icon: MessageSquareText, href: base + "/asistente", text: "Consulta fichas en un proyecto propio" },
-        { key: "presupuesto", title: "Presupuesto", icon: Calculator, href: base + "/presupuesto", text: "Pendiente de cantidades y precios" },
       ]}/>
     </div>
   </PanelView>;

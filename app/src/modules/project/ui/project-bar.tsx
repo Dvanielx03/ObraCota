@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRef, useState, type ComponentType } from "react";
-import { Box, Calculator, ChevronRight, Files, GitCompareArrows, LayoutDashboard, MessageSquareText, Pencil, type LucideProps } from "lucide-react";
+import { Box, ChevronRight, Files, GitCompareArrows, LayoutDashboard, MessageSquareText, Pencil, type LucideProps } from "lucide-react";
 import { InlineName } from "./inline-name";
 import { useProjectScope, type ProjectScopeValue } from "./project-scope";
 import { documentTitle, useDocumentTitle } from "@/shared/ui/document-title";
@@ -14,7 +14,6 @@ const SECTIONS: readonly Section[] = [
   { slug: "visor", label: "Visor", icon: Box },
   { slug: "cambios", label: "Cambios de diseño", icon: GitCompareArrows },
   { slug: "asistente", label: "Asistente", icon: MessageSquareText },
-  { slug: "presupuesto", label: "Presupuesto", icon: Calculator },
 ];
 
 /** Where the "Visor" tab goes: the example viewer, the newest stored version, or nowhere yet. */

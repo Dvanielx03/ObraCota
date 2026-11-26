@@ -23,9 +23,8 @@ export function changeFileName(index: number, change: ModelChange): string {
   return "cambios/" + String(index + 1).padStart(2, "0") + "-" + slug(change.description, "cambio") + ".json";
 }
 
-/** The change as the package keeps it: recipe, engine report and cost estimate, with Spanish keys for the reader. */
+/** The change as the package keeps it: recipe, engine report, with Spanish keys for the reader. */
 export function changeRecord(change: ModelChange, relation: ChangeRelation): string {
-  const { estimate, ...report } = change.report ?? { estimate: null };
   return JSON.stringify({
     id: change.id,
     descripcion: change.description,
@@ -40,14 +39,8 @@ export function changeRecord(change: ModelChange, relation: ChangeRelation): str
     aplicadoEn: change.appliedAt,
     aprobadoPor: change.appliedBy?.email ?? null,
     receta: change.recipe,
-    informe: change.report ? report : null,
-    costo: estimate ?? null,
+    informe: change.report,
   }, null, 2) + "\n";
-}
-
-function money(amount: number, currency: string): string {
-  try { return new Intl.NumberFormat("es-CO", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount); }
-  catch { return amount.toLocaleString("es-CO") + " " + currency; }
 }
 
 export interface PackageSummary {
@@ -71,7 +64,7 @@ export function packageSummary(summary: PackageSummary): string {
   lines.push("- `vistas/`: " + (summary.pictures.length === 1 ? "1 imagen PNG" : summary.pictures.length + " imágenes PNG")
     + (summary.onlyCurrent ? " del encuadre en pantalla" : " de las vistas guardadas") + " y su índice.");
   for (const picture of summary.pictures) lines.push("  - `" + picture.file + "`: " + picture.name);
-  if (summary.changes.length) lines.push("- `cambios/`: receta, informe y costo de cada cambio de diseño aplicado, en JSON.");
+  if (summary.changes.length) lines.push("- `cambios/`: receta e informe de cada cambio de diseño aplicado, en JSON.");
   lines.push("", "## Cambios de diseño aplicados", "");
   if (!summary.changes.length) lines.push("Ninguna propuesta de cambio aplicada produjo esta versión ni se aplicó sobre ella.");
   for (const [index, { change, relation, file }] of summary.changes.entries()) {
@@ -91,8 +84,6 @@ export function packageSummary(summary: PackageSummary): string {
       lines.push("- **Avisos de diseño:**");
       for (const finding of warnings) lines.push("  - " + (finding.explanation ?? finding.rule));
     }
-    const estimate = change.report?.estimate;
-    lines.push("- **Costo estimado:** " + (estimate ? money(estimate.total, estimate.currency || "COP") + (estimate.complete ? "" : " (incompleto: faltan precios)") : "sin estimación"));
     lines.push("");
   }
   return lines.join("\n").replace(/\n+$/, "") + "\n";

@@ -7,7 +7,7 @@ import {backendReady} from "./support/backend";
 
 const door="1hOSvn6df7F8_7GcBWlS8Z",alternate="2klOFZffH6WQFlV10uM1wF";
 
-test("Revisión real de puerta, avisos, precio, aplicación y restauración",async({page},info)=>{
+test("Revisión real de puerta, avisos, aplicación y restauración",async({page},info)=>{
   test.setTimeout(300_000);
   const ifc=process.env.DUPLEX_IFC;
   test.skip(!ifc,"Indica el IFC Duplex original con DUPLEX_IFC.");
@@ -43,7 +43,7 @@ test("Revisión real de puerta, avisos, precio, aplicación y restauración",asy
     const reject=await types.locator("option").filter({hasNotText:/Compatible|Elegir/}).first().getAttribute("value");
     expect(reject).toBeTruthy();
     await types.selectOption(reject!);
-    await proposal.getByRole("button",{name:"Revisar costo y avisos"}).click();
+    await proposal.getByRole("button",{name:"Revisar avisos"}).click();
     await expect(proposal.getByText("Aviso · Medidas del hueco",{exact:true})).toBeVisible();
     await types.selectOption(alternate);
     await proposal.getByLabel("Describe el cambio").fill("Probar una puerta alternativa con el mismo hueco");
@@ -82,17 +82,10 @@ test("Revisión real de puerta, avisos, precio, aplicación y restauración",asy
     await proposal.getByText("Elegir propuesta visual",{exact:true}).click();
     await proposal.getByLabel("Elegir PNG de propuesta").setInputFiles(illustration);
     await expect(proposal.getByAltText("Propuesta visual elegida")).toBeVisible();
-    await proposal.getByText("Ingresar precio y ancho mínimo",{exact:true}).click();
+    await proposal.getByText("Configurar ancho mínimo",{exact:true}).click();
     await proposal.getByLabel("Ancho nominal mínimo de proyecto (mm)").fill("800");
-    for(const [name,price] of [["Tipo actual","100000"],["Tipo propuesto","125000"]]){
-      const group=proposal.getByRole("group",{name,exact:true});
-      await group.getByLabel("Precio COP").fill(price);
-      await group.getByLabel("Fuente").fill("Cotización de prueba");
-      await group.getByLabel("Fecha").fill("2026-11-20");
-    }
     await proposal.getByRole("button",{name:"Guardar datos de revisión"}).click();
     await expect(proposal.getByText("Aviso · Ancho mínimo del proyecto",{exact:true})).toBeVisible();
-    await expect(proposal.getByRole("region",{name:"Estimación del cambio"})).toContainText(/25[.,]000/);
     await proposal.getByRole("button",{name:"Registrar propuesta IFC"}).click();
     await proposal.getByRole("link",{name:"Revisar y decidir si aplicar"}).click();
     await expect(page.getByAltText("Propuesta visual elegida")).toBeVisible();
@@ -118,9 +111,6 @@ test("Revisión real de puerta, avisos, precio, aplicación y restauración",asy
     expect(await edited.json()).toMatchObject({typeId:alternate,width:.762,height:2.032,element:door});
     await page.screenshot({path:info.outputPath("cambio-aplicado.png")});
     const changes=page.url();
-    await page.getByRole("link",{name:"Presupuesto",exact:true}).click();
-    await expect(page.getByRole("region",{name:"Estimación del cambio"})).toContainText(/25[.,]000/);
-    await page.goto(changes);
     await newLink.click();
     // RECORRIDO (antes «Recorrer») queda disponible en la barra inferior al abrir la revisión IFC guardada.
     await expectWalkable(page,60_000);

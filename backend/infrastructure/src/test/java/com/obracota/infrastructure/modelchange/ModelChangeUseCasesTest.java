@@ -12,8 +12,6 @@ import com.obracota.domain.modelchange.model.ChangeStatus;
 import com.obracota.domain.modelchange.model.ModelChange;
 import com.obracota.domain.modelchange.model.ModelChangeEvent;
 import com.obracota.domain.modelchange.model.ModelChangeEvent.Action;
-import com.obracota.domain.modelchange.model.price.PriceKey;
-import com.obracota.domain.modelchange.model.price.UnitPrice;
 import com.obracota.domain.modelchange.model.recipe.*;
 import com.obracota.domain.modelchange.model.report.PreviewReport;
 import com.obracota.domain.modelchange.port.*;
@@ -45,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The model change use cases over in-memory ports, without Spring: the sequences of §4.5 (gate, preview with its
- * retry, optimistic checks), the publishing barrier in the use case, prices copied on publish and stale bases.
+ * retry, optimistic checks), the publishing barrier in the use case, and stale bases.
  * The Spring flow (J1–J17) comes with the adapters and the controllers.
  */
 class ModelChangeUseCasesTest {
@@ -62,7 +60,7 @@ class ModelChangeUseCasesTest {
     ProjectVersions versions;
     ModelChanges drafts;
     PublishModelChange publish;
-    VersionPrices pricing;
+    ConfigureDoorMinimum minimum;
     ModelVersion base;
 
     @BeforeEach void setUp() throws IOException {
@@ -73,8 +71,8 @@ class ModelChangeUseCasesTest {
         };
         var clock = Clock.systemUTC();
         drafts = new ModelChanges(versions, fakes.changes, fakes.prices, fakes.previews, fakes.engine, fakes.doors, fakes.codec, tx, clock);
-        publish = new PublishModelChange(versions, fakes.changes, fakes.prices, fakes.previews, fakes.codec, tx, clock);
-        pricing = new VersionPrices(versions, fakes.prices, tx);
+        minimum = new ConfigureDoorMinimum(versions, fakes.prices, tx);
+        publish = new PublishModelChange(versions, fakes.changes, fakes.previews, fakes.codec, tx, clock);
         base = versions.upload(project, owner, null, "Duplex_A.ifc", BASE.length, new ByteArrayInputStream(BASE));
     }
 
@@ -106,8 +104,6 @@ class ModelChangeUseCasesTest {
         assertEquals(ChangeStatus.READY, ready.change().status());
         assertTrue(ready.actions().apply());
 
-        pricing.replace(person, project, base.id(), new BigDecimal("0.8"), List.of(price(CURRENT, "100000"), price(PROPOSED, "125000")));
-        assertEquals(0, new BigDecimal("25000").compareTo(drafts.get(person, project, id).estimate().total()), "live estimate");
         var previewSha = ready.change().preview().sha256();
 
         var applied = publish.apply(person, project, id);
@@ -117,11 +113,6 @@ class ModelChangeUseCasesTest {
         assertEquals(previewSha, revision.sha256(), "the published revision is the approved preview");
         assertEquals(revision.id(), applied.change().applied().version());
         assertEquals(owner, applied.change().applied().by());
-        assertEquals(0, new BigDecimal("25000").compareTo(applied.estimate().total()), "frozen estimate");
-        var copied = pricing.read(person, project, revision.id()).prices();
-        assertEquals(2, copied.size());
-        assertTrue(copied.stream().allMatch(p -> base.id().equals(p.copiedFrom()) && p.source().equals("Cotización de prueba")
-            && p.date().equals(LocalDate.parse("2026-11-20"))));
         assertTrue(fakes.previews.files.isEmpty(), "the published preview file is removed");
         assertSame(ChangeStatus.APPLIED, publish.apply(person, project, id).change().status(), "apply is idempotent");
         assertEquals(2, versions.list(project, owner, base.fileId()).size());
@@ -131,7 +122,6 @@ class ModelChangeUseCasesTest {
         var third = versions.list(project, owner, base.fileId()).getFirst();
         assertEquals(3, third.revision());
         assertEquals(base.sha256(), third.sha256(), "restoring brings back the bytes of the base");
-        assertTrue(pricing.read(person, project, third.id()).prices().stream().allMatch(p -> revision.id().equals(p.copiedFrom())));
         assertSame(ChangeStatus.RESTORED, publish.restore(person, project, id).change().status(), "restore is idempotent");
         assertEquals(List.of(Action.CREATE, Action.EDIT, Action.PREVIEW, Action.SUBMIT, Action.APPLY, Action.RESTORE), actions(id));
     }
@@ -146,8 +136,7 @@ class ModelChangeUseCasesTest {
         assertFalse(own.actions().apply());
         assertThrows(ForbiddenApplicationException.class, () -> publish.apply(agent, project, id));
         assertThrows(ForbiddenApplicationException.class, () -> publish.restore(agent, project, id));
-        assertThrows(ForbiddenApplicationException.class, () -> pricing.replace(agent, project, base.id(), null, List.of()));
-        assertThrows(ForbiddenApplicationException.class, () -> pricing.copy(agent, project, base.id(), base.id()));
+        assertThrows(ForbiddenApplicationException.class, () -> minimum.set(agent, project, BigDecimal.ONE));
         assertEquals(ChangeStatus.READY, drafts.get(person, project, id).change().status(), "nothing moved");
         assertEquals(1, versions.list(project, owner, base.fileId()).size());
 
@@ -326,7 +315,6 @@ class ModelChangeUseCasesTest {
         assertEquals(2, drafts.doorChanges(person, project).size());
         var review = drafts.doorReview(person, project, base.id(), DOOR, PROPOSED);
         assertEquals(3, review.findings().size());
-        assertNull(review.estimate().difference(), "no prices yet");
     }
 
     @Test void anotherAccountSeesNothing() {
@@ -335,13 +323,8 @@ class ModelChangeUseCasesTest {
         assertThrows(NotFoundApplicationException.class, () -> drafts.get(stranger, project, id));
         assertThrows(NotFoundApplicationException.class, () -> drafts.list(stranger, project, Set.of(), null));
         assertThrows(NotFoundApplicationException.class, () -> publish.apply(stranger, project, id));
-        assertThrows(NotFoundApplicationException.class, () -> pricing.read(stranger, project, base.id()));
     }
 
-    static UnitPrice price(String type, String amount) {
-        return new UnitPrice(PriceKey.type(type), UnitPrice.Unit.UNIT, "COP", new BigDecimal(amount), "Cotización de prueba",
-            LocalDate.parse("2026-11-20"), null);
-    }
 
     static String sha(byte[] bytes) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); }
@@ -457,12 +440,9 @@ class ModelChangeUseCasesTest {
         }
     }
 
-    final class Prices implements PriceBook {
-        final Map<UUID, Map<PriceKey, UnitPrice>> byVersion = new HashMap<>();
+    final class Prices implements DoorMinimum {
         BigDecimal minimum;
 
-        public List<UnitPrice> prices(UUID p, UUID version) { return List.copyOf(byVersion.getOrDefault(version, Map.of()).values()); }
-        public void put(UUID p, UUID version, UnitPrice price) { byVersion.computeIfAbsent(version, v -> new LinkedHashMap<>()).put(price.key(), price); }
         public Optional<BigDecimal> minimumWidth(UUID p) { return Optional.ofNullable(minimum); }
         public void minimumWidth(UUID p, BigDecimal width) { minimum = width; }
     }

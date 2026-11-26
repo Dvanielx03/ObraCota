@@ -20,7 +20,7 @@ import java.util.UUID;
 /** Checks and texts shared by the model change use cases. */
 final class Guards {
     static final String OTHER_PROJECT = "La credencial del agente no alcanza este proyecto.";
-    static final String PUBLISH = "Publicar, restaurar y fijar precios exigen la sesión de la propietaria.";
+    static final String PUBLISH = "Publicar, restaurar y configurar el ancho mínimo exigen la sesión de la propietaria.";
     static final String NOT_OWN = "El agente solo trabaja sobre sus propios borradores.";
     static final String NOT_IFC = "Selecciona una versión IFC.";
     static final String NOT_CHANGEABLE = "Los cambios de modelo trabajan sobre un IFC o un plano DWG/DXF.";
@@ -36,7 +36,7 @@ final class Guards {
         if (!actor.reaches(project)) throw new ForbiddenApplicationException(OTHER_PROJECT);
     }
 
-    /** Publishing, restoring and pricing are the person's. This is the layer that holds even without HTTP. */
+    /** Publishing, restoring and setting the door minimum are the person's. This is the layer that holds even without HTTP. */
     static void person(Actor actor) {
         if (!actor.person()) throw new ForbiddenApplicationException(PUBLISH);
     }

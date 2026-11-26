@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 /**
  * {@code ifc.set_material} (H2 material): gives every piece of {@code elements} the finish {@code material}, with its
  * {@code category} and an approximate {@code color} ({@code #rrggbb}) for other viewers. {@code element} is the first
- * piece, so every report that names one piece per operation keeps working. Without {@code priceKey} the estimate looks
+ * piece, so every report that names one piece per operation keeps working.
  * for {@code item:<material>}; a missing price is shown as missing, never invented.
  */
 public record SetMaterial(String id, List<String> elements, String material, String category, String color, PriceKey priceKey)
@@ -44,7 +44,6 @@ public record SetMaterial(String id, List<String> elements, String material, Str
     public String element() { return elements.getFirst(); }
 
     /** The key whose price the estimate uses: the one given, or {@code item:<material>}. */
-    public PriceKey effectivePriceKey() { return Objects.requireNonNullElseGet(priceKey, () -> PriceKey.item(material)); }
 
     public SetMaterial withId(String value) { return new SetMaterial(value, elements, material, category, color, priceKey); }
 

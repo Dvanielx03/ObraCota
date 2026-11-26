@@ -5,7 +5,7 @@ import {authenticatedResponse} from "@/core/http/http-client";
 import {BusyButton,LoadingStatus,Skeleton} from "@/shared/ui/loading";
 import {isDrawingFormat,operationLabel,statusLabel,type ModelChange} from "../domain/model-change";
 import {modelChangeRepository} from "../infrastructure/model-change-http";
-import {ChangeEstimate,formatDay} from "./change-estimate";
+import {formatDay} from "./change-date";
 import {AgentSteps} from "./agent-steps";
 import "./agent-run.css";
 import {VerifiedDownload} from "@/modules/model-version/ui/verified-download";
@@ -37,7 +37,7 @@ function Picture({path}:{path:string}){
     :<><Skeleton shape="thumb" width={320} style={{maxWidth:"100%"}}/><LoadingStatus hidden>Cargando propuesta…</LoadingStatus></>;
 }
 
-/** Recipe lines in words, keyed by operation id; the estimate reuses them to name its lines. */
+/** Recipe lines in words, keyed by operation id. */
 export function useOperationLabels(change:ModelChange){
   return useMemo(()=>{
     const results=new Map(change.report?.operations.map(result=>[result.id,result])??[]);
@@ -56,7 +56,7 @@ export function ChangeHeader({change}:{change:ModelChange}){
 }
 
 /**
- * One model change (§7.2): its recipe, affected pieces, notices, estimate, diff and validation, then the actions its
+ * One model change (§7.2): its recipe, affected pieces, notices, diff and validation, then the actions its
  * state allows. Each action the server does not allow stays visible, disabled, with the server's «Pendiente: …» reason.
  */
 export function ChangeCard({change,onChange,locked,onWork}:{change:ModelChange;onChange:(next:ModelChange)=>void;locked:boolean;onWork:(busy:boolean)=>void}){
@@ -87,7 +87,6 @@ export function ChangeCard({change,onChange,locked,onWork}:{change:ModelChange;o
     {change.report && !change.report.ok && <p className="change-fail">La vista previa no superó las comprobaciones: el cambio no se puede enviar a aprobación.</p>}
     <ChangeAffected change={change}/>
     <ChangeFindings change={change}/>
-    {(change.report||!change.legacyReview) && <ChangeEstimate change={change} labels={labels}/>}
     <ChangeDiff change={change}/>
     <ChangeValidation change={change}/>
     {change.picture && <figure><Picture path={"projects/"+change.project+"/model-changes/"+change.id+"/picture"}/><figcaption>Referencia visual</figcaption></figure>}

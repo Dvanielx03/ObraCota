@@ -1,24 +1,16 @@
 package com.obracota.infrastructure.modelchange;
 
 import com.obracota.application.common.exception.InvalidRequestApplicationException;
-import com.obracota.application.modelchange.rules.ChangeEstimate;
 import com.obracota.application.modelchange.usecase.ModelChanges;
 import com.obracota.domain.modelchange.model.price.PriceKey;
-import com.obracota.domain.modelchange.model.price.UnitPrice;
 import com.obracota.domain.modelchange.model.recipe.Recipe;
 import com.obracota.domain.modelchange.model.recipe.SetMaterial;
-import com.obracota.domain.modelchange.model.report.EstimateLine;
-import com.obracota.domain.modelchange.model.report.PreviewReport;
-import com.obracota.domain.modelchange.model.report.QuantityLine;
 import com.obracota.infrastructure.modelchange.adapters.out.json.JacksonRecipeCodec;
 import org.junit.jupiter.api.Test;
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** H2 material: {@code ifc.set_material} is enabled, validated in its record and in the codec, and priced per m². */
+/** H2 material: {@code ifc.set_material} is enabled, validated in its record and in the codec. */
 class ModelChangeMaterialTest {
     static final String WALL_1 = "1hOSvn6df7F8_7GcBWlS8Z";
     static final String WALL_2 = "2klOFZffH6WQFlV10uM1wF";
@@ -36,7 +28,6 @@ class ModelChangeMaterialTest {
     @Test void theRecordValidatesItsShape() {
         var finish = stone(null, WALL_1, WALL_2);
         assertEquals(WALL_1, finish.element());
-        assertEquals(PriceKey.item("Piedra · claro"), finish.effectivePriceKey());
         assertEquals(stone(null, WALL_2, WALL_1).target(), finish.target(), "the target does not depend on the order");
         assertThrows(IllegalArgumentException.class, () -> stone(null));
         assertThrows(IllegalArgumentException.class, () -> stone(null, WALL_1, WALL_1));
@@ -67,36 +58,5 @@ class ModelChangeMaterialTest {
             text.replace("}", ",\"scope\":\"type\"}"))) {
             assertEquals("RECIPE_INVALID", assertThrows(InvalidRequestApplicationException.class, () -> codec.operation(broken)).code(), broken);
         }
-    }
-
-    static PreviewReport report(Recipe recipe) {
-        var results = recipe.operations().stream().map(operation -> new PreviewReport.OperationResult(operation.id(), operation.op(), true,
-            operation.element(), List.of(), Map.of(), Map.of(), List.of())).toList();
-        return new PreviewReport(true, "engine", new PreviewReport.Artifact("a1", "f".repeat(64), 10, Instant.now()), results, List.of(),
-            List.of(new QuantityLine(WALL_1, "before", new BigDecimal("10.5"), "M2", "QTO", "NetSideArea", true),
-                new QuantityLine(WALL_1, "after", new BigDecimal("10.5"), "M2", "QTO", "NetSideArea", true),
-                new QuantityLine(WALL_2, "after", new BigDecimal("4.25"), "M2", "QTO", "NetSideArea", true),
-                new QuantityLine(WINDOW, "after", BigDecimal.ONE, "UNIT", "UNIT", "Ventana por unidad", true)),
-            Map.of());
-    }
-
-    @Test void theEstimateUsesTheAreaAndAPricePerSquareMetre() {
-        var recipe = Recipe.empty().append(stone(null, WALL_1, WALL_2, WINDOW));
-        var key = PriceKey.item("Piedra · claro");
-        var perArea = new UnitPrice(key, UnitPrice.Unit.M2, "COP", new BigDecimal("80000"), "Cotización", LocalDate.parse("2026-11-20"), null);
-        var line = ChangeEstimate.of(recipe, report(recipe), List.of(perArea)).lines().getFirst();
-        assertEquals(EstimateLine.Kind.MATERIAL_FINISH, line.kind());
-        assertEquals(0, new BigDecimal("14.75").compareTo(line.quantity()), "only the after m² of the listed pieces");
-        assertEquals(0, new BigDecimal("1180000").compareTo(line.difference()));
-        assertTrue(line.basis().contains("2 de 3 piezas"), line.basis());
-
-        var missing = ChangeEstimate.of(recipe, report(recipe), List.of());
-        assertNull(missing.lines().getFirst().difference(), "no price, no invented cost");
-        assertEquals(key, missing.lines().getFirst().afterKey());
-        assertFalse(missing.complete());
-
-        var perUnit = new UnitPrice(key, UnitPrice.Unit.UNIT, "COP", new BigDecimal("80000"), "Cotización", LocalDate.parse("2026-11-20"), null);
-        assertNull(ChangeEstimate.of(recipe, report(recipe), List.of(perUnit)).lines().getFirst().difference());
-        assertNull(ChangeEstimate.of(recipe, null, List.of(perArea)).lines().getFirst().quantity(), "not previewed yet");
     }
 }

@@ -518,19 +518,11 @@
 .upload-form { max-width: none; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
 .upload-form input, .upload-form select { max-width: 100%; min-width: 0; }
 
-/* Budget and changes lists. */
-.estimate-sheet { overflow-x: auto; }
-.budget-total { margin: 0 0 var(--grid-gap); padding: 16px 24px; border: 1px solid var(--border-soft); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-sm); }
-.budget-total p { margin: 0; }
-.budget-total strong { margin-right: 8px; }
-.budget-total .change-note { margin-top: 4px; }
-.estimate-sheet .change-link { margin: 12px 0 0; }
-.estimate-sheet table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--border-soft); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-sm); }
-.estimate-sheet caption { padding: 0 0 14px; font: var(--type-card-title); text-align: left; }
-.estimate-sheet th { padding: 12px 16px; border-bottom: 1px solid var(--border); font: var(--type-label); color: var(--muted); text-align: left; }
-.estimate-sheet td { padding: 8px 16px; }
-.estimate-sheet > article { margin-bottom: var(--grid-gap); padding: 20px 24px; border: 1px solid var(--border-soft); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-sm); }
-.estimate-sheet > article h2 { font: var(--type-card-title); }
+/* Design change cards. */
+.change-cards { overflow-x: auto; }
+.change-cards .change-link { margin: 12px 0 0; }
+.change-cards > article { margin-bottom: var(--grid-gap); padding: 20px 24px; border: 1px solid var(--border-soft); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--shadow-sm); }
+.change-cards > article h2 { font: var(--type-card-title); }
 
 /* Model change card (H1 §7.2): header with the status chip, sections divided by hairlines, actions at the foot. */
 .change-card { max-width: 960px; }
@@ -540,9 +532,9 @@
 .change-chip:is([data-status="READY"], [data-status="APPLIED"]) { border-color: var(--brand-soft); background: var(--brand-soft); color: var(--brand-ink); }
 .change-chip[data-status="DISCARDED"] { color: var(--muted); }
 .change-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font: var(--type-hint); color: var(--muted); }
-.estimate-sheet .change-card section { margin: 0; padding: 14px 0; border-bottom: 1px solid var(--border-soft); }
-.estimate-sheet .change-card > section:last-child { padding-bottom: 0; border-bottom: 0; }
-.estimate-sheet .change-card h3 { margin: 0 0 8px; font: var(--type-section-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted); }
+.change-cards .change-card section { margin: 0; padding: 14px 0; border-bottom: 1px solid var(--border-soft); }
+.change-cards .change-card > section:last-child { padding-bottom: 0; border-bottom: 0; }
+.change-cards .change-card h3 { margin: 0 0 8px; font: var(--type-section-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted); }
 .change-card p, .change-card li { font: var(--type-body); }
 .change-recipe { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 4px; }
 .change-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -551,19 +543,16 @@
 .change-links { display: flex; gap: 14px; }
 .change-links a, .change-card section a { color: var(--ink); font-weight: 600; }
 .change-flags { color: var(--muted); }
-.change-lines { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.change-lines > li { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border-faint); border-radius: var(--radius-md); }
 .change-basis { font: var(--type-caption); color: var(--muted); }
-.change-total { margin-top: 10px; }
 .change-note { color: var(--muted); }
 .change-fail, .change-missing, .change-unexpected, .change-list [data-status="FAIL"] { color: var(--error); }
 .change-unexpected { margin-top: 8px; }
 .change-unexpected .change-flags { color: var(--error); }
 .change-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 14px; }
-.estimate-sheet .change-actions .panel-action { margin-top: 0; }
+.change-cards .change-actions .panel-action { margin-top: 0; }
 .change-actions > p { margin: 0; }
 .change-actions a.panel-action { text-decoration: none; }
-.estimate-sheet .change-secondary { color: var(--muted); }
+.change-cards .change-secondary { color: var(--muted); }
 
 /* Empty state (shared EmptyState): centred icon, 16/600 title and 13 px text. */
 .panel-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 48px 24px; text-align: center; }

@@ -2,19 +2,17 @@ package com.obracota.application.modelchange.usecase;
 
 import com.obracota.application.modelchange.rules.ChangeActions;
 import com.obracota.domain.modelchange.model.ModelChange;
-import com.obracota.domain.modelchange.model.report.Estimate;
 import com.obracota.domain.modelversion.model.ModelVersion;
 import java.util.Map;
 import java.util.UUID;
 
 /**
  * A change as the actor who asks sees it (§4.2): the change, its base, the latest revision of its file, whether the
- * report is current and the preview available, the estimate (live while it is a proposal, frozen once published, and
- * {@code null} for changes migrated without one), the allowed actions with their reasons, and the e-mail of the people
+ * report is current and the preview available, the allowed actions with their reasons, and the e-mail of the people
  * it mentions.
  */
 public record ChangeView(ModelChange change, ModelVersion base, ModelVersion latest, boolean reportCurrent, boolean previewAvailable,
-                         Estimate estimate, ChangeActions actions, Map<UUID, String> people) {
+                         ChangeActions actions, Map<UUID, String> people) {
     public ChangeView { people = Map.copyOf(people); }
 
     public boolean baseLatest() { return latest.id().equals(base.id()); }
