@@ -1,5 +1,6 @@
 export interface OwnedProject { id: string; name: string; archived: boolean; updatedAt?: string }
 export interface OwnedProjectRepository {
+  remove(id: string): Promise<void>;
   list(): Promise<OwnedProject[]>;
   create(name: string): Promise<OwnedProject>;
   get(id: string): Promise<OwnedProject>;

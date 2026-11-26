@@ -132,3 +132,34 @@ test("Las guías se leen paso a paso y la primera abre el recorrido en el visor"
   await expect(page).toHaveURL(/\/proyectos\/restage\/visor\?guia=rapida$/);
   await expect(page.locator("main")).toHaveAttribute("data-quick", "select", { timeout: 60_000 });
 });
+
+test("Eliminar exige confirmación y actualiza Mis proyectos", async ({ page }) => {
+  const auth = await page.request.post("/api/auth/register", {
+    headers: { "X-ObraCota-Client": "web" },
+    data: { email: "eliminar-" + randomUUID() + "@example.test", password: randomUUID() },
+  });
+  expect(auth.ok()).toBeTruthy();
+  const headers = { Authorization: "Bearer " + (await auth.json()).accessToken };
+  const name = "Proyecto temporal " + randomUUID().slice(0, 8);
+  const created = await page.request.post("/api/projects", { headers, data: { name } });
+  expect(created.status()).toBe(201);
+  const { id } = await created.json();
+  await page.goto("/proyectos/" + id);
+  const trigger = page.getByRole("button", { name: "Eliminar proyecto" });
+  const dialog = page.getByRole("dialog", { name: "Eliminar proyecto" });
+  await trigger.click();
+  await expect(dialog).toContainText(name);
+  await expect(dialog).toContainText("Esta acción no se puede deshacer.");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  expect((await page.request.get("/api/projects/" + id, { headers })).ok()).toBeTruthy();
+  await trigger.click();
+  const deleted = page.waitForResponse(r => r.url().endsWith("/api/projects/" + id) && r.request().method() === "DELETE");
+  await dialog.getByRole("button", { name: "Eliminar proyecto" }).click();
+  expect((await deleted).status()).toBe(204);
+  await expect(page).toHaveURL(/\/proyectos$/);
+  await expect(page.getByRole("tab", { name: "Activos (0)" })).toBeVisible();
+  await expect(page.getByRole("link", { name, exact: true })).toHaveCount(0);
+  expect((await page.request.get("/api/projects/" + id, { headers })).status()).toBe(404);
+});

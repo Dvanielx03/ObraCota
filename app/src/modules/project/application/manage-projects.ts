@@ -11,3 +11,5 @@ export function renameProject(repository: OwnedProjectRepository, id: string, va
 export function archiveProject(repository: OwnedProjectRepository, id: string, archived: boolean) {
   return repository.setArchived(id, archived);
 }
+
+export function deleteProject(repository: OwnedProjectRepository, id: string) { return repository.remove(id); }

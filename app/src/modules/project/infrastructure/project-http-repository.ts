@@ -8,6 +8,7 @@ function toProject(row: ProjectResponse): OwnedProject {
 const path = (id: string) => "projects/" + encodeURIComponent(id);
 
 export const projectHttpRepository: OwnedProjectRepository = {
+  async remove(id) { await authenticated<void>(path(id), { method: "DELETE" }); },
   async list() { return (await authenticated<ProjectResponse[]>("projects")).map(toProject); },
   async get(id) { return toProject(await authenticated<ProjectResponse>(path(id))); },
   async create(name) {

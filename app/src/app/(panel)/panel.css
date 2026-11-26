@@ -627,3 +627,13 @@
 .auth-google-button[hidden] { display: none; }
 .auth-divider { display: flex; align-items: center; gap: 12px; margin: 0; font: var(--type-hint); color: var(--muted); }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+.project-deletion { margin-block-start: 24px; }
+.project-delete-trigger { color: var(--error); }
+.project-delete-dialog { position: fixed; inset: 0; margin: auto; width: min(420px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 24px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-float); overflow-wrap: anywhere; }
+.project-delete-dialog::backdrop { background: rgb(0 0 0 / 45%); }
+.project-delete-dialog h2 { margin: 0 0 8px; font: var(--type-card-title); }
+.project-delete-dialog p { font: var(--type-body); }
+.project-delete-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-block-start: 20px; }
+.project-delete-confirm { background: var(--error); color: var(--on-error); }
+.project-delete-confirm:hover:enabled { background: color-mix(in srgb, var(--error) 86%, var(--ink)); }

@@ -1,6 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { deleteProject } from "../application/manage-projects";
+import { projectHttpRepository } from "../infrastructure/project-http-repository";
+import { useRef, useState } from "react";
 import { Box, Clock, Files, GitCompareArrows, LogIn, MessageSquareText, SearchX } from "lucide-react";
 import { EmptyState, PanelView } from "@/shared/ui/panel-view";
 import { LoadingStatus } from "@/shared/ui/loading";
@@ -59,5 +62,44 @@ export function OwnedSummary({ id }: { id: string }) {
       </figure>
       <SummaryLinks entries={entries(scope.route.base, overview ?? { status: "loading" })}/>
     </div>
+    <ProjectDeletion id={project.id} name={project.name}/>
   </PanelView>;
+}
+
+function ProjectDeletion({ id, name }: { id: string; name: string }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function confirm() {
+    setBusy(true);
+    setError("");
+    try {
+      await deleteProject(projectHttpRepository, id);
+      dialog.current?.close();
+      router.replace("/proyectos");
+    } catch {
+      setError("No se pudo eliminar el proyecto. Inténtalo de nuevo.");
+      setBusy(false);
+    }
+  }
+
+  return <section className="project-deletion">
+    <button type="button" className="panel-button-outline project-delete-trigger" onClick={() => {
+      setError("");
+      dialog.current?.showModal();
+    }}>Eliminar proyecto</button>
+    <dialog ref={dialog} className="project-delete-dialog" aria-labelledby="project-delete-title" aria-describedby="project-delete-description"
+      onCancel={event => { if (busy) event.preventDefault(); }}>
+      <h2 id="project-delete-title">Eliminar proyecto</h2>
+      <p id="project-delete-description">Se eliminará «{name}». Esta acción no se puede deshacer.</p>
+      {error && <p role="alert">{error}</p>}
+      <div className="project-delete-actions">
+        <button type="button" className="panel-button-outline" autoFocus disabled={busy} onClick={() => dialog.current?.close()}>Cancelar</button>
+        <button type="button" className="panel-button-outline project-delete-confirm" disabled={busy}
+          onClick={() => void confirm()}>{busy ? "Eliminando…" : "Eliminar proyecto"}</button>
+      </div>
+    </dialog>
+  </section>;
 }
