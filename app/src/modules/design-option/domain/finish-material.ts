@@ -23,3 +23,17 @@ export function finishMaterial(material: ExteriorMaterial, tone: ExteriorTone | 
   const toneLabel = (TONES.find((item) => item.id === shade)?.label ?? shade).toLowerCase();
   return { material: category + " · " + toneLabel, category, color: COLORS[material][shade] };
 }
+
+/**
+ * The finish an IFC material name stands for when ObraCota wrote it («Madera · claro», see `finishMaterial`), so a
+ * published version and the walk draw the textures of the preview instead of the approximate colour. The engine
+ * (ifc.set_material) names the IfcMaterial and its surface style exactly so; any other name is null.
+ */
+export function finishOfMaterialName(name: string): { material: ExteriorMaterial; tone: ExteriorTone } | null {
+  const at = name.lastIndexOf(" · ");
+  if (at < 0) return null;
+  const category = name.slice(0, at).trim(), toneLabel = name.slice(at + 3).trim().toLowerCase();
+  const finish = FINISHES.find((item) => item.label === category);
+  const tone = TONES.find((item) => item.label.toLowerCase() === toneLabel);
+  return finish && tone ? { material: finish.id, tone: tone.id } : null;
+}

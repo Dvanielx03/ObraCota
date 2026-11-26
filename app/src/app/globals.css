@@ -271,6 +271,8 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 @media(min-width:721px){
   .workspace{--stage-top:calc(var(--nav-offset) + var(--nav-height));position:relative;grid-template-rows:minmax(0,1fr)}
   .workspace>.viewer-header{position:absolute;z-index:var(--z-nav);inset:var(--nav-offset) 0 auto;height:var(--nav-height);padding:0 var(--nav-padding);gap:24px;justify-content:space-between;border:0;background:none;pointer-events:none}
+  /* The walk draws a sky under the header: a scrim of the page colour keeps its title legible in both themes. */
+  .workspace[data-walk=on]>.viewer-header{background:linear-gradient(to bottom,color-mix(in srgb,var(--bg) 88%,transparent),color-mix(in srgb,var(--bg) 55%,transparent) 70%,transparent)}
   .viewer-header>*{pointer-events:auto}
   .viewer-crumbs{flex:0 1 auto}
   .viewer-actions{flex:none;gap:12px}

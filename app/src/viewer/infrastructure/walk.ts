@@ -3,8 +3,14 @@ import {Capsule} from "three/addons/math/Capsule.js";
 import {Octree} from "three/addons/math/Octree.js";
 import type {SceneModel} from "./model-source";
 
-const bodies=/^(IFC(WALL|SLAB|ROOF|DOOR|WINDOW|CURTAINWALL|FURNISHINGELEMENT|FURNITURE|COLUMN|BEAM|MEMBER|PLATE|STAIR|RAMP|GEOGRAPHICELEMENT|BUILDINGELEMENTPROXY|FOOTING))/;
+// The site topography, floor coverings, parts and railings are bodies too: a Revit terrain is the ground around the
+// building, and a floor or roof modelled as IfcCovering/IfcBuildingElementPart is the only surface to stand on.
+const bodies=/^(IFC(WALL|SLAB|ROOF|DOOR|WINDOW|CURTAINWALL|FURNISHINGELEMENT|FURNITURE|COLUMN|BEAM|MEMBER|PLATE|STAIR|RAMP|GEOGRAPHICELEMENT|BUILDINGELEMENTPROXY|FOOTING|SITE|COVERING|BUILDINGELEMENTPART|RAILING|CIVILELEMENT|PAVEMENT|COURSE|EARTHWORKSFILL))/;
 const radius=.23,eye=1.65;
+/** Walking speed (m/s); Shift runs at three times it. */
+const WALK_SPEED=1.5,RUN_FACTOR=3;
+/** Seconds in the air before the walker goes back to the last floor stood on (a fall into a gap, off the model). */
+const MAX_FALL=2.5;
 /**
  * Collision triangles the walk indexes at most. The octree is built on the main thread (with the bounding-box split
  * below, about 0.75 s for the 280 000 triangles of the Jalis sofa); a larger model keeps its biggest pieces.
@@ -29,12 +35,15 @@ class WalkOctree extends Octree {
       children.push(child);
     }
     let triangle:T.Triangle|undefined;
+    // `min + half` rounds: a face lying on the top or the far side of the model (a slab's top at the highest level, the
+    // outermost wall) can fall a hair outside every child. A micrometre of slack keeps it in the ones it touches.
+    const e=1e-6;
     while((triangle=this.triangles.pop())){
       const {a,b,c}=triangle;
       const x0=Math.min(a.x,b.x,c.x),x1=Math.max(a.x,b.x,c.x),y0=Math.min(a.y,b.y,c.y),y1=Math.max(a.y,b.y,c.y),z0=Math.min(a.z,b.z,c.z),z1=Math.max(a.z,b.z,c.z);
       for(const child of children){
         const {min,max}=child.box!;
-        if(x1>=min.x && x0<=max.x && y1>=min.y && y0<=max.y && z1>=min.z && z0<=max.z)child.triangles.push(triangle);
+        if(x1>=min.x-e && x0<=max.x+e && y1>=min.y-e && y0<=max.y+e && z1>=min.z-e && z0<=max.z+e)child.triangles.push(triangle);
       }
     }
     for(const child of children){
@@ -133,16 +142,28 @@ export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,
   }
   if(!grounded(world.tree,foot)||!room(world.tree,body))
     throw new Error("Elige una superficie de piso libre, con espacio para caminar.");
+  const probe=new T.Vector3();
+  function feetOf(player:Capsule){return probe.copy(player.start).addScaledVector(down,radius);}
+  /** Nothing to land on below `player` down to the bottom of the model (past a terrain's edge), and no scene ground. */
+  function overVoid(tree:WalkOctree,player:Capsule){
+    const level=ground?.();
+    if(level!==null && level!==undefined)return false;
+    const feet=feetOf(player);
+    return !tree.floorAt(feet.clone().add(new T.Vector3(0,.12,0)),feet.y-tree.bounds.min.y+1.2);
+  }
   let safe=body.clone();
   const keys=new Set<string>(),vector=new T.Vector3(),step=new T.Vector3(),lift=new T.Vector3();
-  let frame=0,previous=performance.now(),velocity=0,standing=true,needsDraw=true;
+  let frame=0,previous=performance.now(),velocity=0,standing=true,needsDraw=true,running=false,airborne=0;
   // Frames drawn while walking, per second of movement (KNOWN_ISSUES #4): the last measure is kept as a mark.
   let measureFrom=0,measured=0;
+  const measuredFrom=new T.Vector3();
   let pointer:{id:number;x:number;y:number}|undefined;
   camera.position.copy(body.end);camera.lookAt(camera.position.clone().add(heading));
   function move(key:string,held:boolean){if(held)keys.add(key);else keys.delete(key);}
   function keyboard(event:KeyboardEvent){
     if(event.type==="keydown" && event.target!==canvas && (event.target as HTMLElement)?.closest("input,textarea,select,button,a"))return;
+    // Shift runs: its own press and release, and the state carried by every other key.
+    running=event.shiftKey;
     const key=movement[event.key]??movement[event.key.toLowerCase()];
     if(key){event.preventDefault();move(key,event.type==="keydown");}
   }
@@ -158,7 +179,7 @@ export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,
     pointer.x=event.clientX;pointer.y=event.clientY;needsDraw=true;
   }
   function pointerEnd(event:PointerEvent){if(pointer?.id===event.pointerId)pointer=undefined;}
-  function resetInputs(){keys.clear();pointer=undefined;}
+  function resetInputs(){keys.clear();pointer=undefined;running=false;}
   function tick(now:number){
     const delta=Math.min(.05,(now-previous)/1000);previous=now;
     frame=requestAnimationFrame(tick);
@@ -170,19 +191,24 @@ export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,
       measureFrom=0;
       return;
     }
-    if(!measureFrom){measureFrom=now;measured=0;}
+    if(!measureFrom){measureFrom=now;measured=0;measuredFrom.copy(body.end);}
     else if(now-measureFrom>=1000){
+      // Frames per second and the ground speed (m/s, horizontal) of that second, running or not.
+      const metres=Math.hypot(body.end.x-measuredFrom.x,body.end.z-measuredFrom.z);
       performance.clearMarks("obracota:walk-fps");
-      performance.mark("obracota:walk-fps",{detail:{fps:Math.round(measured*10000/(now-measureFrom))/10}});
-      measureFrom=now;measured=0;
+      performance.mark("obracota:walk-fps",{detail:{fps:Math.round(measured*10000/(now-measureFrom))/10,
+        speed:Math.round(metres*10000/(now-measureFrom))/10,running}});
+      measureFrom=now;measured=0;measuredFrom.copy(body.end);
     }
     measured++;
+    const moving=vector.lengthSq()>0;
     vector.normalize().applyAxisAngle(T.Object3D.DEFAULT_UP,camera.rotation.y);
+    const speed=WALK_SPEED*(running?RUN_FACTOR:1);
     standing=false;
     for(let i=0;i<4;i++){
       const dt=delta/4;
       velocity=Math.max(-8,velocity-9.81*dt);
-      step.copy(vector).multiplyScalar(1.5*dt);step.y=velocity*dt;
+      step.copy(vector).multiplyScalar(speed*dt);step.y=velocity*dt;
       const before=body.clone();
       body.translate(step);
       for(let attempt=0;attempt<4;attempt++){
@@ -198,10 +224,16 @@ export function walking(canvas:HTMLCanvasElement,world:WalkWorld,foot:T.Vector3,
         const below=level-(body.start.y-radius);
         if(below>0){body.translate(lift.set(0,below+.00001,0));if(velocity<0){velocity=0;standing=true;}}
       }
+      // The edge of the model (a terrain's border, a slab over nothing) stops the walker like a railing: a step from
+      // the floor onto empty space with nothing below is taken back. A drop onto a lower floor is still walked down.
+      if(moving && !grounded(current.tree,feetOf(body)) && grounded(current.tree,feetOf(before)) &&
+        overVoid(current.tree,body) && !overVoid(current.tree,before)){body=before;velocity=0;standing=true;}
     }
+    // Too long in the air (a gap, a wedge between bodies, off the model): back to the last floor stood on, never stuck.
+    airborne=standing?0:airborne+delta;
+    if(airborne>MAX_FALL || body.end.y<current.tree.bounds.min.y-2){body=safe.clone();velocity=0;standing=true;airborne=0;}
     const feet=body.start.clone().addScaledVector(down,radius);
     if(standing && grounded(current.tree,feet))safe=body.clone();
-    if(body.end.y<current.tree.bounds.min.y-2){body=safe.clone();velocity=0;standing=true;}
     camera.position.copy(body.end);render(camera);needsDraw=false;
   }
   window.addEventListener("keydown",keyboard);window.addEventListener("keyup",keyboard);

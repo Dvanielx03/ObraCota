@@ -75,7 +75,7 @@ export const guides: readonly Guide[] = [
     steps: [
       { title: "Pulsa «Recorrido»", text: "El botón se activa cuando el modelo abierto se puede recorrer." },
       { title: "Elige dónde empezar", text: "Marca un punto libre en el piso. Con Intro se prueba el centro." },
-      { title: "Camina y mira", text: "Arrastra para mirar y usa WASD o las flechas para caminar. Con Esc sales del recorrido." },
+      { title: "Camina y mira", text: "Arrastra para mirar y usa WASD o las flechas para caminar; mantén Mayús para correr. Con Esc sales del recorrido." },
     ],
   },
   {

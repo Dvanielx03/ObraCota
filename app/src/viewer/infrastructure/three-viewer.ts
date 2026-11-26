@@ -16,8 +16,21 @@ function release(root:T.Object3D) {
     for (const m of Array.isArray(node.material) ? node.material : [node.material]) materials.add(m);
   });
   geometry.forEach(g=>g.dispose());
-  materials.forEach(m=>m.dispose());
+  materials.forEach(m=>{(m as T.Material & {map?:T.Texture|null}).map?.dispose();m.dispose();});
 }
+
+type EntityMark={start:number;handle:string;type:string};
+/** The DWG entity whose vertices hold `index`: the last mark that starts at or before it. */
+function entityAt(marks:readonly EntityMark[]|undefined,index:number){
+  if(!marks?.length || !(index>=0))return undefined;
+  let low=0,high=marks.length-1;
+  while(low<high){const mid=(low+high+1)>>1;if(marks[mid].start<=index)low=mid;else high=mid-1;}
+  return marks[low].start<=index?marks[low]:undefined;
+}
+const ENTITY_NAMES:Record<string,string>={INSERT:"Bloque",LINE:"Línea",LWPOLYLINE:"Polilínea",POLYLINE2D:"Polilínea",POLYLINE3D:"Polilínea 3D",
+  ARC:"Arco",CIRCLE:"Círculo",ELLIPSE:"Elipse",POINT:"Punto","3DFACE":"Cara 3D",PFACE_MESH:"Malla",TEXT:"Texto",MTEXT:"Texto",DIMENSION:"Cota",
+  "3DSOLID":"Sólido",BODY:"Cuerpo",REGION:"Región"};
+export const entityName=(type:string,handle:string,detail?:string)=>(ENTITY_NAMES[type]??type)+" "+handle+(detail?" · "+detail:"");
 
 /** cubic-bezier(.22, 1, .36, 1): the curve of the presentation slides (--ease-slide in theme.css). */
 function slideEase(t:number){
@@ -133,8 +146,11 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   }
   let plan=false;
   let initialPlanBounds:T.Box3|undefined;
+  /** The building without a site topography far larger than it (see open), framed first; undefined = everything. */
+  let initialModelBounds:T.Box3|undefined;
   function fit(reset=true,region?:T.Box3,from?:T.Vector3,useRoom=true) {
     if(plan && !region)region=initialPlanBounds;
+    if(!plan && !region && reset)region=initialModelBounds;
     if (!root) return;
     stopTween();
     const center = (region??bounds).getCenter(new T.Vector3());
@@ -198,14 +214,21 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   function pulseMaterial(source:T.Material){
     if(!("color" in source) || !(source.color instanceof T.Color))return source;
     let copy=tinted.get(source);
-    if(!copy){copy=source.clone() as ColoredMaterial;tinted.set(source,copy);}
+    if(!copy){
+      copy=source.clone() as ColoredMaterial;
+      // clone() leaves out the shader hooks: an approved finish keeps its textures while it pulses.
+      copy.onBeforeCompile=source.onBeforeCompile;copy.customProgramCacheKey=source.customProgramCacheKey;
+      tinted.set(source,copy);
+    }
     return copy;
   }
   function pulsePreference(){
     if(!pulseActive)return;
     window.clearTimeout(pulseTimer);
-    originals.forEach((_material,node)=>{
-      node.material=node instanceof T.Mesh?highlight:node instanceof T.Points?highlightedPoints:highlightedLines;
+    originals.forEach((source,node)=>{
+      // A text of a plan keeps its letters: its own texture tinted orange, never a solid block.
+      node.material=node instanceof T.Mesh?(node.userData.label && !Array.isArray(source)?labelHighlight(source):highlight)
+        :node instanceof T.Points?highlightedPoints:highlightedLines;
     });
     marker.style.removeProperty("--selection-color");span.material.color.copy(orange);
     renderer.render(scene,camera);
@@ -230,7 +253,28 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   motion.addEventListener("change",pulsePreference);
   document.addEventListener("visibilitychange",pulsePreference);
   const previewMaterial=new T.MeshStandardMaterial({side:T.DoubleSide});
+  // A selected text of a plan stays legible: its own texture, tinted orange (one copy per text, freed with the model).
+  const labelHighlights=new Map<T.Material,T.Material>();
+  function labelHighlight(source:T.Material){
+    let copy=labelHighlights.get(source);
+    if(!copy){copy=source.clone();(copy as T.MeshBasicMaterial).color.set(0xff6900);labelHighlights.set(source,copy);}
+    return copy;
+  }
+  function clearLabelHighlights(){labelHighlights.forEach(material=>material.dispose());labelHighlights.clear();}
+  /**
+   * Pieces taken out of the view because they stood between the camera and a located piece (see locate): out of the
+   * camera's and the raycaster's layer, so they are neither drawn nor picked. A camera gesture, a picture, the walk or
+   * the next framing brings them back; another model drops them.
+   */
+  const veiled:[T.Object3D,number][]=[];
+  function unveil(){
+    if(!veiled.length)return;
+    for(const [node,mask] of veiled.splice(0))node.layers.mask=mask;
+    draw();
+  }
   function select(id:string|null, group?:Set<string>,color?:string) {
+    // The veil stays while the camera stays: a mark placed on the located piece must not end up behind the
+    // pieces that come back (marks hide when their piece is out of sight). Moving the camera lifts it.
     endPulse();
     selectedForWalk=id??(group?.size===1?group.values().next().value??null:null);
     hint.hidden=true;
@@ -253,7 +297,8 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       if ((mesh instanceof T.Mesh || mesh instanceof T.LineSegments || mesh instanceof T.Points) && (group?group.has(mesh.userData.elementId):mesh.userData.elementId === id)) {
         originals.set(mesh,mesh.material);
         if(plan){selectedOrder.set(mesh,mesh.renderOrder);mesh.renderOrder=5;}
-        mesh.material = mesh instanceof T.Mesh ? (color?previewMaterial:highlight) : mesh instanceof T.Points ? highlightedPoints : highlightedLines;
+        mesh.material = mesh instanceof T.Mesh ? (mesh.userData.label?labelHighlight(mesh.material as T.Material):color?previewMaterial:highlight)
+          : mesh instanceof T.Points ? highlightedPoints : highlightedLines;
       }
     });
     draw();
@@ -271,6 +316,29 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       const stage=container.closest<HTMLElement>(".stage")??container;
       if(state)stage.dataset.environment=state;else delete stage.dataset.environment;
     }});
+  // The walk's sky: a gradient dome around the walker instead of the canvas dot grid. A scene with surroundings
+  // («Recorrer esta escena en 3D») brings its own sky, and then this one stays hidden.
+  const walkSky=new T.Mesh(new T.SphereGeometry(1,32,16),new T.ShaderMaterial({
+    uniforms:{top:{value:new T.Color(0x6f9fd8)},horizon:{value:new T.Color(0xe4edf5)},bottom:{value:new T.Color(0xd2ccc0)}},
+    vertexShader:"varying vec3 vDir;\nvoid main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+    fragmentShader:`uniform vec3 top; uniform vec3 horizon; uniform vec3 bottom; varying vec3 vDir;
+void main(){
+  float h = normalize(vDir).y;
+  vec3 color = h > 0.0 ? mix(horizon, top, pow(min(h * 1.4, 1.0), 0.8)) : mix(horizon, bottom, min(-h * 6.0, 1.0));
+  gl_FragColor = vec4(color, 1.0);
+  #include <colorspace_fragment>
+}`,side:T.BackSide,depthWrite:false,depthTest:false,fog:false,toneMapped:false}));
+  walkSky.name="obracota-walk-sky";walkSky.renderOrder=-20;walkSky.frustumCulled=false;walkSky.visible=false;
+  // Centred on the eye and inside the far plane, so it is always behind the model and never clipped.
+  walkSky.onBeforeRender=(_renderer,_scene,view)=>{
+    walkSky.position.copy(view.position);walkSky.scale.setScalar((view as T.PerspectiveCamera).far*.5||500);walkSky.updateMatrixWorld();
+  };
+  scene.add(walkSky);
+  function renderWalk(view:T.Camera){
+    const surroundings=environment.current();
+    walkSky.visible=!surroundings || surroundings.surroundings==="none";
+    renderer.render(scene,view);
+  }
   function locateOnPlan(id:string) {
     const forward=camera.getWorldDirection(new T.Vector3());
     // The cursor zoom can shift the frustum away from the OrbitControls target.
@@ -348,7 +416,81 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     } else {
       root?.traverse(node=>{if(node.userData.elementId===id)region.expandByObject(node);});
     }
-    if(!region.isEmpty()){fit(false,region);pulseActive=true;pulsePreference();}
+    if(region.isEmpty())return;
+    if(note)fit(false,region);else frameInSight(region,new Set([id]));
+    pulseActive=true;pulsePreference();
+  }
+  /**
+   * A piece inside the building (a door, an interior wall) is often behind a roof or a facade from the current
+   * direction. Keep the direction when it sees the pieces; otherwise frame them from the side that sees them best,
+   * and take out of the view whatever still stands in front (unveil brings it back).
+   */
+  function frameInSight(region:T.Box3,ids:Set<string>){
+    unveil();
+    if(!root){fit(false,region);return;}
+    const center=region.getCenter(new T.Vector3());
+    const samples=[center,...[0,1,2,3,4,5,6,7].map(k=>new T.Vector3(k&1?region.max.x:region.min.x,k&2?region.max.y:region.min.y,k&4?region.max.z:region.min.z).lerp(center,.3))];
+    const reach=bounds.getSize(new T.Vector3()).length()*2+1,ray=new T.Raycaster(),model=root;
+    function sight(direction:T.Vector3){
+      let seen=0;const occluders=new Set<T.Object3D>();
+      for(const point of samples){
+        ray.set(point.clone().addScaledVector(direction,reach),direction.clone().negate());ray.far=reach*2;
+        const before:T.Object3D[]=[];
+        for(const hit of ray.intersectObject(model,true)){
+          if(!(hit.object instanceof T.Mesh))continue;
+          if(ids.has(hit.object.userData.elementId)){seen++;for(const node of before)occluders.add(node);break;}
+          before.push(hit.object);
+        }
+      }
+      return {seen,occluders};
+    }
+    const directions=[camera.getWorldDirection(new T.Vector3()).negate(),new T.Vector3(1,.65,1.45).normalize(),
+      ...[0,1,2,3].map(k=>new T.Vector3(Math.cos(k*Math.PI/2),.45,Math.sin(k*Math.PI/2)).normalize()),new T.Vector3(.05,1,.08).normalize()];
+    let best=directions[0],view=sight(best);
+    for(const direction of directions.slice(1)){
+      if(view.seen===samples.length && !view.occluders.size)break;
+      const next=sight(direction);
+      if(next.seen>view.seen || next.seen===view.seen && next.occluders.size<view.occluders.size){best=direction;view=next;}
+    }
+    fit(false,region,best);
+    for(const node of view.occluders){veiled.push([node,node.layers.mask]);node.layers.mask=0;}
+    if(view.occluders.size)draw();
+  }
+  /**
+   * Editar on a plan: the text under the click, else a dimension or text whose anchor is within a few pixels (dimensions
+   * are listed, not drawn), else the entity of the stroke under it (an INSERT stands for its whole block).
+   */
+  function planProbe(x:number,y:number){
+    if(!root)return null;
+    const rect=canvas.getBoundingClientRect(),ray=new T.Raycaster();
+    ray.params.Line.threshold=(camera.top-camera.bottom)/camera.zoom/rect.height*4;
+    ray.params.Points.threshold=ray.params.Line.threshold;
+    ray.setFromCamera(new T.Vector2((x-rect.left)/rect.width*2-1,1-(y-rect.top)/rect.height*2),camera);
+    const hits=ray.intersectObject(root,true).filter(item=>typeof item.object.userData.elementId==="string");
+    const label=hits.find(item=>item.object.userData.label);
+    const point=(value:T.Vector3):[number,number,number]=>[value.x,value.y,value.z];
+    const annotation=(id:string,at:T.Vector3)=>{
+      const item=annotations.get(id),note=item?.annotation;
+      if(!item || !note?.handle)return null;
+      return {id,point:point(at),entity:{handle:note.handle,type:item.type,name:entityName(item.type,note.handle,item.name.slice(0,60))}};
+    };
+    if(label){const found=annotation(label.object.userData.elementId,label.point);if(found)return found;}
+    let near:{id:string;distance:number;at:T.Vector3}|null=null;
+    const projected=new T.Vector3();
+    for(const [id,item] of annotations){
+      const note=item.annotation;
+      if(!note)continue;
+      projected.set(note.anchor[0],note.anchor[1],note.anchor[2]).project(camera);
+      const distance=Math.hypot((projected.x+1)/2*rect.width+rect.left-x,(1-projected.y)/2*rect.height+rect.top-y);
+      if(distance<=12 && (!near || distance<near.distance))near={id,distance,at:new T.Vector3(...note.anchor)};
+    }
+    if(near){const found=annotation(near.id,near.at);if(found)return found;}
+    const hit=hits[0];
+    if(!hit)return null;
+    const object=hit.object,id=object.userData.elementId as string;
+    const index=object instanceof T.Mesh?(hit.face?.a??-1):(hit.index??-1);
+    const mark=entityAt(object.userData.entities,index);
+    return {id,point:point(hit.point),...(mark?{entity:{handle:mark.handle,type:mark.type,name:entityName(mark.type,mark.handle,object.userData.layer)}}:{})};
   }
   function hitAt(x:number,y:number) {
     if (!root) return;
@@ -396,7 +538,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   // Camera moves between saved views (presentation, ↑/↓): one at a time, cancelled by any other camera action.
   let tween:number|undefined;
   function stopTween(){if(tween!==undefined){cancelAnimationFrame(tween);tween=undefined;}}
-  controls.addEventListener("start",stopTween);
+  controls.addEventListener("start",()=>{stopTween();unveil();});
   function applyPose(next:CameraPose,duration=0) {
     if(plan || walk || !root || !(next.span>0))return;
     stopTween();
@@ -514,6 +656,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   function walkAt(x:number,y:number){
     const notify=markFloor;
     if(!notify || !activeModel)return;
+    unveil();
     // With a scene around the model its ground counts as floor too: the walk can start outside and go around.
     const hit=hitAt(x,y)??groundAt(x,y);
     if(!hit){notify("Selecciona un punto visible en el piso.");return;}
@@ -528,7 +671,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       }
       // A click a few centimetres off a free spot (next to a column, a railing, a stud) still starts the walk:
       // try the point, then rings around it up to 0.9 m on the same floor height.
-      const start=(point:T.Vector3)=>walking(canvas,entry!.world,point,heading.clone().normalize(),view=>renderer.render(scene,view),()=>environment.groundLevel());
+      const start=(point:T.Vector3)=>walking(canvas,entry!.world,point,heading.clone().normalize(),renderWalk,()=>environment.groundLevel());
       let failure:unknown;
       outer: for(const radius of [0,.2,.4,.6,.9]){
         for(let k=0;k<(radius?8:1);k++){
@@ -542,6 +685,10 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       notify(error instanceof Error?error.message:"No se pudo iniciar el recorrido.");
       return;
     }
+    // Test-readable: the surface the walk started on (IFCSITE for a Revit topography, null for a scene's ground).
+    performance.clearMarks("obracota:walk-start");
+    performance.mark("obracota:walk-start",{detail:{ifcType:hit.object.userData.ifcType??null,element:hit.object.userData.elementId??null,
+      height:Math.round(hit.point.y*100)/100}});
     walkModel=activeModel;
     walkOrbitSelection=selectedForWalk;
     startWalkBatches();
@@ -596,6 +743,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
   // Captures keep a light background in both colour modes; the value comes from the --capture-bg token.
   function captureBackground(){return getComputedStyle(container).getPropertyValue("--capture-bg").trim()||"#F3F2F1";}
   function snapshot(background:string,maxSide=1280) {
+    unveil();
       // A picture larger than the canvas (exports) is rendered once at a higher pixel ratio, then the
       // canvas goes back to its own ratio within the same task, so nothing different is ever painted.
       const width=Math.max(container.clientWidth,1),height=Math.max(container.clientHeight,1);
@@ -623,7 +771,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     return area;
   }
   function captureGroup(ids:string[],format:"png"|"jpeg"="jpeg",view:GroupCaptureView="current"){
-      const materials=new Map<T.Mesh,T.Material|T.Material[]>(),temporary:T.Material[]=[];
+      const materials=new Map<T.Mesh|T.LineSegments|T.Points,T.Material|T.Material[]>(),temporary:T.Material[]=[];
       const hidden:T.Object3D[]=[];
       function flat(value:number){
         const m=new T.MeshBasicMaterial({color:value,side:T.DoubleSide,toneMapped:false});
@@ -631,6 +779,13 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       }
       const black=flat(0), colors=new Map(ids.map((id,i)=>[id,((i+1)*0x73a9ef)&0xffffff]));
       const masks=new Map([...colors].map(([id,c])=>[id,flat(c)]));
+      // A plan is strokes: they paint the mask too (black, or the colour of a marked layer).
+      const strokes=new Map<number,T.LineBasicMaterial>();
+      function stroke(value:number){
+        let m=strokes.get(value);
+        if(!m){m=new T.LineBasicMaterial({color:value,toneMapped:false});strokes.set(value,m);temporary.push(m);}
+        return m;
+      }
       function readMask(){
         const mask=snapshot("#000000"),ctx=mask.getContext("2d")!;
         const pixels=ctx.getImageData(0,0,mask.width,mask.height),seen=new Set<number>(),allowed=new Set(colors.values());
@@ -652,6 +807,9 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
             hidden.push(node);node.visible=false;
           }
           if(node instanceof T.Mesh){materials.set(node,node.material);node.material=masks.get(node.userData.elementId)??black;}
+          else if(plan && (node instanceof T.LineSegments || node instanceof T.Points)){
+            materials.set(node,node.material);node.material=stroke(colors.get(node.userData.elementId)??0);
+          }
         });
         let coverage=readMask();
         if(area && !area.isEmpty() && coverage.missing){
@@ -680,7 +838,11 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       }
   }
   function applyButtons(){
-    if(plan)return;
+    if(plan){
+      // On a plan the left button pans; in Editar › Seleccionar it marks, and the right and middle buttons pan.
+      controls.mouseButtons.LEFT=marking?(-1 as T.MOUSE):T.MOUSE.PAN;controls.mouseButtons.RIGHT=T.MOUSE.PAN;controls.touches.ONE=T.TOUCH.PAN;
+      return;
+    }
     controls.mouseButtons.LEFT=marking?(-1 as T.MOUSE):panning?T.MOUSE.PAN:T.MOUSE.ROTATE;
     controls.mouseButtons.RIGHT=marking?T.MOUSE.ROTATE:T.MOUSE.PAN;
     controls.touches.ONE=panning?T.TOUCH.PAN:T.TOUCH.ROTATE;
@@ -716,7 +878,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     if(!walk && !markFloor && !walkModels.size)return;
     if(walkSelection){select(null);walkSelection=null;}
     markFloor=undefined;walk?.dispose();walk=undefined;
-    walkModel=undefined;
+    walkModel=undefined;walkSky.visible=false;
     releaseWalkBatches();
     if(activeModel && root!==activeModel.root){
       if(root)scene.remove(root);
@@ -743,7 +905,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     previewGroup(ids,color){select(null,new Set(ids),color);canvas.toggleAttribute("data-group-preview",ids.length>0);},
     frameGroup(ids){
       const area=groupBounds(new Set(ids));
-      if(!area.isEmpty())fit(false,area);
+      if(!area.isEmpty())frameInSight(area,new Set(ids));
     },
     captureGroup,
     enterWalk(mark){
@@ -787,7 +949,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     async open(file,signal,status,source) {
       const next = await loadModel(file,signal,status,source);
       if (disposed || signal.aborted) {release(next.root);throw new DOMException("Cancelado","AbortError");}
-      cancelWalk();select(null);exterior.reset();environment.reset();
+      cancelWalk();select(null);veiled.length=0;exterior.reset();environment.reset();clearLabelHighlights();
       if (root) {scene.remove(root);release(root);}
       root = next.root; scene.add(root);activeModel=next;originalFile=file;
       annotations=new Map(next.elements.filter(item=>item.annotation).map(item=>[item.id,item]));
@@ -797,7 +959,21 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       const depth=next.drawing?.depth??size.y;
       // Allow floating point noise but retain shallow, genuinely spatial models.
       plan=!bounds.isEmpty() && depth<=Math.max(size.x,size.z,1)*1e-10;
-      initialPlanBounds=undefined;sheet=undefined;
+      initialPlanBounds=undefined;sheet=undefined;initialModelBounds=undefined;
+      if(!plan){
+        // A Revit topography or a road exported with the model (as IfcSite, a proxy or a geographic element) can be
+        // hundreds of metres wide: the first frame and «Home» show the building, and «Extensión completa» still
+        // shows everything. A piece counts as surroundings when it alone spans more than half the model.
+        const whole=bounds.getSize(new T.Vector3()).length(),building=new T.Box3(),piece=new T.Box3();
+        let surroundings=false;
+        root.traverse(node=>{
+          if(!(node instanceof T.Mesh))return;
+          piece.setFromObject(node,true);
+          if(piece.getSize(new T.Vector3()).length()>whole*.5)surroundings=true;
+          else building.union(piece);
+        });
+        if(surroundings && !building.isEmpty() && building.getSize(new T.Vector3()).length()<whole*.5)initialModelBounds=building.clone();
+      }
       controls.minZoom=plan?1:.0001;controls.maxZoom=plan?128:1e7;
       controls.enableRotate=!plan;
       panning=false;
@@ -843,7 +1019,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       stopTween();cancelWalk();activeModel=undefined;originalFile=null;
       if(windowMode)exitWindow();
       setMarking(false);
-      select(null);exterior.reset();environment.reset();
+      select(null);exterior.reset();environment.reset();clearLabelHighlights();
       sheet=undefined;annotations.clear();
       if (root) {scene.remove(root);release(root);root=null;}
       draw();
@@ -851,9 +1027,26 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
     zoom(factor) {stopTween();camera.zoom =T.MathUtils.clamp(camera.zoom*factor,controls.minZoom,controls.maxZoom);camera.updateProjectionMatrix();draw();},
     pan(enabled) {if(plan)return;panning=enabled;applyButtons();},
     probe(x,y){
-      if(plan || walk)return null;
+      if(walk || !root)return null;
+      if(plan)return planProbe(x,y);
       const hit=hitAt(x,y),id=hit?.object.userData.elementId;
-      return hit && typeof id==="string"?{id,point:[hit.point.x,hit.point.y,hit.point.z]}:null;
+      if(!hit || typeof id!=="string")return null;
+      // A 3D DWG: the solid under the click, by the triangle ranges of its bodies.
+      const body=hit.faceIndex!=null?entityAt(hit.object.userData.entities,hit.faceIndex):undefined;
+      return {id,point:[hit.point.x,hit.point.y,hit.point.z],...(body?{entity:{handle:body.handle,type:body.type,
+        name:entityName(body.type,body.handle,hit.object.userData.layer)}}:{})};
+    },
+    locateHandle(handle){
+      if(!root || !handle)return null;
+      const note=[...annotations.values()].find(item=>item.annotation?.handle===handle);
+      if(note){locate(note.id);return note.id;}
+      let found:string|null=null;
+      root.traverse(node=>{
+        if(found || !Array.isArray(node.userData.entities))return;
+        if((node.userData.entities as EntityMark[]).some(mark=>mark.handle===handle))found=node.userData.elementId;
+      });
+      if(found)locate(found);
+      return found;
     },
     project,
     onFrame(listener){frameListeners.add(listener);return ()=>{frameListeners.delete(listener);};},
@@ -866,7 +1059,7 @@ export function createViewer(container: HTMLElement, onPick:(id:string|null)=>vo
       canvas.removeEventListener("pointerdown",start);canvas.removeEventListener("pointerup",end);
       canvas.removeEventListener("webglcontextlost",lose);
       originals.forEach((mat,m)=>{m.material=mat;}); exterior.reset(); environment.reset(); if (root) release(root);
-      span.geometry.dispose();span.material.dispose();previewMaterial.dispose();
+      span.geometry.dispose();span.material.dispose();previewMaterial.dispose();walkSky.geometry.dispose();walkSky.material.dispose();
       hint.remove();marker.remove();box.remove();highlightedLines.dispose();highlightedPoints.dispose();highlight.dispose();renderer.dispose();canvas.remove();
     }
   };

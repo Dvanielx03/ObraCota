@@ -1,8 +1,10 @@
 import * as T from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
-import type { ElementInfo, ModelInfo } from "../domain/viewer.port";
+import type { ElementInfo, ExteriorMaterial, ExteriorTone, ModelInfo } from "../domain/viewer.port";
 import { openFailures } from "../domain/open-failure";
+import { finishOfMaterialName } from "@/modules/design-option/domain/finish-material";
+import { approvedFinish } from "./exterior-finish";
 import { readMesh, walkableFloor } from "./mesh-source";
 import { fetchSolids, solidGroups, type StoredSource } from "./dwg-solids";
 import { readRevit, revitReason } from "./revit-file";
@@ -56,7 +58,52 @@ async function readSample(signal: AbortSignal): Promise<SceneModel> {
 }
 
 interface Part {key:number; matrix:number[]; color:number[]}
-interface Payload {schema:string; versionId?:string; walk?:number[]; geometry:Map<number,{vertices:Float32Array;indices:Uint32Array}>; elements:(ElementInfo & {parts:Part[];external?:boolean;predefined?:string})[]}
+interface Payload {schema:string; versionId?:string; walk?:number[]; geometry:Map<number,{vertices:Float32Array;indices:Uint32Array}>;
+  /** `materials`: the names of the piece's IfcMaterial, layers or constituents (read-ifc.js), to find an approved finish. */
+  elements:(ElementInfo & {parts:Part[];external?:boolean;predefined?:string;materials?:string[]})[]}
+/** A finish ObraCota approved into the IFC on this piece: its first material named «Madera · claro» (finish-material.ts). */
+function approvedFinishOf(names:string[]|undefined){
+  for(const name of names??[]){const finish=finishOfMaterialName(name);if(finish)return {...finish,name};}
+  return null;
+}
+/**
+ * The pieces with an approved finish take the textured material of its preview (exterior-finish.ts), one material per
+ * finish and model, so the published version, the walk and Anterior/Nueva show what Renderizar previewed. The whole body
+ * takes it, as in the preview: the IFC cannot paint only the exterior face of a solid. If the textures cannot be loaded
+ * the pieces keep the colour of the IFC's surface style.
+ */
+async function dressApprovedFinishes(root:T.Group){
+  const pieces=new Map<string,T.Mesh[]>();
+  root.traverse(node=>{
+    const finish=node.userData.finish as {name:string}|undefined;
+    if(!(node instanceof T.Mesh) || !finish)return;
+    const list=pieces.get(finish.name);
+    if(list)list.push(node);else pieces.set(finish.name,[node]);
+  });
+  const shown:string[]=[];
+  await Promise.all([...pieces].map(async([name,meshes])=>{
+    const {material:kind,tone}=meshes[0].userData.finish as {material:ExteriorMaterial;tone:ExteriorTone};
+    try{
+      const material=await approvedFinish(kind,tone);
+      if(!material.transparent){
+        // Some IFCs keep a second coplanar proxy over the wall: the finish wins the depth tie, as in the preview.
+        material.polygonOffset=true;material.polygonOffsetFactor=-2;material.polygonOffsetUnits=-2;
+      }
+      material.name=name;
+      for(const mesh of meshes)mesh.material=material;
+      shown.push(name);
+    }catch{/* the IFC's own colour stays */}
+  }));
+  // Test-readable: what the last IFC opened shows (the walk's other version included).
+  const elements=new Set<string>(),guids=new Set<string>();
+  for(const meshes of pieces.values())for(const mesh of meshes){
+    elements.add(String(mesh.userData.elementId));
+    if(mesh.userData.finish.guid)guids.add(mesh.userData.finish.guid);
+  }
+  performance.clearMarks("obracota:approved-finishes");
+  performance.mark("obracota:approved-finishes",{detail:{finishes:shown.sort(),pieces:elements.size,guids:[...guids].slice(0,300),
+    meshes:[...pieces.values()].reduce((sum,list)=>sum+list.length,0),textured:shown.length===pieces.size}});
+}
 function assemble(file:File, payload:Payload):SceneModel {
   const root = new T.Group();
   const geometries = new Map<number,T.BufferGeometry>();
@@ -69,7 +116,8 @@ function assemble(file:File, payload:Payload):SceneModel {
     geo.setIndex(new T.BufferAttribute(data.indices,1));
     geometries.set(key,geo);
   }
-  const elements = payload.elements.map(({parts,external,predefined,...info}) => {
+  const elements = payload.elements.map(({parts,external,predefined,materials:names,...info}) => {
+    const finish=approvedFinishOf(names);
     for (const part of parts) {
       const key = part.color.join(",");
       let material = materials.get(key);
@@ -85,6 +133,7 @@ function assemble(file:File, payload:Payload):SceneModel {
       // Envelope hints for the exterior finish preview: Pset_*Common.IsExternal and the IFC predefined type.
       if(external!==undefined)mesh.userData.external=external;
       if(predefined)mesh.userData.predefined=predefined.toUpperCase();
+      if(finish)mesh.userData.finish={...finish,guid:info.guid};
       root.add(mesh);
     }
     return info;
@@ -121,7 +170,9 @@ interface DrawingData {
   versionId?:string;
   labels:ElementInfo[];
   version:string; units:number; depth:number; omissions:string;
-  groups:{id:string;layer:string;kind:"faces"|"lines"|"points";color:number;count:number;positions:Float32Array;cad:ElementInfo["cad"]}[];
+  groups:{id:string;layer:string;kind:"faces"|"lines"|"points";color:number;count:number;positions:Float32Array;cad:ElementInfo["cad"];
+    /** Where each model space entity's vertices start in `positions` (vertex index), so a click names its handle. */
+    entities?:{start:number;handle:string;type:string}[]}[];
   /** Drawing coordinates the positions are relative to, ACIS solids left out and the colour of each layer. */
   origin?:number[]; acis?:number; layerColors?:Record<string,number|undefined>;
 }
@@ -172,10 +223,14 @@ export function readDrawingIndex(file: File, signal: AbortSignal) {
 export async function loadModel(file: File | null, signal: AbortSignal, status:(s:string)=>void, source?:StoredSource): Promise<SceneModel> {
   openFailures.clear();
   if (!file) return readSample(signal);
-  if (/\.ifc$/i.test(file.name)) return assemble(file,await readWorker<Payload>("ifc",file,signal,status));
+  if (/\.ifc$/i.test(file.name)) {
+    const model=assemble(file,await readWorker<Payload>("ifc",file,signal,status));
+    await dressApprovedFinishes(model.root);
+    return model;
+  }
   if (/\.(fbx|obj)$/i.test(file.name)) return readMesh(file,signal,status);
   if (/\.rvt$/i.test(file.name)) return rejectRevit(file,signal,status,!!source);
-  if (!/\.dwg$/i.test(file.name)) throw new Error("Elige un archivo IFC, DWG, RVT, FBX u OBJ.");
+  if (!/\.(dwg|dxf)$/i.test(file.name)) throw new Error("Elige un archivo IFC, DWG, DXF, RVT, FBX u OBJ.");
   let data:DrawingData, failure:{message:string;preview?:AcisPreview}|undefined;
   try{data=await readWorker<DrawingData>("dwg",file,signal,status);}
   catch(error){
@@ -196,7 +251,7 @@ export async function loadModel(file: File | null, signal: AbortSignal, status:(
       node=new T.Mesh(geometry,new T.MeshStandardMaterial({color,side:T.DoubleSide}));
     }else if(group.kind==="points")node=new T.Points(geometry,new T.PointsMaterial({color,size:3,sizeAttenuation:false}));
     else node=new T.LineSegments(geometry,new T.LineBasicMaterial({color}));
-    node.userData.elementId=group.id;root.add(node);
+    node.userData.elementId=group.id;node.userData.entities=group.entities??[];node.userData.layer=group.layer;root.add(node);
     const type={faces:"Caras",points:"Puntos",lines:"Trazos"}[group.kind];
     return {id:group.id,name:type+" · "+group.layer,level:group.layer,type,count:group.count,cad:group.cad};
   });
@@ -230,12 +285,77 @@ export async function loadModel(file: File | null, signal: AbortSignal, status:(
   // A plan, or a drawing without a unit, keeps its own units.
   const metres=METRES_PER_UNIT[data.units];
   const solid=depth>0 && root.children.some(node=>node instanceof T.Mesh);
+  // A flat drawing shows its texts on the sheet, so a revision's new text is seen where it is (and can be clicked).
+  if(!solid && isFlat(data,depth))addLabels(root,data.labels,data.layerColors??{});
   if(metres && solid)root.scale.setScalar(metres);
-  return {root,elements:[...elements,...data.labels],sample:false,name:file.name,schema:"DWG "+data.version,versionId:data.versionId,
+  return {root,elements:[...elements,...data.labels],sample:false,name:file.name,schema:data.version==="DXF"?"DXF":"DWG "+data.version,versionId:data.versionId,
     drawing:{units:drawingUnits(data.units),depth,omissions},
     // In metres it can be walked: on its own floor if it has one, otherwise on the ground of a scene around it.
     ...(metres && solid?{walk:walkableFloor(root,root.children.filter((node):node is T.Mesh=>node instanceof T.Mesh)),coordination:Array.from(new T.Matrix4().elements)}:{})};
 }
+/** Same rule as the viewer's plan: no height beyond floating point noise against the drawing's extent. */
+function isFlat(data:DrawingData,depth:number){
+  let extent=1;
+  for(const group of data.groups){
+    const cad=group.cad;
+    if(cad)extent=Math.max(extent,cad.max[0]-cad.min[0],cad.max[1]-cad.min[1]);
+  }
+  return depth<=extent*1e-10;
+}
+/** Texts drawn per plan, at most: each one is a small texture. */
+const LABEL_LIMIT=800;
+const LABEL_FONT=40;
+const LABEL_INK=0x35404a;
+/**
+ * TEXT and MTEXT of a plan as flat textured quads on the sheet, at their insertion point, height and angle. The texture is
+ * white text tinted by the material's colour (ink, or orange when selected). Each quad keeps the element id of its text,
+ * so picking, locating and Editar marks treat it as the text.
+ */
+function addLabels(root:T.Group,labels:ElementInfo[],colors:Record<string,number|undefined>){
+  const canvas=document.createElement("canvas"),context=canvas.getContext("2d");
+  if(!context)return;
+  const font='500 '+LABEL_FONT+'px Arial, "Helvetica Neue", sans-serif';
+  let drawn=0;
+  for(const item of labels){
+    const note=item.annotation,draw=note?.draw;
+    if(drawn>=LABEL_LIMIT)break;
+    if(!note || !draw?.lines.length || !(note.height>0) || item.type==="DIMENSION")continue;
+    context.font=font;
+    const widths=draw.lines.map(line=>context.measureText(line).width);
+    const pad=4,step=LABEL_FONT*1.25;
+    const width=Math.ceil(Math.max(...widths))+pad*2,height=Math.ceil(step*draw.lines.length)+pad*2;
+    const scale=Math.min(1,2048/width);
+    const target=document.createElement("canvas");
+    target.width=Math.max(4,Math.ceil(width*scale));target.height=Math.max(4,Math.ceil(height*scale));
+    const ink=target.getContext("2d");
+    if(!ink)continue;
+    ink.scale(scale,scale);ink.font=font;ink.fillStyle="#ffffff";ink.textBaseline="alphabetic";
+    draw.lines.forEach((line,index)=>ink.fillText(line,pad,pad+LABEL_FONT*.95+index*step));
+    const texture=new T.CanvasTexture(target);
+    texture.colorSpace=T.SRGBColorSpace;texture.generateMipmaps=true;texture.minFilter=T.LinearMipmapLinearFilter;
+    // CAD text height is the capital height, about 0.72 of the font size.
+    const unit=note.height/(.72*LABEL_FONT),w=width*unit,h=height*unit;
+    // A TEXT on its baseline: the bottom of the box is the descent and padding below it.
+    const baseline=item.type==="TEXT" && draw.ay===0?(height-(pad+LABEL_FONT*.95))*unit:0;
+    const geometry=new T.PlaneGeometry(w,h);
+    geometry.translate(w/2-draw.ax*w,h/2-draw.ay*h-baseline,0);
+    geometry.rotateZ(draw.angle);geometry.rotateX(-Math.PI/2);
+    const declared=colors[item.level];
+    const color=declared===0xffffff || declared===0 || declared==null?LABEL_INK:declared;
+    const material=new T.MeshBasicMaterial({map:texture,color,transparent:true,depthWrite:false,side:T.DoubleSide,toneMapped:false});
+    const mesh=new T.Mesh(geometry,material);
+    mesh.position.set(note.anchor[0],note.anchor[1],note.anchor[2]);
+    mesh.renderOrder=3;
+    mesh.userData.elementId=item.id;mesh.userData.label=true;
+    root.add(mesh);
+    drawn++;
+  }
+  canvas.remove();
+}
 function release(root:T.Object3D){
-  root.traverse(node=>{if(node instanceof T.Mesh || node instanceof T.LineSegments || node instanceof T.Points){node.geometry.dispose();(node.material as T.Material).dispose();}});
+  root.traverse(node=>{if(node instanceof T.Mesh || node instanceof T.LineSegments || node instanceof T.Points){
+    node.geometry.dispose();
+    const material=node.material as T.Material & {map?:T.Texture|null};
+    material.map?.dispose();material.dispose();
+  }});
 }

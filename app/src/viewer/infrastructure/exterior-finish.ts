@@ -223,6 +223,57 @@ function triplanar(material: T.MeshStandardMaterial, maps: { color: T.Texture; n
   material.customProgramCacheKey = () => "obracota-triplanar";
 }
 
+type TextureSource = (path: string, color: boolean) => T.Texture;
+const MAP_FILES = [["color.webp", true], ["normal.webp", false], ["rugosidad.webp", false]] as const;
+
+/** The material of a finish: the scans at real scale (stone, wood, concrete, steel) or a plain colour (paint, glass). */
+export function finishSurface(kind: ExteriorMaterial, tone: ExteriorTone, texture: TextureSource): T.Material {
+  if (kind === "glass") {
+    const [color, opacity] = GLASS[tone];
+    return new T.MeshPhysicalMaterial({ color, metalness: 0, roughness: .06, transparent: true, opacity, depthWrite: false, side: T.DoubleSide, specularIntensity: 1, clearcoat: .6 });
+  }
+  if (kind === "paint") return new T.MeshStandardMaterial({ color: PAINT[tone], roughness: .88, metalness: 0, side: T.DoubleSide });
+  const spec = LIBRARY[kind]!;
+  const material = new T.MeshStandardMaterial({ color: new T.Color(1, 1, 1).multiplyScalar(TONE[tone] * spec.gain), metalness: spec.metalness, roughness: spec.roughness, side: T.DoubleSide });
+  const base = "/materials/" + spec.dir + "/";
+  const [color, normal, rough] = MAP_FILES.map(([file, srgb]) => texture(base + file, srgb));
+  triplanar(material, { color, normal, rough }, 1 / spec.size, spec.normal);
+  return material;
+}
+
+/** Textures of the approved finishes, loaded once per page and shared by every model (a model's release never frees them). */
+const approvedMaps = new Map<string, Promise<T.Texture>>();
+function approvedMap(path: string, color: boolean) {
+  let pending = approvedMaps.get(path);
+  if (!pending) {
+    pending = new T.TextureLoader().loadAsync(path).then((map) => {
+      map.wrapS = map.wrapT = T.RepeatWrapping;
+      // The renderer clamps it to what the GPU supports.
+      map.anisotropy = 8;
+      if (color) map.colorSpace = T.SRGBColorSpace;
+      return map;
+    });
+    pending.catch(() => approvedMaps.delete(path));
+    approvedMaps.set(path, pending);
+  }
+  return pending;
+}
+
+/**
+ * The material of a finish approved into the IFC (an IfcMaterial «Madera · claro» written by ifc.set_material): the
+ * same textures and tone as the Renderizar preview, so the published version, its walk and the Anterior/Nueva
+ * comparison show what was previewed instead of the approximate colour of its surface style. It resolves once the
+ * textures can be drawn; a failed load rejects and the caller keeps the IFC's own colour.
+ */
+export async function approvedFinish(kind: ExteriorMaterial, tone: ExteriorTone): Promise<T.Material> {
+  const spec = LIBRARY[kind], maps = new Map<string, T.Texture>();
+  if (spec) await Promise.all(MAP_FILES.map(async ([file, color]) => {
+    const path = "/materials/" + spec.dir + "/" + file;
+    maps.set(path, await approvedMap(path, color));
+  }));
+  return finishSurface(kind, tone, (path) => maps.get(path)!);
+}
+
 export function exteriorPreview(scene: T.Scene, renderer: T.WebGLRenderer, hemisphere: T.HemisphereLight, sun: T.DirectionalLight, slot: {
   get: (mesh: T.Mesh) => T.Material | T.Material[];
   set: (mesh: T.Mesh, material: T.Material | T.Material[]) => void;
@@ -247,16 +298,7 @@ export function exteriorPreview(scene: T.Scene, renderer: T.WebGLRenderer, hemis
     return map;
   }
   function build(kind: ExteriorMaterial, tone: ExteriorTone) {
-    if (kind === "glass") {
-      const [color, opacity] = GLASS[tone];
-      return new T.MeshPhysicalMaterial({ color, metalness: 0, roughness: .06, transparent: true, opacity, depthWrite: false, side: T.DoubleSide, specularIntensity: 1, clearcoat: .6 });
-    }
-    if (kind === "paint") return new T.MeshStandardMaterial({ color: PAINT[tone], roughness: .88, metalness: 0, side: T.DoubleSide });
-    const spec = LIBRARY[kind]!;
-    const material = new T.MeshStandardMaterial({ color: new T.Color(1, 1, 1).multiplyScalar(TONE[tone] * spec.gain), metalness: spec.metalness, roughness: spec.roughness, side: T.DoubleSide });
-    const base = "/materials/" + spec.dir + "/";
-    triplanar(material, { color: texture(base + "color.webp", true), normal: texture(base + "normal.webp", false), rough: texture(base + "rugosidad.webp", false) }, 1 / spec.size, spec.normal);
-    return material;
+    return finishSurface(kind, tone, texture);
   }
   function restoreMaterials() {
     originals.forEach((material, mesh) => slot.set(mesh, material));
