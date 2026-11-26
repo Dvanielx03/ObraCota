@@ -295,6 +295,18 @@ class AskDocumentTest {
         assertEquals("INSUFFICIENT", invented.status());
     }
 
+    @Test void flattenedTableCellsCannotSupportAnUnlabelledAnswer() {
+        var row = "Cambridge ancho de panel 2-6 6-1/4 19-11/16 26-1/8.";
+        store.piece = List.of(source(DOC_A, "cambridge.pdf", "INDEXED"));
+        store.byDocument.put(DOC_A, List.of(new SpecificationPassages.Passage(2, 1, row, "Cambridge")));
+        for (var quote : List.of(row, "6-1/4")) {
+            var answer = local(prompt -> reply("6-1/4", 2, quote)).askPiece(PROJECT, USER, VERSION, WALL,
+                "En la tabla Cambridge de la página 2, ¿qué ancho de panel corresponde a una hoja de 2 pies y 6 pulgadas?");
+            assertEquals("INSUFFICIENT", answer.status(), answer.toString());
+            assertTrue(answer.evidence().isEmpty());
+        }
+    }
+
     @Test void aQuotedValueForSomethingElseIsNotPublished() {
         threeSheets();
         store.piece = List.of(source(DOC_A, "concreto-a.pdf", "INDEXED"));

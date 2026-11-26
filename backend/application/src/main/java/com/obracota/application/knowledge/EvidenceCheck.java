@@ -36,6 +36,11 @@ public final class EvidenceCheck {
         + "mpa|kpa|gpa|psi|pa|kn|kw|db|°c|ºc|m²|m2|m³|m3|mm|cm|km|ml|kg|lb|ft|in|pulgadas|pulgada|pies|horas|hora|hrs|hr|"
         + "minutos|min|segundos|seg|dias|días|años|anos|meses|%|°|m|g|t|l|h|s|n|w|v";
     private static final Pattern MEASURE = Pattern.compile("(?iu)(?<![\\p{L}\\p{N}])(\\d+(?:[.,]\\d+)*)\\s?(" + UNITS + ")(?![\\p{L}\\p{N}²³])");
+    private static final String TABLE_VALUE = "\\d+(?:[.,]\\d+)?(?:[- ]\\d+/\\d+|/\\d+)?";
+    private static final Pattern FLAT_ROW = Pattern.compile("(?iu)(?<![\\p{L}\\p{N}./-])" + TABLE_VALUE
+        + "(?:[\\s|]+(?:" + TABLE_VALUE + ")){2,}(?![\\p{L}\\p{N}./-])");
+    private static final Pattern CELL_GAP = Pattern.compile("[\\s|]*");
+
     private static final Set<String> COMMON = Set.of("cual", "cuales", "cuanto", "cuanta", "cuantos", "como", "donde", "cuando",
         "sobre", "segun", "tiene", "tienen", "dice", "indica", "indican", "cita", "citar", "exacta", "exactas", "exacto", "palabras",
         "contenido", "apartado", "literal", "literalmente", "ficha", "fichas", "tecnica", "documento", "documentos", "dato", "datos",
@@ -205,6 +210,20 @@ public final class EvidenceCheck {
         if (c != '.') return false;
         boolean decimal = i > 0 && i + 1 < text.length() && Character.isDigit(text.charAt(i - 1)) && Character.isDigit(text.charAt(i + 1));
         return !decimal;
+    }
+
+    /** Consecutive cells without a surviving header cannot support a numeric answer. */
+    public static boolean ambiguousTable(String passage, int start, int end) {
+        var row = FLAT_ROW.matcher(passage);
+        while (row.find()) if (row.start() < end && row.end() > start) return true;
+        var cells = measures(passage);
+        for (int i = 1; i < cells.size(); i++) {
+            var left = cells.get(i - 1);
+            var right = cells.get(i);
+            if (left.start() >= end || right.end() <= start) continue;
+            if (CELL_GAP.matcher(passage.substring(left.end(), right.start())).matches()) return true;
+        }
+        return false;
     }
 
     /** The text around a span of its passage: the label before a value usually names what is measured. */

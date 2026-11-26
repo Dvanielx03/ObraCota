@@ -280,6 +280,8 @@ public final class AskDocument {
             String quote = data.substring(span.get()[0], span.get()[1]);
             int at = span.get()[0];
             if (!passage.content().contains(quote) || quote.contains(EvidenceCheck.OMITTED) || EvidenceCheck.instruction(quote)) continue;
+            if (!EvidenceCheck.numbers(c.answer()).isEmpty()
+                && EvidenceCheck.ambiguousTable(data, at, at + quote.length())) continue;
             var support = EvidenceCheck.supports(c.answer(), quote);
             if (support.isEmpty()) return Optional.empty();
             if (!terms.isEmpty() && !EvidenceCheck.mentions(EvidenceCheck.window(data, at, at + quote.length()), terms))
