@@ -79,15 +79,23 @@ async function selectPiece(page:Page,guid:string,kind?:RegExp){
   return sheetOf(page);
 }
 
+const assistantOf=(page:Page)=>page.locator(".piece-assistant");
+
+async function openPieceAssistant(page:Page){
+  await expect(sheetOf(page).getByLabel("Pregunta sobre la ficha")).toHaveCount(0);
+  await sheetOf(page).getByRole("link",{name:"Preguntar en el asistente del proyecto"}).click();
+  await expect(page).toHaveURL(/\/asistente\?[^#]*version=.*element=/);
+}
+
 async function ask(page:Page,question:string){
-  const sheet=sheetOf(page);
+  const sheet=assistantOf(page);
   await sheet.getByLabel("Pregunta sobre la ficha").fill(question);
   const response=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith("/assistant")&&r.request().method()==="POST",{timeout:300_000});
   await sheet.getByRole("button",{name:"Consultar ficha"}).click();
   const result=await response;
   expect(result.status()).toBe(200);
   const answer=await result.json() as Answer;
-  await expect(sheet.locator(".piece-answer").first()).toContainText(answer.answer.slice(0,40),{timeout:30_000});
+  await expect(assistantOf(page).locator(".piece-answer").first()).toContainText(answer.answer.slice(0,40),{timeout:30_000});
   return answer;
 }
 
@@ -193,6 +201,7 @@ test("2 · PDF digital en un muro: dato, unidad, cita, página y vuelta al visor
     const sheet=await selectPiece(page,DUPLEX.wall,/^IFCWALLSTANDARDCASE$/i);
     await sheet.getByLabel("Vincular ficha PDF a esta pieza").setInputFiles({name:WALL_PDF,mimeType:"application/pdf",buffer:textPdf(WALL_PAGES)});
     await waitReady(page,WALL_PDF);
+    await openPieceAssistant(page);
     const answer=await ask(page,"¿Cuál es la resistencia a la compresión del bloque?");
     await info.attach("respuesta",{body:JSON.stringify(answer,null,2),contentType:"application/json"});
     expect(answer,JSON.stringify(answer)).toMatchObject({status:"ANSWERED",datum:"14 MPa",version,element:DUPLEX.wall});
@@ -203,17 +212,12 @@ test("2 · PDF digital en un muro: dato, unidad, cita, página y vuelta al visor
     expect(citation.quote).toMatch(/14 MPa/);
     expect(pageText(WALL_PAGES[1])).toContain(citation.quote);
     await verbatim(page,project,version,DUPLEX.wall,citation);
-    const view=sheet.locator(".piece-answer").first();
+    const view=assistantOf(page).locator(".piece-answer").first();
     await expect(view).toContainText("Dato citado: 14 MPa");
     await expect(view.locator("blockquote")).toContainText(citation.quote);
     await expect(view.locator("cite")).toHaveText(WALL_PDF+" · pág. 2");
     await expect(view.locator("footer")).toContainText("Propiedades mecánicas");
     await expect(view).toContainText("Respuesta asistida por IA");
-    // «Ver en el modelo» inside Propiedades frames the same piece.
-    await view.getByRole("button",{name:"Ver en el modelo"}).click();
-    await expect(properties(page).locator(".guid")).toHaveText(DUPLEX.wall);
-    // From the assistant page the citation leads back to the viewer and selects the cited piece.
-    await page.goto("/proyectos/"+project.id+"/asistente");
     const cited=page.locator(".piece-answer").filter({hasText:citation.quote}).first();
     await expect(cited.locator("cite")).toHaveText(WALL_PDF+" · pág. 2");
     await cited.getByRole("link",{name:"Ver en el modelo"}).click();
@@ -224,14 +228,16 @@ test("2 · PDF digital en un muro: dato, unidad, cita, página y vuelta al visor
     await expect(page.locator("#explorer .entry[aria-pressed=true]")).toContainText("138157");
     await expect(sheetOf(page).getByRole("listitem").filter({hasText:WALL_PDF})).toContainText("Lista para consultar");
     await modelShown(page);
-    await sheetOf(page).locator(".piece-answer").first().scrollIntoViewIfNeeded();
+    await openPieceAssistant(page);
+    await expect(assistantOf(page).locator(".piece-answer").filter({hasText:citation.quote})).toHaveCount(1);
     await shot(page,"2-pdf-digital-muro-duplex.png");
     // After reloading, the sheet is still on the wall and only there.
+    await page.goBack();
     await page.reload();
     await expect(renderButton(page)).toBeVisible({timeout:240_000});
     await expect(properties(page).locator(".guid")).toHaveText(DUPLEX.wall);
     await expect(sheetOf(page).getByRole("listitem").filter({hasText:WALL_PDF})).toContainText("Lista para consultar");
-    await expect(sheetOf(page).locator(".piece-answer").filter({hasText:citation.quote})).toHaveCount(1);
+    await expect(sheetOf(page).locator(".piece-answer")).toHaveCount(0);
     const door=await selectPiece(page,DUPLEX.door0762,/^IFCDOOR$/i);
     await expect(door).toContainText("aún no tiene una ficha");
     await expect(door.getByRole("listitem").filter({hasText:WALL_PDF})).toHaveCount(0);
@@ -265,6 +271,7 @@ test("3 · PDF escaneado en Rame Tower: OCR, respuesta con fuente y consulta sin
     expect(source.ocrPages).toBe(2);
     // The temporary copy is gone before the index is published: no download, but the text answers.
     expect((await page.request.get("/api/projects/"+project.id+"/versions/"+version+"/specifications/"+source.id,{headers:project.headers})).status()).toBe(404);
+    await openPieceAssistant(page);
     const answer=await ask(page,"¿Cuál es el recubrimiento mínimo del refuerzo?");
     await info.attach("respuesta",{body:JSON.stringify(answer,null,2),contentType:"application/json"});
     expect(answer,JSON.stringify(answer)).toMatchObject({status:"ANSWERED",version,element:RAME.column});
@@ -274,10 +281,9 @@ test("3 · PDF escaneado en Rame Tower: OCR, respuesta con fuente y consulta sin
     expect(citation).toMatchObject({page:2,section:"Durabilidad",filename:SCAN_PDF,document:source.id});
     expect(citation.quote).toMatch(/40\s?mm/);
     await verbatim(page,project,version,RAME.column,citation);
-    const view=sheet.locator(".piece-answer").first();
+    const view=assistantOf(page).locator(".piece-answer").first();
     await expect(view.locator("cite")).toHaveText(SCAN_PDF+" · pág. 2");
     await expect(view.locator("blockquote")).toContainText(citation.quote);
-    await page.goto("/proyectos/"+project.id+"/asistente");
     await expect(page.getByText(/OCR en 2 pág/)).toBeVisible();
     await expect(page.getByRole("link",{name:"Abrir ficha original"})).toHaveCount(0);
     await expect(page.locator(".piece-answer").filter({hasText:citation.quote}).locator("cite")).toHaveText(SCAN_PDF+" · pág. 2");
@@ -311,11 +317,12 @@ test("4 · Coherencia: abstención, discrepancia entre fuentes autorizadas e ins
     for(const name of [SOURCE_A,SOURCE_B,NOTE])await waitReady(page,name);
     const results:Record<string,Answer>={};
 
+    await openPieceAssistant(page);
     // A datum no authorised sheet holds: abstention, nothing cited.
     const unsupported=results.sinDato=await ask(page,"¿Cuál es el coeficiente de transmisión térmica de la losa?");
     expect(unsupported.status,JSON.stringify(unsupported)).toBe("INSUFFICIENT");
     expect(unsupported.evidence).toEqual([]);
-    await expect(sheet.locator(".piece-answer").first()).toContainText("Sin evidencia suficiente");
+    await expect(assistantOf(page).locator(".piece-answer").first()).toContainText("Sin evidencia suficiente");
 
     // Two authorised sheets with opposite values: both cited with their values, or abstention. Never one value alone.
     const strength=results.discrepancia=await ask(page,"¿Cuál es la resistencia a la compresión del concreto?");
@@ -327,7 +334,7 @@ test("4 · Coherencia: abstención, discrepancia entre fuentes autorizadas e ins
       expect(pageText(A_PAGES[0])).toContain(strength.evidence.find(e=>e.filename===SOURCE_A)!.quote);
       expect(pageText(B_PAGES[1])).toContain(strength.evidence.find(e=>e.filename===SOURCE_B)!.quote);
       expect(strength.answer).toMatch(/28 MPa[\s\S]*35 MPa|35 MPa[\s\S]*28 MPa/);
-      const view=sheet.locator(".piece-answer[data-status=DISCREPANCY]").first();
+      const view=assistantOf(page).locator(".piece-answer[data-status=DISCREPANCY]").first();
       await expect(view).toContainText("no coinciden");
       await expect(view.locator("cite")).toHaveText([SOURCE_A+" · pág. 1",SOURCE_B+" · pág. 2"].sort((a,b)=>
         strength.evidence.findIndex(e=>a.startsWith(e.filename!))-strength.evidence.findIndex(e=>b.startsWith(e.filename!))));
@@ -349,12 +356,11 @@ test("4 · Coherencia: abstención, discrepancia entre fuentes autorizadas e ins
     expect(["ANSWERED","DISCREPANCY","INSUFFICIENT"]).toContain(injected.status);
     if(injected.datum)expect(["28 MPa","35 MPa"]).toContain(injected.datum);
     expect(injected.omitted).toBeGreaterThanOrEqual(1);
-    await expect(sheet.locator(".piece-answer").first()).toContainText("forma de instrucción");
+    await expect(assistantOf(page).locator(".piece-answer").first()).toContainText("forma de instrucción");
     // The text search below still shows the PDF as it is (data with its source); no assistant answer repeats it.
-    await expect(sheet.locator(".piece-assistant")).not.toContainText("999");
+    await expect(assistantOf(page)).not.toContainText("999");
     await info.attach("respuestas",{body:JSON.stringify(results,null,2),contentType:"application/json"});
-    await modelShown(page);
-    await sheet.locator(".piece-answer").nth(1).scrollIntoViewIfNeeded();
+    await assistantOf(page).locator(".piece-answer").nth(1).scrollIntoViewIfNeeded();
     await shot(page,"4-coherencia-losa-duplex.png");
   }finally{await project.remove();}
 });
@@ -388,50 +394,59 @@ test("5 · Aislamiento por cuenta, versión y pieza al cambiar selección y revi
     let sheet=await selectPiece(page,DUPLEX.wall,/^IFCWALLSTANDARDCASE$/i);
     await waitReady(page,WALL_V1);
     await expect(sheet.getByRole("listitem")).toHaveText([WALL_V1+" · Lista para consultar"]);
+    await openPieceAssistant(page);
     const wall=await ask(page,question);
     expect(wall,JSON.stringify(wall)).toMatchObject({status:"ANSWERED",datum:"290 mm",version:v1.id,element:DUPLEX.wall});
     only(wall,WALL_V1);
 
     // A question in flight when the selection changes never shows up under the new piece.
-    await sheet.getByLabel("Pregunta sobre la ficha").fill(question);
+    await assistantOf(page).getByLabel("Pregunta sobre la ficha").fill(question);
     // The browser aborts the request (requestfailed) or receives its answer (requestfinished); either one ends it.
     const asked=(r:Request)=>new URL(r.url()).pathname.endsWith("/assistant")&&r.method()==="POST";
     const late=Promise.race([
       page.waitForEvent("requestfinished",{predicate:asked,timeout:300_000}).catch(()=>null),
       page.waitForEvent("requestfailed",{predicate:asked,timeout:300_000}).catch(()=>null)]);
-    await sheet.getByRole("button",{name:"Consultar ficha"}).click();
+    await assistantOf(page).getByRole("button",{name:"Consultar ficha"}).click();
+    await openVersion(page,project.id,v1.id);
     sheet=await selectPiece(page,DUPLEX.door0762,/^IFCDOOR$/i);
     await late;
-    await expect(sheet.locator(".piece-answer")).toHaveCount(0);
+    await expect(assistantOf(page).locator(".piece-answer")).toHaveCount(0);
     await expect(sheet).not.toContainText("290");
     await expect(sheet.getByRole("listitem")).toHaveText([DOOR_V1+" · Lista para consultar"]);
+    await openPieceAssistant(page);
     const door=await ask(page,question);
     expect(door,JSON.stringify(door)).toMatchObject({status:"ANSWERED",datum:"44 mm",version:v1.id,element:DUPLEX.door0762});
     only(door,DOOR_V1);
-    await expect(sheet.locator(".piece-answer")).toHaveCount(1);
-    await expect(sheet).not.toContainText("290");
+    await expect(assistantOf(page).locator(".piece-answer")).toHaveCount(1);
+    await expect(assistantOf(page)).not.toContainText("290");
 
     // Another revision from the version rail: the same GlobalId has its own sheet there.
+    await page.goBack();
     await page.getByRole("navigation",{name:"Versiones del archivo"}).getByRole("link",{name:/^Abrir versión 2 /i}).click();
     await expect(page).toHaveURL(new RegExp("/visor/"+v2.id));
     await expect(renderButton(page)).toBeVisible({timeout:240_000});
     sheet=await selectPiece(page,DUPLEX.wall,/^IFCWALLSTANDARDCASE$/i);
     await waitReady(page,WALL_V2);
     await expect(sheet.getByRole("listitem")).toHaveText([WALL_V2+" · Lista para consultar"]);
-    await expect(sheet.locator(".piece-answer")).toHaveCount(0);
+    await expect(assistantOf(page).locator(".piece-answer")).toHaveCount(0);
+    await openPieceAssistant(page);
     const revised=await ask(page,question);
     expect(revised,JSON.stringify(revised)).toMatchObject({status:"ANSWERED",datum:"310 mm",version:v2.id,element:DUPLEX.wall});
     only(revised,WALL_V2);
-    await expect(sheet.locator(".piece-answer")).toHaveCount(1);
-    await expect(sheet).not.toContainText("290 mm");
+    await expect(assistantOf(page).locator(".piece-answer")).toHaveCount(1);
+    await expect(assistantOf(page)).not.toContainText("290 mm");
+    await page.goBack();
     const doorV2=await selectPiece(page,DUPLEX.door0762,/^IFCDOOR$/i);
     await expect(doorV2).toContainText("aún no tiene una ficha");
     await expect(doorV2.getByLabel("Pregunta sobre la ficha")).toHaveCount(0);
-    const back=await selectPiece(page,DUPLEX.wall,/^IFCWALLSTANDARDCASE$/i);
-    await expect(back.locator(".piece-answer")).toHaveCount(1);
-    await expect(back.locator(".piece-answer cite")).toHaveText(WALL_V2+" · pág. 1");
-    await modelShown(page);
-    await back.locator(".piece-answer").scrollIntoViewIfNeeded();
+    await openPieceAssistant(page);
+    await expect(page.getByText("La pieza seleccionada no tiene una ficha vinculada en esta versión.")).toBeVisible();
+    await page.goBack();
+    await selectPiece(page,DUPLEX.wall,/^IFCWALLSTANDARDCASE$/i);
+    await openPieceAssistant(page);
+    await expect(assistantOf(page).locator(".piece-answer")).toHaveCount(1);
+    await expect(assistantOf(page).locator(".piece-answer cite")).toHaveText(WALL_V2+" · pág. 1");
+    await assistantOf(page).locator(".piece-answer").scrollIntoViewIfNeeded();
     await shot(page,"5-aislamiento-version-pieza.png");
 
     // Another account cannot list, read or ask about these sources, not even from its own project.

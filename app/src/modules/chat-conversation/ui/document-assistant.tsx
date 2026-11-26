@@ -69,18 +69,19 @@ export function SelectedDocuments({project,version,keys}:{project:string;version
   return <><label>Ficha vinculada<select value={source.id} onChange={e=>setId(e.target.value)}>{rows.map(s=><option key={s.id} value={s.id}>{s.filename} · {s.element}</option>)}</select></label>
     <Consultation key={source.id} project={project} source={source}/></>;
 }
-export function DocumentAssistant({project}:{project:string}){
+export function DocumentAssistant({project,piece}:{project:string;piece?:{version:string;element:string}}){
   const [models,setModels]=useState<{id:string;label:string}[]>([]),[current,choose]=useState("");
   useEffect(()=>{
     let live=true;
     fileCatalog.list(project).then(files=>Promise.all(files.filter(f=>f.format==="IFC").map(f=>versionRepository.list(project,f.id))))
-      .then(rows=>{if(live){const options=rows.flat().map(v=>({id:v.id,label:v.name+" · v"+v.revision}));setModels(options);choose(options[0]?.id??"");}})
+      .then(rows=>{if(live){const options=rows.flat().map(v=>({id:v.id,label:v.name+" · v"+v.revision}));setModels(options);choose(options.find(option=>option.id===piece?.version)?.id??options[0]?.id??"");}})
       .catch(()=>{if(live)setModels([]);});
     return ()=>{live=false;};
-  },[project]);
+  },[project,piece?.version]);
   const {sources,error}=useDocumentSources(project);
   const [selected,select]=useState("");
-  const source=sources?.find(s=>s.id===selected)??sources?.[0];
+  const matching=piece && sources?.find(s=>s.version===piece.version && s.element===piece.element);
+  const source=sources?.find(s=>s.id===selected)??(piece?matching:sources?.[0]);
   return <PanelView title="Asistente" project={false}>
     <section className={styles.workspace}><h2>Editar · Asistente de diseño</h2>
       {current?<><label>Versión del modelo<select value={current} onChange={e=>choose(e.target.value)}>{models.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}</select></label>
@@ -89,7 +90,8 @@ export function DocumentAssistant({project}:{project:string}){
     {error && <p role="alert">{error}</p>}
     {!sources && !error && <LoadingStatus>Buscando fichas del proyecto…</LoadingStatus>}
     {sources?.length===0 && <section><h2>Vincula la primera ficha</h2><p>Abre una versión guardada en el visor y adjunta un PDF desde «Ficha técnica» en las propiedades de cualquier pieza IFC, o desde una selección del plano DWG.</p><Link href={"/proyectos/"+project+"/archivos"}>Archivos y versiones</Link></section>}
-    {!!sources?.length && <section className={styles.workspace}><label>Ficha del proyecto <select value={source?.id} onChange={e=>select(e.target.value)}>{sources.map(s=><option key={s.id} value={s.id}>{s.filename} · {s.model} · v{s.revision} · {s.element}</option>)}</select></label>
+    {piece && sources && !source && <p role="status">La pieza seleccionada no tiene una ficha vinculada en esta versión.</p>}
+    {!!sources?.length && <section className={styles.workspace}><label>Ficha del proyecto <select value={source?.id??""} onChange={e=>select(e.target.value)}>{!source && <option value="" disabled>Selecciona una ficha</option>}{sources.map(s=><option key={s.id} value={s.id}>{s.filename} · {s.model} · v{s.revision} · {s.element}</option>)}</select></label>
       {source && <Consultation key={source.id} project={project} source={source}/>}</section>}
   </PanelView>;
 }

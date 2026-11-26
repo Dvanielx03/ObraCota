@@ -12,9 +12,7 @@ type Evidence={documents:({id:string;filename:string}&DocumentIndex)[];citations
  * GlobalId of a piece, or the key of a DWG selection (`drawing`). The caller keys it by version and element, so a
  * change of selection never shows the documents of the previous one; requests of a previous key are aborted.
  */
-export function Specifications({scope,element,drawing=false,initialQuery="",onDocuments}:{scope:SheetScope;element:string;drawing?:boolean;initialQuery?:string;
-  /** The documents of the element whenever they are read (to tell the assistant when a sheet is ready). */
-  onDocuments?:(documents:Evidence["documents"])=>void}){
+export function Specifications({scope,element,drawing=false,initialQuery=""}:{scope:SheetScope;element:string;drawing?:boolean;initialQuery?:string}){
   const base="projects/"+scope.project+"/versions/"+scope.version+"/specifications";
   const [term,setTerm]=useState(initialQuery),[query,search]=useState(initialQuery);
   const [resolved,setResolved]=useState<{url:string;value:Evidence}>(),[revision,refresh]=useState(0);
@@ -30,10 +28,10 @@ export function Specifications({scope,element,drawing=false,initialQuery="",onDo
   useEffect(()=>{
     const control=new AbortController();
     authenticated<Evidence>(urlQuery,{signal:control.signal})
-      .then(value=>{if(!control.signal.aborted){setResolved({url:urlQuery,value});onDocuments?.(value.documents);}})
+      .then(value=>{if(!control.signal.aborted){setResolved({url:urlQuery,value});}})
       .catch(()=>{if(!control.signal.aborted)notify("No se pudo consultar la ficha.");});
     return ()=>control.abort();
-  },[urlQuery,revision]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[urlQuery,revision]);
   useEffect(()=>{
     if(!result?.documents.some(isIndexPending))return;
     const timer=window.setTimeout(()=>refresh(n=>n+1),2000);

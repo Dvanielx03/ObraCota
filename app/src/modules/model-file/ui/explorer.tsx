@@ -119,7 +119,7 @@ export function Explorer({tab,changeTab,elements,selected,drawing,drawingName,lo
       <button className="locate" onClick={()=>locate(selected.id)}>Volver a encuadrar</button></> : <p>Selecciona un resultado para consultar sus propiedades.</p>}
       {selected?.evidence && <DoorEvidence key={"evidence:"+selected.id} item={selected}/>}
       {selected && !drawing && sheet && <ElementSheet key={"sheet:"+(sheet.kind==="saved"?sheet.scope.version:sheet.kind)+":"+(selected.guid??"")+":"+selected.id}
-        source={sheet} item={selected} locate={()=>{changeTab("properties");locate(selected.id);}}/>}
+        source={sheet} item={selected}/>}
       {drawing && selected && <DrawingEvidence key={"dwg:"+selected.id} item={selected} units={drawing.units} scope={scope}/>}
       {options}
       {version && <ReviewNotes onSaved={onNoteSaved} key={version} version={version} selected={selected} elements={elements} locate={id=>{setQuery("");locate(id);}}/>}

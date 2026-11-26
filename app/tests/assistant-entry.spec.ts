@@ -16,6 +16,9 @@ test("Desde la demo se entra al asistente de la cuenta",async({page})=>{
   await page.getByRole("button",{name:"Crear proyecto y abrir asistente"}).click();
   await expect(page.getByRole("heading",{name:"Vincula la primera ficha"})).toBeVisible();
   const actual=page.url();
+  await page.goto(actual+"?version="+randomUUID()+"&element=sin-ficha");
+  await expect(page.getByText("La pieza seleccionada no tiene una ficha vinculada en esta versión.")).toBeVisible();
+  await expect(page.getByLabel("Pregunta sobre la ficha")).toHaveCount(0);
   await page.goto("/proyectos/restage/asistente");
   await page.getByRole("link",{name,exact:true}).click();
   await expect(page).toHaveURL(actual);

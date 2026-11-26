@@ -21,7 +21,8 @@ test("Respuesta documental real con cita, historial y aislamiento del proyecto",
     const spec=await page.request.post(api+"/versions/"+versionId+"/specifications",{params:{element:"1hOSvn6df7F8_7GcBWlS8Z",name:basename(pdf!)},headers:{...headers,"Content-Type":"application/pdf"},data:readFileSync(pdf!)});
     expect(spec.ok()).toBeTruthy();
     const document=(await spec.json()).id;
-    await page.reload();
+    await page.goto("/proyectos/"+id+"/asistente?"+new URLSearchParams({version:versionId,element:"1hOSvn6df7F8_7GcBWlS8Z"}));
+    await expect(page.getByLabel("Ficha del proyecto")).toHaveValue(document);
     async function ask(question:string){
       await page.getByLabel("Pregunta sobre la ficha").fill(question);
       const response=page.waitForResponse(r=>r.url().endsWith("/assistant")&&r.request().method()==="POST",{timeout:180000});
