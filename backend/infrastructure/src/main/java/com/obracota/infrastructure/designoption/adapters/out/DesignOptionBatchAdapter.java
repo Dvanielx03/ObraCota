@@ -49,7 +49,8 @@ public class DesignOptionBatchAdapter implements DesignOptionBatches {
         for (var b : batches) {
             UUID id = UUID.fromString((String) b.get("id"));
             b.put("drafts", db.queryForList("select description from design_option_description where batch_id=? order by slot", String.class, id));
-            b.put("options", db.query("select slot,description from design_option where batch_id=? order by slot",
+            b.put("options", db.query("select o.slot,d.description from design_option o join design_option_description d"
+                    + " on d.batch_id=o.batch_id and d.slot=o.slot where o.batch_id=? order by o.slot",
                 (r, n) -> Map.of("slot", r.getInt(1), "description", r.getString(2)), id));
             b.put("runs", db.query("select slot, model_id, status, error_code, input_tokens,output_tokens,total_tokens from ai_run where batch_id=? order by slot",
                 (r, n) -> {

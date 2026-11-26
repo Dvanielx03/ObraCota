@@ -27,7 +27,7 @@ public class SampleProjectAdapter implements SampleProjects {
     }
 
     @Override
-    public Scope create(UUID owner, SampleModel sample, String uploaderEmail) {
+    public Scope create(UUID owner, SampleModel sample) {
         var project = UUID.randomUUID();
         var file = UUID.randomUUID();
         var version = UUID.randomUUID();
@@ -41,9 +41,9 @@ public class SampleProjectAdapter implements SampleProjects {
         }
         db.update("insert into model_file (id, project_id, name, format) values (?,?,?,?)", file, project, sample.fileName(), sample.format());
         db.update("""
-            insert into model_version (id, file_id, revision, name, format, byte_size, sha256, uploaded_at, uploaded_by, uploader_email)
-            values (?,?,1,?,?,?,?,?,?,?)""",
-            version, file, sample.fileName(), sample.format(), sample.byteSize(), sample.sha256(), now, owner, uploaderEmail);
+            insert into model_version (id, file_id, revision, name, format, byte_size, sha256, uploaded_at, uploaded_by)
+            values (?,?,1,?,?,?,?,?,?)""",
+            version, file, sample.fileName(), sample.format(), sample.byteSize(), sample.sha256(), now, owner);
         return new Scope(project, version);
     }
 }

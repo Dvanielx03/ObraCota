@@ -18,17 +18,19 @@ public class PriceBookAdapter implements PriceBook {
 
     @Override
     public List<UnitPrice> prices(UUID project, UUID version) {
-        return db.query("select price_key, unit, currency, amount, source, price_date, copied_from from unit_price"
-                + " where project_id=? and version_id=? order by price_key",
+        // The project is the version's (V24): the key of a price is (version_id, price_key).
+        return db.query("select p.price_key, p.unit, p.currency, p.amount, p.source, p.price_date, p.copied_from from unit_price p"
+                + " join model_version v on v.id=p.version_id join model_file f on f.id=v.file_id"
+                + " where f.project_id=? and p.version_id=? order by p.price_key",
             (rs, n) -> new UnitPrice(new PriceKey(rs.getString(1)), UnitPrice.Unit.valueOf(rs.getString(2)), rs.getString(3),
                 rs.getBigDecimal(4), rs.getString(5), rs.getObject(6, LocalDate.class), rs.getObject(7, UUID.class)), project, version);
     }
 
     @Override
     public void put(UUID project, UUID version, UnitPrice price) {
-        db.update("delete from unit_price where project_id=? and version_id=? and price_key=?", project, version, price.key().value());
-        db.update("insert into unit_price (project_id, version_id, price_key, unit, currency, amount, source, price_date, copied_from, updated_at)"
-                + " values (?,?,?,?,?,?,?,?,?,?)", project, version, price.key().value(), price.unit().name(), price.currency(),
+        db.update("delete from unit_price where version_id=? and price_key=?", version, price.key().value());
+        db.update("insert into unit_price (version_id, price_key, unit, currency, amount, source, price_date, copied_from, updated_at)"
+                + " values (?,?,?,?,?,?,?,?,?)", version, price.key().value(), price.unit().name(), price.currency(),
             price.amount(), price.source(), price.date(), price.copiedFrom(), OffsetDateTime.now(ZoneOffset.UTC));
     }
 

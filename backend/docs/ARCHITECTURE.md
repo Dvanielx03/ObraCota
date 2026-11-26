@@ -77,3 +77,9 @@ Un DWG o DXF guardado admite recetas `dwg.*` (`DwgSetText`, `DwgSetLayer`, `DwgS
 ## Recorrido local
 
 El recorrido vive detrás de `ViewerPort`. Three.js usa una cápsula con ojos a 1,65 m, gravedad y un octree para colisiones con geometrías IFC. La comparación solo abre revisiones IFC del mismo archivo, transforma la pose mediante las matrices de coordinación y exige un piso libre en el destino. El índice tiene un tope de 800 000 triángulos de colisión por versión. Cada sesión mantiene como máximo dos revisiones; salir libera la alternativa. El MVP requiere unidades SI de longitud explícitas, suelo modelado y WebGL 2.
+
+## Modelo de datos en tercera forma normal
+
+Desde V24 cada columna que no es clave depende solo de la clave de su tabla. Un dato que otra tabla ya guarda se lee con un JOIN en vez de repetirse: el correo de quien sube una versión sale de `security_user` por `uploaded_by`; el archivo, el formato y el proyecto de un cambio salen de su `base_version`; el proyecto de una ejecución del agente, de una traducción de Revit y de un precio sale de su versión, y el proyecto y la persona de cada paso del agente salen de su `agent_run` (con llave foránea). El texto de una opción visual vive solo en `design_option_description` y la clave de `unit_price` es (`version_id`, `price_key`). Las entidades JPA leen esos datos con `@Formula`, de solo lectura.
+
+Quedan de forma deliberada: `user_id`, `author_id`, `owner_id` y `uploaded_by` registran quién actuó, que es un hecho del evento y no del proyecto; `model_version.format` puede diferir del de su archivo (una revisión DXF de un DWG); `specification_passage.content` y `words` son el índice derivado del texto de cada página, y `recipe`, `report`, `approved_estimate` y el resultado del asistente se guardan como documentos JSON que se leen completos.

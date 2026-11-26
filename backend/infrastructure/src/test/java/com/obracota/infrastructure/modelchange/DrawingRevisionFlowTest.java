@@ -117,7 +117,7 @@ class DrawingRevisionFlowTest {
         var site = new Site();
         var run = site.agent(site.version, "3465", "Hazlo más bonito");
         assertEquals("NO_CHANGE", run.get("status").asText());
-        assertEquals(0, db.queryForObject("select count(*) from model_change where project_id=?", Integer.class, UUID.fromString(site.project)));
+        assertEquals(0, db.queryForObject("select count(*) from model_change where base_version in (select v.id from model_version v join model_file f on f.id=v.file_id where f.project_id=?)", Integer.class, UUID.fromString(site.project)));
     }
 
     @Test void aDrawingTakesHandlesAndOnlyDrawingOperations() throws Exception {

@@ -117,7 +117,7 @@ class DesignAgentRunTest {
         }
 
         int changes() {
-            return db.queryForObject("select count(*) from model_change where project_id=?", Integer.class, UUID.fromString(project));
+            return db.queryForObject("select count(*) from model_change where base_version in (select v.id from model_version v join model_file f on f.id=v.file_id where f.project_id=?)", Integer.class, UUID.fromString(project));
         }
     }
 
@@ -221,8 +221,8 @@ class DesignAgentRunTest {
 
         assertEquals(2, model.calls());
         assertEquals(List.of("get_element", "draft_set_property"), db.queryForList(
-            "select tool from agent_tool_call where project_id=? order by step,seq", String.class, project));
-        assertEquals("DRAFT", db.queryForObject("select status from model_change where project_id=?", String.class, project));
+            "select c.tool from agent_tool_call c join agent_run r on r.id=c.run_id join model_version v on v.id=r.version_id join model_file f on f.id=v.file_id where f.project_id=? order by c.step,c.seq", String.class, project));
+        assertEquals("DRAFT", db.queryForObject("select status from model_change where base_version in (select v.id from model_version v join model_file f on f.id=v.file_id where f.project_id=?)", String.class, project));
         var ended = history.list(project, site.owner, null, null).getFirst();
         assertEquals(AgentRunHistory.Status.INTERRUPTED, ended.status());
         assertNotNull(ended.finishedAt());

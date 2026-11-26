@@ -22,13 +22,19 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
  * estimate as JSON text, so the same migration runs on H2 and PostgreSQL.
  */
 public class ModelChangeAdapter implements ModelChangeRepository {
+    /** File, format and project are the base version's (V24, third normal form): read through the join of {@link #SCOPED}. */
     private static final String COLUMNS = """
-        id, project_id, file_id, base_version, format, status, origin, author_id, agent_run_id, description, summary, recipe,
-        report, report_recipe_sha256, previewed_at, preview_id, preview_sha256, preview_size, legacy_review,
-        case when picture is null then false else true end as picture_present, submitted_at, applied_version, applied_at,
-        applied_by, approved_estimate, restored_version, restored_at, restored_by, discarded_at, discarded_by,
-        discarded_by_kind, created_at, updated_at
+        m.id, f.project_id, b.file_id, m.base_version, b.format, m.status, m.origin, m.author_id, m.agent_run_id, m.description,
+        m.summary, m.recipe, m.report, m.report_recipe_sha256, m.previewed_at, m.preview_id, m.preview_sha256, m.preview_size,
+        m.legacy_review, case when m.picture is null then false else true end as picture_present, m.submitted_at, m.applied_version,
+        m.applied_at, m.applied_by, m.approved_estimate, m.restored_version, m.restored_at, m.restored_by, m.discarded_at,
+        m.discarded_by, m.discarded_by_kind, m.created_at, m.updated_at
         """;
+    private static final String SCOPED =
+        " from model_change m join model_version b on b.id = m.base_version join model_file f on f.id = b.file_id";
+    /** The versions of one project, for writes that must stay inside it. */
+    private static final String PROJECT_VERSIONS =
+        "select v.id from model_version v join model_file pf on pf.id = v.file_id where pf.project_id = ?";
     private static final List<String> PENDING = List.of(ChangeStatus.DRAFT.name(), ChangeStatus.READY.name());
 
     private final JdbcTemplate db;
@@ -44,7 +50,7 @@ public class ModelChangeAdapter implements ModelChangeRepository {
 
     @Override
     public Optional<ModelChange> find(UUID project, UUID id) {
-        return db.query("select " + COLUMNS + " from model_change where project_id=? and id=?", this::row, project, id).stream().findFirst();
+        return db.query("select " + COLUMNS + SCOPED + " where f.project_id=? and m.id=?", this::row, project, id).stream().findFirst();
     }
 
     /** {@code ProjectJpaRepository.lockOwned} is a {@code PESSIMISTIC_WRITE} on this same row, without the owner. */
@@ -57,17 +63,17 @@ public class ModelChangeAdapter implements ModelChangeRepository {
 
     @Override
     public List<ModelChange> list(UUID project, Set<ChangeStatus> statuses, UUID file, int limit) {
-        var sql = new StringBuilder("select ").append(COLUMNS).append(" from model_change where project_id=:project");
+        var sql = new StringBuilder("select ").append(COLUMNS).append(SCOPED).append(" where f.project_id=:project");
         var params = new MapSqlParameterSource("project", project);
         if (statuses != null && !statuses.isEmpty()) {
-            sql.append(" and status in (:statuses)");
+            sql.append(" and m.status in (:statuses)");
             params.addValue("statuses", statuses.stream().map(Enum::name).toList());
         }
         if (file != null) {
-            sql.append(" and file_id=:file");
+            sql.append(" and b.file_id=:file");
             params.addValue("file", file);
         }
-        sql.append(" order by created_at desc, id");
+        sql.append(" order by m.created_at desc, m.id");
         if (limit > 0 && limit < Integer.MAX_VALUE) {
             sql.append(" limit :limit");
             params.addValue("limit", limit);
@@ -77,31 +83,28 @@ public class ModelChangeAdapter implements ModelChangeRepository {
 
     @Override
     public List<ModelChange> pending(UUID project, UUID file) {
-        return named.query("select " + COLUMNS + " from model_change where project_id=:project and file_id=:file and status in (:pending)"
-            + " order by created_at", new MapSqlParameterSource("project", project).addValue("file", file).addValue("pending", PENDING), this::row);
+        return named.query("select " + COLUMNS + SCOPED + " where f.project_id=:project and b.file_id=:file and m.status in (:pending)"
+            + " order by m.created_at", new MapSqlParameterSource("project", project).addValue("file", file).addValue("pending", PENDING), this::row);
     }
 
     @Override
     public List<ModelChange> holdingPreviews() {
-        return named.query("select " + COLUMNS + " from model_change where status in (:pending) and preview_id is not null order by created_at",
+        return named.query("select " + COLUMNS + SCOPED + " where m.status in (:pending) and m.preview_id is not null order by m.created_at",
             new MapSqlParameterSource("pending", PENDING), this::row);
     }
 
     @Override
     public void insert(ModelChange change, byte[] picture) {
         db.update("""
-            insert into model_change (id, project_id, file_id, base_version, format, status, origin, author_id, agent_run_id,
+            insert into model_change (id, base_version, status, origin, author_id, agent_run_id,
               description, summary, recipe, report, report_recipe_sha256, previewed_at, preview_id, preview_sha256, preview_size,
               legacy_review, picture, submitted_at, applied_version, applied_at, applied_by, approved_estimate, restored_version,
               restored_at, restored_by, discarded_at, discarded_by, discarded_by_kind, created_at, updated_at)
-            values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, statement -> {
             int i = 1;
             statement.setObject(i++, change.id());
-            statement.setObject(i++, change.project());
-            statement.setObject(i++, change.file());
             statement.setObject(i++, change.baseVersion());
-            statement.setString(i++, change.format());
             i = fields(statement, i, change);
             if (picture == null) statement.setNull(i, Types.BINARY); else statement.setBytes(i, picture);
             i++;
@@ -118,8 +121,8 @@ public class ModelChangeAdapter implements ModelChangeRepository {
               report_recipe_sha256=?, previewed_at=?, preview_id=?, preview_sha256=?, preview_size=?, legacy_review=?,
               submitted_at=?, applied_version=?, applied_at=?, applied_by=?, approved_estimate=?, restored_version=?, restored_at=?,
               restored_by=?, discarded_at=?, discarded_by=?, discarded_by_kind=?, updated_at=?
-            where id=? and project_id=?
-            """, statement -> {
+            where id=? and base_version in (%s)
+            """.formatted(PROJECT_VERSIONS), statement -> {
             int i = fields(statement, 1, change);
             i = published(statement, i, change);
             statement.setObject(i++, time(change.updatedAt()));
@@ -184,7 +187,7 @@ public class ModelChangeAdapter implements ModelChangeRepository {
 
     @Override
     public Optional<byte[]> picture(UUID project, UUID id) {
-        return db.query("select picture from model_change where project_id=? and id=? and picture is not null",
+        return db.query("select m.picture" + SCOPED + " where f.project_id=? and m.id=? and m.picture is not null",
             (rs, n) -> rs.getBytes(1), project, id).stream().findFirst();
     }
 

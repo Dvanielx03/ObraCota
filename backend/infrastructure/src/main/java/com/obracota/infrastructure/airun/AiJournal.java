@@ -22,7 +22,8 @@ public class AiJournal implements GenerateOptions.Journal {
         db.update("update ai_run set status='FAILED',error_code=?,input_tokens=?,output_tokens=?,total_tokens=? where id=?",error,u.inputTokens(),u.outputTokens(),u.totalTokens(),run);
     }
     public void save(UUID batch,int slot,String description,ImageGenerationPort.Image image) {
-        db.update("insert into design_option(batch_id,slot,description,image_bytes,mime) values(?,?,?,?,?)",batch,slot,description,image.bytes(),image.mime());
+        // The text of the option is the one describe() already wrote in design_option_description (V24).
+        db.update("insert into design_option(batch_id,slot,image_bytes,mime) values(?,?,?,?)",batch,slot,image.bytes(),image.mime());
     }
     public void end(UUID batch,boolean success) {
         db.update("update design_option_batch set state=? where id=?",success?"READY":"FAILED",batch);

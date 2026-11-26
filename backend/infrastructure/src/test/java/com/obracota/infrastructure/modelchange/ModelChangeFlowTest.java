@@ -526,9 +526,9 @@ class ModelChangeFlowTest {
         // A row as V15 leaves a pending door_change: DRAFT, legacy review, recipe, no report and no preview.
         var migrated = UUID.randomUUID();
         var at = OffsetDateTime.now(ZoneOffset.UTC).minusDays(2);
-        db.update("insert into model_change (id, project_id, file_id, base_version, format, status, origin, author_id, description, recipe,"
-                + " legacy_review, created_at, updated_at) values (?, ?, ?, ?, 'IFC', 'DRAFT', 'PERSON', ?, ?, ?, ?, ?, ?)",
-            migrated, UUID.fromString(site.project), UUID.fromString(site.file), UUID.fromString(v1), owner, "Cambio migrado",
+        db.update("insert into model_change (id, base_version, status, origin, author_id, description, recipe,"
+                + " legacy_review, created_at, updated_at) values (?, ?, 'DRAFT', 'PERSON', ?, ?, ?, ?, ?, ?)",
+            migrated, UUID.fromString(v1), owner, "Cambio migrado",
             "{\"format\":\"obracota.recipe/1\",\"operations\":[{\"id\":\"op-1\",\"op\":\"ifc.change_type\",\"element\":\"" + DOOR
                 + "\",\"type_id\":\"" + ALTERNATE + "\"}]}", legacy, at, at);
 

@@ -38,8 +38,8 @@ public final class SampleScopes {
         var sample = sample(key).orElseThrow(NotFoundApplicationException::new);
         try {
             return tx.required(() -> projects.find(user, sample.key()).orElseGet(() -> {
-                var email = users.byId(user).orElseThrow(NotFoundApplicationException::new).email();
-                return projects.create(user, sample, email);
+                users.byId(user).orElseThrow(NotFoundApplicationException::new);
+                return projects.create(user, sample);
             }));
         } catch (SampleProjects.Taken raced) {
             // Two first requests at once (two tabs): the other one created it, and its scope is this person's scope.

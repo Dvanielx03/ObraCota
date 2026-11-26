@@ -10,7 +10,10 @@ public class VersionRow {
     @Id private UUID id;
     private UUID fileId, uploadedBy;
     private int revision;
-    private String name, format, sha256, uploaderEmail;
+    private String name, format, sha256;
+    /** The uploader's email belongs to {@code security_user} (V24): read through {@code uploaded_by}, never written here. */
+    @org.hibernate.annotations.Formula("(select u.email from security_user u where u.id = uploaded_by)")
+    private String uploaderEmail;
     private long byteSize;
     private Instant uploadedAt;
     protected VersionRow() {}

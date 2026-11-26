@@ -21,5 +21,5 @@ public interface SampleProjects {
      *
      * @throws Taken when the person's sample project already exists (a concurrent request)
      */
-    Scope create(UUID owner, SampleModel sample, String uploaderEmail);
+    Scope create(UUID owner, SampleModel sample);
 }
