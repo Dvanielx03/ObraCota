@@ -301,7 +301,7 @@ public final class AskDocument {
             int start = Math.min(at, locatedLabel.map(EvidenceCheck.Label::start).orElse(at));
             int end = Math.max(at + quote.length(), locatedLabel.map(EvidenceCheck.Label::end).orElse(at));
             var whole = EvidenceCheck.sentence(data, start, end);
-            String sentence = data.substring(whole[0], whole[1]);
+            String sentence = data.substring(whole[0], whole[1]).strip();
             String cited = !sentence.contains(EvidenceCheck.OMITTED) && passage.content().contains(sentence) ? sentence : quote;
             return Optional.of(new Verified(answer, new Evidence(c.page(), cited, passage.section(), document, filename,
                 datum.map(Measure::text).orElse(null)), datum, label));

@@ -262,8 +262,9 @@ public final class EvidenceCheck {
         for (int i = start; i < end; i++) if (boundary(passage, i)) { end = i; break; }
         var following = measures(passage.substring(start, end));
         if (!following.isEmpty()) end = start + following.getFirst().start();
-        String after = passage.substring(start, end);
-        return names(after, terms) ? new Label(after, start, end) : new Label(before, from, at);
+        String after = passage.substring(measure.end(), end);
+        return names(after, terms) && mentions(passage.substring(start, end), terms)
+            ? new Label(after, measure.end(), end) : new Label(before, from, at);
     }
 
     public static Terms namedTerms(String label, Terms question) {
