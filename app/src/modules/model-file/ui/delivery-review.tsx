@@ -18,7 +18,7 @@ function ServerChange({role,change}:{role:Parameters<typeof roleLabel>[0];change
   const labels=useOperationLabels(change);
   return <article className="review-server-change" aria-label={roleLabel(role)+": "+change.description}>
     <h4>{roleLabel(role)}</h4>
-    <p>{change.description} · {statusLabel(change.status)}{change.origin==="AGENT"?" · generado con IA":""} · <Link href={"/proyectos/"+change.project+"/cambios#"+change.id}>Abrir su tarjeta</Link></p>
+    <p>{change.description} · {statusLabel(change.status)}{change.origin==="AGENT"?" · propuesto por el agente de diseño":""} · <Link href={"/proyectos/"+change.project+"/cambios#"+change.id}>Abrir su tarjeta</Link></p>
     <ChangeRecipe change={change} labels={labels}/>
     <ChangeFindings change={change}/>
     <ChangeDiff change={change}/>

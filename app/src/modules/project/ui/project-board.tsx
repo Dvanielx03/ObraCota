@@ -63,6 +63,13 @@ function Board({ examples, guides }: { examples: readonly Project[]; guides: Rea
       .catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [attempt]);
+  // «Mi archivo» in the welcome lands here with ?nuevo=1: the project is created and its upload page opens directly.
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || new URLSearchParams(window.location.search).get("nuevo") !== "1") return;
+    started.current = true;
+    void create();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   async function create() {
     setCreating(true); setAlert("");
     try {

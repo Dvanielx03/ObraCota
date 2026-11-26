@@ -58,9 +58,9 @@ export function ModelChanges({project,budget=false}:{project:string;budget?:bool
         <LoadingStatus>Cargando revisiones…</LoadingStatus>
       </div>)}
     {rows?.length===0 && (budget ?
-      <p>Selecciona una puerta de una <Link href={"/proyectos/"+project+"/archivos"}>versión IFC guardada</Link> para registrar una propuesta.</p> :
+      <p>Selecciona una pieza de una <Link href={"/proyectos/"+project+"/archivos"}>versión IFC o DWG guardada</Link> para registrar una propuesta.</p> :
       <EmptyState heading="Sin cambios registrados" icon={<EmptyArt kind="changes" width={184}/>}>
-        Abre una <Link href={"/proyectos/"+project+"/archivos"}>versión IFC guardada</Link> para registrar una propuesta.
+        Abre una <Link href={"/proyectos/"+project+"/archivos"}>versión IFC o DWG guardada</Link> para registrar una propuesta.
       </EmptyState>)}
     {budget && !!rows?.length && <BudgetTotal rows={rows}/>}
     <div className="estimate-sheet">{rows?.map(change=>budget?<BudgetCard key={change.id} change={change}/>

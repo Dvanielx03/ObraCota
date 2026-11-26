@@ -41,6 +41,13 @@ function OwnedScope({ route, children }: { route: ProjectRoute; children: ReactN
   const [owned, setOwned] = useState<OwnedStatus>({ status: "loading" });
   const [overview, setOverview] = useState<OverviewStatus>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
+  // Bumped when «Archivos y versiones» stores a version, so the «Visor» tab enables itself without leaving the page.
+  const [stored, setStored] = useState(0);
+  useEffect(() => {
+    const saved = () => setStored(value => value + 1);
+    window.addEventListener("obracota:version-saved", saved);
+    return () => window.removeEventListener("obracota:version-saved", saved);
+  }, []);
   const email = session?.email;
   useEffect(() => {
     if (!email) return;
@@ -59,7 +66,7 @@ function OwnedScope({ route, children }: { route: ProjectRoute; children: ReactN
       .then(result => { if (live) setOverview({ status: "ready", ...result }); })
       .catch(() => { if (live) setOverview({ status: "error" }); });
     return () => { live = false; };
-  }, [email, route.id, route.section, attempt]);
+  }, [email, route.id, route.section, attempt, stored]);
   const rename = useCallback(async (name: string) => {
     const saved = await renameProject(projectHttpRepository, route.id, name);
     setOwned({ status: "ready", project: saved });

@@ -20,8 +20,12 @@ public class DesignOptionController {
     private final DesignOptions options;
     private final GeminiModels gemini;
     private final Panoramas panoramas;
-    public DesignOptionController(DesignOptions options,GeminiModels gemini,Panoramas panoramas) {
+    /** Who receives the capture and the mask: the image provider in use, named for the privacy note before sending. */
+    private final String images;
+    public DesignOptionController(DesignOptions options,GeminiModels gemini,Panoramas panoramas,
+            @org.springframework.beans.factory.annotation.Value("${IMAGE_PROVIDER:gemini}") String imageProvider) {
         this.options=options;this.gemini=gemini;this.panoramas=panoramas;
+        this.images="cloudflare".equals(imageProvider)?"Cloudflare":"Gemini";
     }
     public record PanoramaInput(String scene,String jpeg) {}
     public record Input(UUID id,String element,String name,String request,String jpeg,String mask) {}
@@ -46,7 +50,7 @@ public class DesignOptionController {
     public Map<String,Object> list(@PathVariable UUID project,@PathVariable UUID version,@AuthenticationPrincipal UUID user,@RequestParam String element) {
         var listing=options.list(project,version,user,element);
         // The client shows the cost before sending; the limit is still enforced on submit.
-        return Map.of("available",gemini.configured(),"batches",listing.batches(),
+        return Map.of("available",gemini.configured(),"images",images,"batches",listing.batches(),
             "budget",Map.of("reserve_cents",options.reserveCents(),"remaining_cents",listing.remainingCents()));
     }
     @PostMapping @ResponseStatus(HttpStatus.ACCEPTED)

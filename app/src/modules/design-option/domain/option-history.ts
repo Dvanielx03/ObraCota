@@ -21,6 +21,8 @@ export function optionFailure(batch: OptionBatch) {
 }
 export interface OptionHistory {
   available: boolean;
+  /** The image provider that receives the capture and the mask («Cloudflare» or «Gemini»). */
+  images?: string;
   /** Newest first, as the server lists them. */
   batches: OptionBatch[];
   budget?: { reserve_cents: number; remaining_cents: number };

@@ -95,7 +95,7 @@ export function serverReportLines(review: ServerReview): string[] {
   if (!review.changes.length) lines.push("Cambios de modelo: ninguno publicado ni abierto sobre esta versión");
   for (const { role, change } of review.changes) {
     const results = new Map(change.report?.operations.map((result) => [result.id, result]) ?? []);
-    lines.push("", roleLabel(role) + " · " + change.description + " (" + statusLabel(change.status) + (change.origin === "AGENT" ? " · generado con IA" : "") + ")");
+    lines.push("", roleLabel(role) + " · " + change.description + " (" + statusLabel(change.status) + (change.origin === "AGENT" ? " · propuesto por el agente de diseño" : "") + ")");
     change.recipe.operations.forEach((operation, index) => lines.push("  " + (index + 1) + ". " + operationLabel(operation, results.get(operation.id), change.legacyReview)));
     if (!change.report) { lines.push("  Sin vista previa del servidor"); continue; }
     for (const finding of reportFindings(change.report))

@@ -60,6 +60,8 @@ function Library({project}:{project:string}) {
       const version=await storeVersion(versionRepository,project,file,target || undefined);
       select(version.fileId); reload(v=>v+1); form.reset(); setTarget("");
       setStatus("Versión " + version.revision + " guardada.");
+      // The project bar reads the newest version again, so its «Visor» tab opens this one right away.
+      window.dispatchEvent(new Event("obracota:version-saved"));
     } catch(e) { setError(e instanceof Error?e.message:"No se pudo guardar el archivo."); }
     finally { setUploading(null); }
   }
@@ -75,7 +77,7 @@ function Library({project}:{project:string}) {
       <form className="account-form upload-form" onSubmit={upload}>
         {files.length>0 && <label>Guardar en<select disabled={busy} value={target} onChange={e=>setTarget(e.target.value)}>
           <option value="">Agrupar por nombre de archivo</option>{files.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select></label>}
-        <label>Archivo IFC, DWG, RVT, FBX u OBJ<input type="file" name="original" accept={MODEL_ACCEPT} disabled={busy} required data-testid={MODEL_UPLOAD_TEST_ID}/></label>
+        <label>Archivo IFC, DWG, DXF, RVT, FBX u OBJ<input type="file" name="original" accept={MODEL_ACCEPT} disabled={busy} required data-testid={MODEL_UPLOAD_TEST_ID}/></label>
         <p>Hasta 256 MiB. Cada entrega conserva su original. Los sólidos ACIS de un DWG guardado se calculan en el servidor y se ven en 3D. Un RVT de Revit se guarda tal cual; para verlo en 3D exporta también un IFC.</p>
         <BusyButton className="panel-action" busy={busy} busyLabel="Subiendo original…" spinnerSize={14}>Guardar versión</BusyButton>
       </form>

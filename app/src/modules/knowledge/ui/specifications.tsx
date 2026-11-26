@@ -12,7 +12,7 @@ type Evidence={documents:({id:string;filename:string}&DocumentIndex)[];citations
  * GlobalId of a piece, or the key of a DWG selection (`drawing`). The caller keys it by version and element, so a
  * change of selection never shows the documents of the previous one; requests of a previous key are aborted.
  */
-export function Specifications({scope,element,drawing=false,initialQuery="acabado",onDocuments}:{scope:SheetScope;element:string;drawing?:boolean;initialQuery?:string;
+export function Specifications({scope,element,drawing=false,initialQuery="",onDocuments}:{scope:SheetScope;element:string;drawing?:boolean;initialQuery?:string;
   /** The documents of the element whenever they are read (to tell the assistant when a sheet is ready). */
   onDocuments?:(documents:Evidence["documents"])=>void}){
   const base="projects/"+scope.project+"/versions/"+scope.version+"/specifications";
@@ -64,7 +64,7 @@ export function Specifications({scope,element,drawing=false,initialQuery="acabad
       {d.originalAvailable?<button disabled={busy} onClick={()=>open(d.id,1)}>{d.filename}</button>:<span>{d.filename}</span>}
       {" · "}{documentStatus(d)}</li>)}</ul>}
     <form onSubmit={e=>{e.preventDefault();notify("");search(term.trim());refresh(n=>n+1);}}>
-      <label>Buscar en la ficha<input value={term} required maxLength={160} onChange={e=>setTerm(e.target.value)}/></label><button>Consultar</button>
+      <label>Buscar en la ficha<input value={term} required maxLength={160} placeholder="Por ejemplo: acabado, espesor o resistencia" onChange={e=>setTerm(e.target.value)}/></label><button>Consultar</button>
     </form>
     {query.trim() && result?.documents.some(d=>d.status==="LEGACY"||d.status==="INDEXED"||d.status==="TEXT_ONLY") && !result.citations.length && <p>Sin coincidencias en el texto indexado. Puedes revisar el PDF en tu equipo.</p>}
     {query.trim() && !!result?.citations.length && <><p>{drawing?"Coincidencias en los documentos vinculados.":"Coincidencias documentales. Un catálogo puede ofrecer varios acabados para una misma medida."}</p>

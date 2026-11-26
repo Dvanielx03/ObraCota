@@ -102,8 +102,8 @@ class SceneViewFlowTest {
         String base="/api/projects/"+id(p),cover=base+"/cover";
         String first=upload(base,owner);
 
-        // Without any preview there is no cover yet.
-        mvc.perform(get(cover).header("Authorization",owner)).andExpect(status().isNotFound());
+        // Without any preview there is no cover yet: an empty answer, not an error.
+        mvc.perform(get(cover).header("Authorization",owner)).andExpect(status().isNoContent());
 
         // A view without preview, then two with one: the list says which have it.
         String plain=first+"/"+id(mvc.perform(post(first).header("Authorization",owner).contentType("application/json").content(view("Sin imagen")))

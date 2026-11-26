@@ -160,7 +160,7 @@ export function VisualOptions({ base, optionKey, name, state, open, group, choic
         <button key={value} type="button" role="radio" aria-checked={scope.value === value} className="chip" title={label}
           tabIndex={scope.value === value ? 0 : -1} onClick={() => scope.onChange(value)}><span>{label}</span></button>)}
     </div>}
-    {group && <p className="options-note">Al enviar se comparte con Gemini el encuadre actual y la máscara de las piezas seleccionadas.</p>}
+    {group && <p className="options-note">Al enviar se comparte con {history?.images ?? "el proveedor de imágenes"} el encuadre actual y la máscara de las piezas seleccionadas; Gemini solo recibe el texto del pedido.</p>}
     <fieldset className="option-request" disabled={busy}><legend className="visually-hidden">Qué quieres probar</legend>
       <ChipChoice legend="Acabado o material" items={FINISHES} value={choices.finish} onChange={(finish) => choose({ finish })} columns={3} />
       <ChipChoice legend="Tono" items={TONES} value={choices.tone} onChange={(tone) => choose({ tone })} columns={3} />
