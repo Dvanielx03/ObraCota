@@ -238,7 +238,7 @@ public final class AskDocument {
         try {
             var reply = chat.complete(chatModel, prompt);
             journal.finish(run, reply.usage());
-            verified = codec.citation(reply.text()).flatMap(c -> verify(c, terms, context, ranked, cleaned, document, filename)).orElse(null);
+            verified = codec.citation(reply.text()).flatMap(c -> verify(c, question, terms, context, ranked, cleaned, document, filename)).orElse(null);
         } catch (ProviderFailure e) {
             journal.fail(run, e.code(), UNKNOWN);
             return new Finding(document, filename, "UNAVAILABLE", null, ranked, cleaned, omitted, method);
@@ -249,7 +249,7 @@ public final class AskDocument {
             try {
                 var reply = retry.complete(chatModel, prompt);
                 journal.finish(again, reply.usage());
-                verified = codec.citation(reply.text()).flatMap(c -> verify(c, terms, context, ranked, cleaned, document, filename)).orElse(null);
+                verified = codec.citation(reply.text()).flatMap(c -> verify(c, question, terms, context, ranked, cleaned, document, filename)).orElse(null);
             } catch (ProviderFailure e) {
                 journal.fail(again, e.code(), UNKNOWN);
             }
@@ -263,7 +263,7 @@ public final class AskDocument {
      * question and, for a quoted measurement, the label before the value names what was asked. The surroundings are
      * read without the sentences left out as instructions, so an instruction cannot vouch for a quote next to it.
      */
-    private static Optional<Verified> verify(CitationCodec.Citation c, Terms terms, List<Passage> context, List<Passage> indexed,
+    private static Optional<Verified> verify(CitationCodec.Citation c, String question, Terms terms, List<Passage> context, List<Passage> indexed,
                                              List<Passage> cleaned, UUID document, String filename) {
         String said = c.quote();
         if (c.answer().isBlank() || said.length() < 4 || said.contains(EvidenceCheck.OMITTED) || EvidenceCheck.instruction(said))
@@ -279,7 +279,8 @@ public final class AskDocument {
             String quote = data.substring(span.get()[0], span.get()[1]);
             int at = span.get()[0];
             if (!passage.content().contains(quote) || quote.contains(EvidenceCheck.OMITTED) || EvidenceCheck.instruction(quote)) continue;
-            if (EvidenceCheck.ambiguousTable(data, at, at + quote.length())) continue;
+            if (EvidenceCheck.ambiguousTable(data, at, at + quote.length())
+                && !EvidenceCheck.labelledTableValue(data, at, quote, question, c.answer())) continue;
             var support = EvidenceCheck.supports(c.answer(), quote);
             if (support.isEmpty()) return Optional.empty();
             if (!terms.isEmpty() && !EvidenceCheck.mentions(EvidenceCheck.window(data, at, at + quote.length()), terms))

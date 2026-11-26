@@ -43,6 +43,11 @@ public final class EvidenceCheck {
     private static final String TABLE_CELL = TABLE_VALUE + "(?:\\s*\\(" + TABLE_VALUE + "\\))?";
     private static final Pattern FLAT_ROW = Pattern.compile("(?iu)(?<![\\p{L}\\p{N}./-])" + TABLE_CELL
         + "(?:[\\s|]+(?:" + TABLE_CELL + ")){2,}(?![\\p{L}\\p{N}/-]|\\.\\d)");
+    private static final Pattern PANEL_COLUMNS = Pattern.compile(
+        "(?iu)\\bWidth Height # of Panels Thickness (Panel Width) Outer Stiles\\* Center Stile Top Rail Lock Rail Bottom Rail Sticking Profile Surface\\b");
+    private static final Pattern IMPERIAL_WIDTH = Pattern.compile("(?iu)\\b(\\d+)\\s+pies?\\s+y\\s+(\\d+)\\s+pulgadas?\\b");
+    private static final Pattern PANEL_ROW = Pattern.compile("(?iu)(\\d+'\\d+\")\\s+\\d+'\\d+\"\\s+\\d+'\\d+\""
+        + "\\s+(?:One|Two|Three|Four)\\s+" + TABLE_VALUE + "\\s+" + TABLE_VALUE + "\\s+(\\d+(?:-\\d+/\\d+)?\")");
     private static final Pattern CELL_GAP = Pattern.compile("[\\s|]*");
 
     private static final Set<String> COMMON = Set.of("cual", "cuales", "cuanto", "cuanta", "cuantos", "como", "donde", "cuando",
@@ -231,6 +236,30 @@ public final class EvidenceCheck {
             if (CELL_GAP.matcher(passage.substring(left.end(), right.start())).matches()) return true;
         }
         return false;
+    }
+
+    /** A flattened panel table is usable only when its source column and exact row are still recoverable. */
+    public static boolean labelledTableValue(String passage, int at, String quote, String question, String answer) {
+        if (!normalize(question).contains("ancho de panel")) return false;
+        var requested = IMPERIAL_WIDTH.matcher(question);
+        if (!requested.find()) return false;
+        var row = PANEL_ROW.matcher(quote);
+        if (!row.lookingAt() || !row.group(1).equals(requested.group(1) + "'" + requested.group(2) + "\"")) return false;
+        var columns = PANEL_COLUMNS.matcher(passage.substring(0, at));
+        int headerEnd = -1;
+        while (columns.find()) headerEnd = columns.end();
+        if (headerEnd < 0) return false;
+        // A new model name or a prose break cannot carry the earlier table's column mapping into this row.
+        String preceding = passage.substring(headerEnd, at).stripTrailing();
+        if (!(preceding.isBlank() || preceding.matches("(?is).*(?:Smooth|Textured)$"))) return false;
+        var following = passage.substring(at + row.end());
+        var model = Pattern.compile("(?u)\\b([A-Z]{5,})\\s+[A-Z]{5,}").matcher(following);
+        if (!model.find() || !terms(question).codes().contains(model.group(1).charAt(0)
+            + model.group(1).substring(1).toLowerCase(Locale.ROOT))) return false;
+        String value = row.group(2).replace("\"", "");
+        return numbers(answer).equals(numbers(value))
+            && Pattern.compile("(?iu)(?<![\\d/-])" + Pattern.quote(value) + "(?:\\s+pulgadas?|\")(?![\\d/-])")
+            .matcher(answer).find();
     }
 
     /** The text around a span of its passage: the label before a value usually names what is measured. */
