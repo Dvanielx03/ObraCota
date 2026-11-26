@@ -36,9 +36,13 @@ public final class EvidenceCheck {
         + "mpa|kpa|gpa|psi|pa|kn|kw|db|°c|ºc|m²|m2|m³|m3|mm|cm|km|ml|kg|lb|ft|in|pulgadas|pulgada|pies|horas|hora|hrs|hr|"
         + "minutos|min|segundos|seg|dias|días|años|anos|meses|%|°|m|g|t|l|h|s|n|w|v";
     private static final Pattern MEASURE = Pattern.compile("(?iu)(?<![\\p{L}\\p{N}])(\\d+(?:[.,]\\d+)*)\\s?(" + UNITS + ")(?![\\p{L}\\p{N}²³])");
-    private static final String TABLE_VALUE = "\\d+(?:[.,]\\d+)?(?:[- ]\\d+/\\d+|/\\d+)?";
-    private static final Pattern FLAT_ROW = Pattern.compile("(?iu)(?<![\\p{L}\\p{N}./-])" + TABLE_VALUE
-        + "(?:[\\s|]+(?:" + TABLE_VALUE + ")){2,}(?![\\p{L}\\p{N}/-]|\\.\\d)");
+    private static final String INCH = "[\"″]";
+    private static final String FEET = "[’'′]";
+    private static final String TABLE_VALUE = "\\d+(?:[.,]\\d+)?(?:[- ]\\d+/\\d+|/\\d+)?"
+        + "(?:" + FEET + "\\d+(?:[- ]\\d+/\\d+)?" + INCH + "?|" + INCH + "|" + FEET + ")?";
+    private static final String TABLE_CELL = TABLE_VALUE + "(?:\\s*\\(" + TABLE_VALUE + "\\))?";
+    private static final Pattern FLAT_ROW = Pattern.compile("(?iu)(?<![\\p{L}\\p{N}./-])" + TABLE_CELL
+        + "(?:[\\s|]+(?:" + TABLE_CELL + ")){2,}(?![\\p{L}\\p{N}/-]|\\.\\d)");
     private static final Pattern CELL_GAP = Pattern.compile("[\\s|]*");
 
     private static final Set<String> COMMON = Set.of("cual", "cuales", "cuanto", "cuanta", "cuantos", "como", "donde", "cuando",

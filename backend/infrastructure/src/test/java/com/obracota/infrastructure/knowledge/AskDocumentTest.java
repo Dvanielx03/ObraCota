@@ -296,10 +296,12 @@ class AskDocumentTest {
     }
 
     @Test void flattenedTableCellsCannotSupportAnUnlabelledAnswer() {
-        var row = "Cambridge ancho de panel 2-6 6-1/4 19-11/16 26-1/8.";
+        var row = "7'0\" Two 1-3/8\" 1-3/4\" 21-11/16\" 5-1/8\" N/A 4-1/4\" (6'8\") 6-1/4\" (7'0\") 7\" "
+            + "9-1/4\" (6'8\") 11-1/4\" (7'0\") O Smooth 2'10\" 3'0\" 6'8\" 7'0\" Two 1-3/8\" 1-3/4\" "
+            + "22-3/4\" 5-1/8\" (2'10\") 6-1/8\" (3'0\") N/A 4-1/4\" (6'8\") 6-1/4\" (7'0\") 7\"";
         store.piece = List.of(source(DOC_A, "cambridge.pdf", "INDEXED"));
         store.byDocument.put(DOC_A, List.of(new SpecificationPassages.Passage(2, 1, row, "Cambridge")));
-        for (var quote : List.of(row, "6-1/4")) {
+        for (var quote : List.of(row, "6-1/4\" (7'0\")")) {
             var answer = local(prompt -> reply("6-1/4", 2, quote)).askPiece(PROJECT, USER, VERSION, WALL,
                 "En la tabla Cambridge de la página 2, ¿qué ancho de panel corresponde a una hoja de 2 pies y 6 pulgadas?");
             assertEquals("INSUFFICIENT", answer.status(), answer.toString());
