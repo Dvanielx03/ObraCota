@@ -38,6 +38,8 @@ Para repetir las pruebas, la construcción de Docker ejecuta Maven, incluido el 
 
 ## Asistente documental
 
+`DOCUMENT_OLLAMA_KEEP_ALIVE` establece la retención solicitada a Ollama, 30 minutos por defecto. Al arrancar, el backend intenta precargar EmbeddingGemma y Qwen en segundo plano. Si Ollama no está disponible, la API sigue arrancando y las consultas posteriores pueden volver a conectar. La retención depende de la memoria disponible en Ollama.
+
 El asistente consulta las fichas PDF vinculadas a una pieza de una versión. En una versión IFC la pieza se identifica por su GlobalId (22 caracteres del alfabeto IFC), y al vincular un PDF `SpecificationController` comprueba que el original guardado de esa revisión declare ese GlobalId. En un plano DWG se usa la clave de la selección. Otros formatos no aceptan fichas. El backend comprueba la propiedad del proyecto, la pertenencia de la versión y la de la ficha. V21 registra la huella, el autor, la fecha y el estado de cada carga. En Compose, los archivos nuevos van a un directorio temporal en memoria. El trabajador valida el PDF, extrae texto con PDFBox y usa Tesseract en páginas sin texto. Mantiene página, orden y sección cuando el PDF incluye marcadores. La copia temporal se elimina antes de publicar el índice. Las fichas anteriores a V21 conservan su descarga.
 
 El trabajador divide las páginas en pasajes de 1.400 caracteres con hasta 200 de solapamiento. EmbeddingGemma genera vectores de 768 dimensiones en Ollama antes de marcar la ficha como lista. La pregunta usa el mismo modelo con un prefijo de búsqueda. PostgreSQL combina coincidencia textual y distancia coseno mediante fusión de rangos. Si falta el modelo, el índice permite buscar por texto.

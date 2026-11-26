@@ -62,6 +62,8 @@ services:
         condition: service_healthy
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Retención en memoria tras cada llamada documental; los modelos se precargan en segundo plano.
+      DOCUMENT_OLLAMA_KEEP_ALIVE: ${DOCUMENT_OLLAMA_KEEP_ALIVE:-30m}
       DOCUMENT_OLLAMA_URL: ${DOCUMENT_OLLAMA_URL:-http://ollama:11434}
       DOCUMENT_SPOOL_DIR: /srv/document-spool
       DOCUMENT_CLAMAV_DATABASE: ${DOCUMENT_CLAMAV_DATABASE:-}

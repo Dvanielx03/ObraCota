@@ -14,6 +14,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -23,10 +25,29 @@ public class LocalDocumentModels {
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build();
     private final ObjectMapper json;
     private final String endpoint;
+    private final String keepAlive;
 
-    public LocalDocumentModels(ObjectMapper json, @Value("${DOCUMENT_OLLAMA_URL:}") String endpoint) {
+    public LocalDocumentModels(ObjectMapper json, @Value("${DOCUMENT_OLLAMA_URL:}") String endpoint,
+                               @Value("${DOCUMENT_OLLAMA_KEEP_ALIVE:30m}") String keepAlive) {
         this.json = json;
         this.endpoint = endpoint;
+        this.keepAlive = keepAlive;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmOnStartup() {
+        if (enabled()) Thread.startVirtualThread(this::warm);
+    }
+
+    void warm() {
+        warm("/api/embed", Map.of("model", EMBEDDING, "input", "inicio"));
+        warm("/api/chat", Map.of("model", CHAT, "messages", List.of(), "stream", false,
+            "options", Map.of("num_ctx", 4096)));
+    }
+
+    private void warm(String path, Map<String, Object> body) {
+        try { call(path, body); }
+        catch (ProviderFailure ignored) { /* A normal request can retry when Ollama is available. */ }
     }
 
     public boolean enabled() { return !endpoint.isBlank(); }
@@ -87,12 +108,14 @@ public class LocalDocumentModels {
         return new ChatModelPort.Reply(response.at("/message/content").asText(), new Consumption(input, generated, input + generated));
     }
 
-    private JsonNode call(String path, Object body) {
+    private JsonNode call(String path, Map<String, Object> body) {
         if (!enabled()) throw new ProviderFailure("LOCAL_MODEL_NOT_CONFIGURED");
+        var payload = new LinkedHashMap<>(body);
+        payload.put("keep_alive", keepAlive);
         try {
             var request = HttpRequest.newBuilder(URI.create(endpoint + path)).timeout(Duration.ofSeconds(110))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofByteArray(json.writeValueAsBytes(body))).build();
+                .POST(HttpRequest.BodyPublishers.ofByteArray(json.writeValueAsBytes(payload))).build();
             var response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() != 200) throw new ProviderFailure("HTTP_" + response.statusCode());
             return json.readTree(response.body());
