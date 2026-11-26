@@ -307,6 +307,30 @@ class AskDocumentTest {
         }
     }
 
+    @Test void sikaCompressionLabelCanFollowTheValueAndItsEquivalent() {
+        var quote = "> 17.5 Mpa (175kg/cm²) a 28 días.Resistencia a Compresión";
+        store.piece = List.of(source(DOC_A, "sikamur.pdf", "INDEXED"));
+        store.byDocument.put(DOC_A, List.of(new SpecificationPassages.Passage(1, 1, quote)));
+        var answer = local(prompt -> reply("> 17.5 Mpa", 1, quote)).askPiece(PROJECT, USER, VERSION, WALL,
+            "¿Cuál es la resistencia a compresión del mortero a 28 días?");
+        assertEquals("ANSWERED", answer.status(), answer.toString());
+        assertEquals("17.5 Mpa", answer.datum());
+        assertEquals(quote, answer.evidence().getFirst().quote());
+    }
+
+    @Test void sikaLayerRangeDoesNotConflictWithJointThickness() {
+        var layer = "Espesor de Capa 5mm - 15mm";
+        var joint = "espesor de la junta requerida 1 cm o 6 mm";
+        store.piece = List.of(source(DOC_A, "sikamur.pdf", "INDEXED"), source(DOC_B, "junta.pdf", "INDEXED"));
+        store.byDocument.put(DOC_A, List.of(new SpecificationPassages.Passage(1, 1, layer + ". " + joint)));
+        store.byDocument.put(DOC_B, List.of(new SpecificationPassages.Passage(2, 1, joint)));
+        var answer = local(prompt -> prompt.contains(layer) ? reply("5mm - 15mm", 1, layer) : reply("6 mm", 2, joint))
+            .askPiece(PROJECT, USER, VERSION, WALL, "¿Cuál es el espesor de capa?");
+        assertEquals("ANSWERED", answer.status(), answer.toString());
+        assertEquals("5mm - 15mm", answer.answer());
+        assertEquals(List.of(DOC_A), answer.evidence().stream().map(SpecificationPassages.Evidence::document).toList());
+    }
+
     @Test void aQuotedValueForSomethingElseIsNotPublished() {
         threeSheets();
         store.piece = List.of(source(DOC_A, "concreto-a.pdf", "INDEXED"));

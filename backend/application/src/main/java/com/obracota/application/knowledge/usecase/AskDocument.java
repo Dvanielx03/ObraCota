@@ -20,7 +20,6 @@ import com.obracota.domain.airun.Consumption;
 import com.obracota.domain.assistant.port.service.ChatModelPort;
 import com.obracota.domain.knowledge.port.service.EmbeddingPort;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -280,20 +279,28 @@ public final class AskDocument {
             String quote = data.substring(span.get()[0], span.get()[1]);
             int at = span.get()[0];
             if (!passage.content().contains(quote) || quote.contains(EvidenceCheck.OMITTED) || EvidenceCheck.instruction(quote)) continue;
-            if (!EvidenceCheck.numbers(c.answer()).isEmpty()
-                && EvidenceCheck.ambiguousTable(data, at, at + quote.length())) continue;
+            if (EvidenceCheck.ambiguousTable(data, at, at + quote.length())) continue;
             var support = EvidenceCheck.supports(c.answer(), quote);
             if (support.isEmpty()) return Optional.empty();
             if (!terms.isEmpty() && !EvidenceCheck.mentions(EvidenceCheck.window(data, at, at + quote.length()), terms))
                 return Optional.empty();
             var datum = support.get();
-            String label = datum.map(m -> EvidenceCheck.label(data, at + m.start())).orElse("");
-            if (datum.isPresent() && !terms.isEmpty() && !EvidenceCheck.names(label, terms)) return Optional.empty();
+            var locatedLabel = datum.map(m -> EvidenceCheck.label(data,
+                new Measure(m.text(), m.value(), m.unit(), at + m.start(), at + m.end()), terms));
+            String label = locatedLabel.map(EvidenceCheck.Label::text).orElse("");
+            if (datum.isPresent() && !terms.isEmpty()) {
+                if (!EvidenceCheck.names(label, terms)) return Optional.empty();
+                var named = EvidenceCheck.namedTerms(label, terms);
+                if (terms.words().size() == 2 && terms.codes().isEmpty() && named.words().size() == 1
+                    && terms.words().stream().noneMatch(word -> word.startsWith("#"))) return Optional.empty();
+            }
             // An answer without the value («espesores») is replaced by the label and value of the indexed text.
             String answer = datum.isPresent() && EvidenceCheck.numbers(c.answer()).isEmpty()
                 ? (label.strip() + " " + datum.get().text()).strip() : c.answer();
             // The citation shows the whole sentence of the indexed text, when it holds no omitted instruction.
-            var whole = EvidenceCheck.sentence(data, at, at + quote.length());
+            int start = Math.min(at, locatedLabel.map(EvidenceCheck.Label::start).orElse(at));
+            int end = Math.max(at + quote.length(), locatedLabel.map(EvidenceCheck.Label::end).orElse(at));
+            var whole = EvidenceCheck.sentence(data, start, end);
             String sentence = data.substring(whole[0], whole[1]);
             String cited = !sentence.contains(EvidenceCheck.OMITTED) && passage.content().contains(sentence) ? sentence : quote;
             return Optional.of(new Verified(answer, new Evidence(c.page(), cited, passage.section(), document, filename,
@@ -315,8 +322,10 @@ public final class AskDocument {
             return new Answer("INSUFFICIENT", "La evidencia recuperada no permite responder esta pregunta.", List.of(), method, null, omitted, version, element);
         }
         var evidence = new ArrayList<Evidence>();
-        verified.forEach(f -> evidence.add(f.verified().evidence()));
         var reference = verified.stream().map(Finding::verified).filter(v -> v.datum().isPresent()).findFirst();
+        verified.stream().map(Finding::verified).filter(v -> reference.isEmpty() || v.datum().isEmpty()
+            || EvidenceCheck.namedTerms(reference.get().label(), terms).equals(EvidenceCheck.namedTerms(v.label(), terms)))
+            .forEach(v -> evidence.add(v.evidence()));
         if (reference.isPresent()) evidence.addAll(corroborate(reference.get(), terms, findings, evidence));
         var values = new ArrayList<Measure>();
         for (var item : evidence) {
@@ -349,22 +358,22 @@ public final class AskDocument {
      */
     private static List<Evidence> corroborate(Verified reference, Terms terms, List<Finding> findings, List<Evidence> cited) {
         Measure datum = reference.datum().orElseThrow();
-        var named = new LinkedHashSet<String>();
-        String plain = EvidenceCheck.normalize(reference.label());
-        for (String word : terms.words()) if (!word.startsWith("#") && Pattern.compile("(?<![\\p{L}\\p{N}])" + Pattern.quote(word)).matcher(plain).find()) named.add(word);
-        var codes = terms.codes().stream().filter(code -> reference.label().toLowerCase(Locale.ROOT).contains(code.toLowerCase(Locale.ROOT)))
-            .collect(Collectors.toCollection(LinkedHashSet::new));
-        var labelTerms = named.isEmpty() && codes.isEmpty() ? terms : new Terms(named, codes);
+        var labelTerms = EvidenceCheck.namedTerms(reference.label(), terms);
+        if (labelTerms.isEmpty()) return List.of();
         var found = new ArrayList<Evidence>();
         for (var finding : findings) {
+            if (java.util.Objects.equals(reference.evidence().document(), finding.document())) continue;
             for (int n = 0; n < finding.cleaned().size(); n++) {
                 var clean = finding.cleaned().get(n);
                 var original = finding.indexed().get(n);
                 for (var measure : EvidenceCheck.measures(clean.content())) {
                     if (!measure.unit().equals(datum.unit())) continue;
-                    String label = EvidenceCheck.label(clean.content(), measure.start());
-                    if (label.contains(EvidenceCheck.OMITTED) || !EvidenceCheck.names(label, labelTerms)) continue;
-                    String quote = (label + clean.content().substring(measure.start(), measure.end())).strip();
+                    if (EvidenceCheck.ambiguousTable(clean.content(), measure.start(), measure.end())) continue;
+                    var label = EvidenceCheck.label(clean.content(), measure, terms);
+                    if (label.text().contains(EvidenceCheck.OMITTED)
+                        || !labelTerms.equals(EvidenceCheck.namedTerms(label.text(), terms))) continue;
+                    String quote = clean.content().substring(Math.min(label.start(), measure.start()),
+                        Math.max(label.end(), measure.end())).strip();
                     if (quote.length() < 4 || !original.content().contains(quote)) continue;
                     var item = new Evidence(original.page(), quote, original.section(), finding.document(), finding.filename(), measure.text());
                     boolean known = cited.stream().anyMatch(e -> same(e, item)) || found.stream().anyMatch(e -> same(e, item));

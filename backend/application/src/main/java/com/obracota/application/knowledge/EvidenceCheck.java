@@ -38,7 +38,7 @@ public final class EvidenceCheck {
     private static final Pattern MEASURE = Pattern.compile("(?iu)(?<![\\p{L}\\p{N}])(\\d+(?:[.,]\\d+)*)\\s?(" + UNITS + ")(?![\\p{L}\\p{N}²³])");
     private static final String TABLE_VALUE = "\\d+(?:[.,]\\d+)?(?:[- ]\\d+/\\d+|/\\d+)?";
     private static final Pattern FLAT_ROW = Pattern.compile("(?iu)(?<![\\p{L}\\p{N}./-])" + TABLE_VALUE
-        + "(?:[\\s|]+(?:" + TABLE_VALUE + ")){2,}(?![\\p{L}\\p{N}./-])");
+        + "(?:[\\s|]+(?:" + TABLE_VALUE + ")){2,}(?![\\p{L}\\p{N}/-]|\\.\\d)");
     private static final Pattern CELL_GAP = Pattern.compile("[\\s|]*");
 
     private static final Set<String> COMMON = Set.of("cual", "cuales", "cuanto", "cuanta", "cuantos", "como", "donde", "cuando",
@@ -49,6 +49,9 @@ public final class EvidenceCheck {
         "what", "which", "does", "with", "from", "this", "that", "page");
     private static final Set<String> NOT_NAMES = Set.of("Cual", "Cuál", "Cuales", "Cuáles", "Cuanto", "Cuánto", "Cuanta", "Cuánta",
         "Como", "Cómo", "Donde", "Dónde", "Cuando", "Cuándo", "Segun", "Según", "Para", "Esta", "Este", "Dime", "Indica", "What", "Which");
+
+    private static final Pattern VALUE_SUFFIX = Pattern.compile(
+        "(?iu)\\s*(?:\\([^()]{1,35}\\)\\s*)?(?:a\\s+\\d+\\s+d[ií]as\\s*)?(?:\\.(?=\\p{Lu}))?\\s*");
 
     private EvidenceCheck() {}
 
@@ -240,6 +243,36 @@ public final class EvidenceCheck {
             if ((c == '.' && !decimal) || c == ';' || c == '!' || c == '?') { from = i + 1; break; }
         }
         return passage.substring(from, at);
+    }
+
+    public record Label(String text, int start, int end) {}
+
+    /** Find the nearest descriptive label, including data sheets that put the value first. */
+    public static Label label(String passage, Measure measure, Terms terms) {
+        int at = measure.start();
+        String before = label(passage, at);
+        int from = at - before.length();
+        for (var previous : measures(before)) from = at - before.length() + previous.end();
+        before = passage.substring(from, at);
+        if (names(before, terms)) return new Label(before, from, at);
+        var suffix = VALUE_SUFFIX.matcher(passage).region(measure.end(), passage.length());
+        suffix.lookingAt();
+        int start = suffix.end();
+        int end = Math.min(passage.length(), start + 120);
+        for (int i = start; i < end; i++) if (boundary(passage, i)) { end = i; break; }
+        var following = measures(passage.substring(start, end));
+        if (!following.isEmpty()) end = start + following.getFirst().start();
+        String after = passage.substring(start, end);
+        return names(after, terms) ? new Label(after, start, end) : new Label(before, from, at);
+    }
+
+    public static Terms namedTerms(String label, Terms question) {
+        String plain = normalize(label);
+        var words = new LinkedHashSet<String>();
+        for (String term : question.words()) if (!term.startsWith("#") && word(plain, List.of(), term)) words.add(term);
+        var codes = new LinkedHashSet<String>();
+        for (String term : question.codes()) if (code(label, term)) codes.add(term);
+        return new Terms(words, codes);
     }
 
     /**
