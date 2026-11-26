@@ -42,7 +42,7 @@ export function ViewerHeader({ returnHref, returnLabel, projectName, fileName, p
       <button ref={present.ref} type="button" className="header-pill header-present" disabled={present.disabled} title={present.title} onClick={present.onClick}>
         <Presentation size={12} strokeWidth={2} aria-hidden="true"/>Presentar</button>
       <button type="button" className="open header-icon" aria-label="Abrir archivo" title="Abrir un IFC, DWG, RVT, FBX u OBJ de tu equipo" disabled={openDisabled}
-        onClick={() => input.current?.click()}><FolderOpen size={16} strokeWidth={2} aria-hidden="true"/><span className="open-label">Abrir archivo</span></button>
+        onClick={() => input.current?.click()}><FolderOpen size={16} strokeWidth={2} aria-hidden="true"/></button>
       <button ref={help.ref} type="button" className="help-icon header-icon" aria-label="Guía de uso" title={"Guía de uso\nAtajos de teclado: ?"} aria-haspopup="dialog"
         disabled={help.disabled} onClick={help.onClick}><CircleHelp size={16} strokeWidth={2} aria-hidden="true"/></button>
       {onClose && <button type="button" className="header-close header-icon" aria-label="Cerrar modelo" title="Cerrar modelo" onClick={onClose}>

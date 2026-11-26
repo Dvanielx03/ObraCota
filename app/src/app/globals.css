@@ -267,6 +267,15 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
 .viewer-crumbs{flex:1}
 .crumb-chevron,.project-name,.crumb-dot,.header-pill{display:none}
 .header-icon{place-items:center;flex:none;padding:0}
+@media(max-width:720px){
+  .workspace>.viewer-header{min-width:0;justify-content:space-between;padding:4px 10px;gap:4px}
+  .viewer-header .viewer-crumbs,.viewer-header .viewer-actions{gap:2px}
+  .viewer-header .viewer-back{flex:none}
+  .viewer-header .viewer-actions{flex:none}
+  .viewer-header .viewer-actions :is(.header-icon,.theme-toggle){display:grid;place-items:center;width:44px;height:44px;min-height:0;padding:0;margin:0;border-radius:var(--radius-md);background:none;color:var(--muted)}
+  .viewer-header .viewer-actions :is(.header-icon,.theme-toggle):hover:not(:disabled){background:var(--hover);color:var(--ink)}
+  .viewer-header .viewer-badge{display:none}
+}
 @media(min-width:721px){
   .workspace{--stage-top:calc(var(--nav-offset) + var(--nav-height));position:relative;grid-template-rows:minmax(0,1fr)}
   .workspace>.viewer-header{position:absolute;z-index:var(--z-nav);inset:var(--nav-offset) 0 auto;height:var(--nav-height);padding:0 var(--nav-padding);gap:24px;justify-content:space-between;border:0;background:none;pointer-events:none}
@@ -285,7 +294,6 @@ dl{display:block}dd{margin-bottom:6px}.stagebar{padding:0 5px}}
   .viewer-header .header-icon{display:grid;width:var(--theme-button);height:var(--theme-button);min-height:0;border-radius:var(--radius-md);background:none;color:var(--muted);transition:color var(--duration-base) var(--ease-standard),background-color var(--duration-base) var(--ease-standard)}
   .viewer-header .header-icon svg{width:var(--icon-md);height:var(--icon-md)}
   .viewer-header .header-icon:hover:not(:disabled):not([aria-disabled=true]){background:var(--hover);color:var(--ink)}
-  .viewer-header .open-label{display:none}
   .header-pill{display:inline-flex;align-items:center;gap:6px;flex:none;min-height:0;height:var(--pill-height);padding:0 12px;border-radius:var(--radius-pill);font:var(--type-pill);letter-spacing:var(--tracking-caps);text-transform:uppercase;white-space:nowrap;transition:background-color var(--duration-base) var(--ease-standard)}
   .header-pill svg{width:var(--icon-sm);height:var(--icon-sm)}
   .header-export{height:auto;padding:6px 12px;border:1px solid var(--border);background:var(--secondary);color:var(--ink);box-shadow:var(--shadow-sm)}

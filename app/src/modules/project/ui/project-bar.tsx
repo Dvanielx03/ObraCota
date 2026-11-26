@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRef, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Box, ChevronRight, Files, GitCompareArrows, LayoutDashboard, MessageSquareText, Pencil, type LucideProps } from "lucide-react";
 import { InlineName } from "./inline-name";
 import { useProjectScope, type ProjectScopeValue } from "./project-scope";
@@ -83,6 +83,16 @@ export function ProjectBar() {
 }
 
 function ProjectBarContent({ scope, viewer }: { scope: ProjectScopeValue; viewer: ReturnType<typeof viewerTarget> }) {
+  const tabs = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = tabs.current;
+    const active = nav?.querySelector('[aria-current="page"]');
+    if (!active || !nav || nav.scrollWidth <= nav.clientWidth) return;
+    const tab = active.getBoundingClientRect();
+    const visible = nav.getBoundingClientRect();
+    if (tab.left < visible.left) nav.scrollLeft += tab.left - visible.left - 4;
+    else if (tab.right > visible.right) nav.scrollLeft += tab.right - visible.right + 4;
+  }, [scope.route.section]);
   const viewerOff = useDisabledReason(viewer.href ? undefined : viewer.reason);
   return <div className="panel-head project-bar">
     <div className="panel-head-title">
@@ -90,7 +100,7 @@ function ProjectBarContent({ scope, viewer }: { scope: ProjectScopeValue; viewer
       <ChevronRight className="panel-crumb-sep" size={20} aria-hidden="true"/>
       <ProjectName scope={scope}/>
     </div>
-    <nav className="panel-tabs project-sections" aria-label="Secciones del proyecto">
+    <nav ref={tabs} className="panel-tabs project-sections" aria-label="Secciones del proyecto">
       {SECTIONS.map(({ slug, label, icon: Icon }) => {
         const content = <><Icon size={14} aria-hidden="true"/>{label}</>;
         if (slug === "visor") return viewer.href

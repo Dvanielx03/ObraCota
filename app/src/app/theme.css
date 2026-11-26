@@ -241,7 +241,7 @@
 
   /* Motion */
   --ease-standard: cubic-bezier(.4, 0, .2, 1);
-  --ease-pop: var(--ease-standard);   /* toolbar entrance */
+  --ease-pop: var(--ease-slide);   /* toolbar entrance */
   --ease-slide: cubic-bezier(.22, 1, .36, 1);     /* presentation slides */
   --ease-pulse: cubic-bezier(.4, 0, .6, 1);       /* skeleton pulse, 2 s */
   --duration-fast: .12s;

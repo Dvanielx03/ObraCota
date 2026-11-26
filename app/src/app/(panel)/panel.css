@@ -613,7 +613,8 @@
   .panel-main { padding: 8px 16px 0; }
   .panel-head, .panel-body { margin-inline: 0; padding-inline: 0; }
   .panel-head { flex-wrap: wrap; }
-  .project-sections { flex: 1 1 100%; min-width: 0; }
+  .project-sections { flex: 1 1 100%; min-width: 0; scroll-padding-inline: 4px; }
+  .summary-link-text > :last-child { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; }
   .panel-scroll { overflow: visible; }
   .panel-columns, .summary-layout, .guide-feature, .account-split { grid-template-columns: minmax(0, 1fr); }
   .account-split > div + div { padding: 24px 0 0; border-left: 0; border-top: 1px solid var(--border); margin-top: 24px; }

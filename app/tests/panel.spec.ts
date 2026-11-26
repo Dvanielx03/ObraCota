@@ -117,3 +117,29 @@ test("El recorrido público abre ReStage y recupera su sección de origen", asyn
   await page.getByRole("link", { name: "Volver al recorrido" }).click();
   await expect(page).toHaveURL(new URL("/#recorrido", landing).href);
 });
+
+for (const [width, height] of [[1440, 900], [390, 844]]) {
+  test(`Barra, atajos y visor caben a ${width} × ${height}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height });
+    await page.goto("/proyectos/restage");
+    const shortcuts = page.locator(".summary-links");
+    await expect(shortcuts).toBeVisible();
+    expect(await shortcuts.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    if (width === 390) {
+      await expect(shortcuts.locator(".summary-link-text > :last-child").first()).toHaveCSS("white-space", "normal");
+    }
+    await page.goto("/proyectos/restage/asistente");
+    const tabs = page.getByRole("navigation", { name: "Secciones del proyecto" });
+    await expect.poll(() => tabs.evaluate(node => {
+      const selected = node.querySelector('[aria-current="page"]')!.getBoundingClientRect();
+      const area = node.getBoundingClientRect();
+      return selected.left >= area.left - 1 && selected.right <= area.right + 1;
+    })).toBe(true);
+    await page.goto("/proyectos/restage/visor");
+    const open = page.getByRole("button", { name: "Abrir archivo", exact: true });
+    await expect(open).toBeVisible();
+    await expect(open).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("button", { name: "Guía de uso", exact: true })).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: info.outputPath("visor.png"), animations: "disabled" });
+  });
+}
