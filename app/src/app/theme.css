@@ -222,10 +222,10 @@
   --type-mode: 700 11px/16.5px var(--font-sans);        /* uppercase toolbar mode button */
   --type-version: 700 11px/16.5px var(--font-sans);
   --type-panel-title: 900 11px/16.5px var(--font-sans); /* uppercase */
-  --type-pill: 700 10px/15px var(--font-sans);          /* uppercase header pills */
-  --type-section-label: 900 10px/15px var(--font-sans); /* uppercase */
-  --type-chip: 700 10px/15px var(--font-sans);          /* uppercase */
-  --type-overline: 600 10px/15px var(--font-sans);      /* uppercase */
+  --type-pill: 700 11px/16px var(--font-sans);          /* uppercase header pills */
+  --type-section-label: 900 11px/16px var(--font-sans); /* uppercase */
+  --type-chip: 700 11px/16px var(--font-sans);          /* uppercase */
+  --type-overline: 600 11px/16px var(--font-sans);      /* uppercase */
   --type-main-button: 900 12px/16px var(--font-sans);   /* uppercase */
   --type-monogram: 800 80px/1 var(--font-sans);
   --tracking-logo: -.01em;
@@ -241,7 +241,7 @@
 
   /* Motion */
   --ease-standard: cubic-bezier(.4, 0, .2, 1);
-  --ease-pop: cubic-bezier(.34, 1.56, .64, 1);   /* toolbar entrance */
+  --ease-pop: var(--ease-standard);   /* toolbar entrance */
   --ease-slide: cubic-bezier(.22, 1, .36, 1);     /* presentation slides */
   --ease-pulse: cubic-bezier(.4, 0, .6, 1);       /* skeleton pulse, 2 s */
   --duration-fast: .12s;
